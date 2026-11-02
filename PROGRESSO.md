@@ -1,5 +1,17 @@
 # PROGRESSO — Órbita
 
+## Estudos — Início para execução, ciclos para planejamento (2026-11-02)
+
+- Tela Início exibe todas as sessões planejadas do dia com trilha visual por ciclo, progresso individual, ações Concluir, Desfazer e Registrar, sem controles de configuração. Uma animação discreta indica passagem da etapa à próxima matéria.
+- Tela Estudos mantém criação, edição, exclusão e modalidades, além de permitir distribuir sessões entre datas (até 31 dias), quantidade de sessões por dia, seleção de dias ou apenas os dias com disponibilidade. Cada ocorrência é uma sessão real contabilizada separadamente na carga planejada.
+- Para semanas futuras, sessões ainda não iniciadas seguem dinamicamente a matéria atual do ciclo ao executar; planejamento por data não avança rotação sozinho. Pausas são respeitadas. A conclusão da última sessão exigida de uma etapa libera a próxima matéria; desfazer a conclusão pode reabrir a etapa se não houver conclusões posteriores.
+- A quantidade configurada por matéria indica conclusões necessárias antes do avanço, não cria sessões automaticamente. Duração efetiva permanece independente da previsão; não são inventadas horas.
+- Testes de lógica e de navegador abrangem agendamento, carga, progresso, conclusão, desfazer e integração com outras telas.
+
+---
+
+
+
 ## Complementos finais (2026-11-02)
 
 Implementado `stage6.js` e `stage6.css`: etapas editáveis/concluíveis dos objetivos, vínculo explícito de atividades aos objetivos, aproveitamento do vínculo existente dos ciclos, horários ocupados recorrentes e por data, disponibilidade efetiva descontando apenas interseções com faixas livres (sem descontar duas vezes horas declaradas livres), avisos de colisões, recomendações condicionadas a evidência real de desempenho, tempo desde revisão e modalidade, agendamento voluntário sem avançar ciclos, início da semana configurável em qualquer dia. Novos testes `tests/stage6.test.mjs` e atualização do cache PWA.
