@@ -102,6 +102,21 @@ async function fetchRemote(){
  return data?{version:Number(data.version),document:data.content}:{version:0,document:null};
 }
 function isValidDoc(doc){return doc&&typeof doc==="object"&&!Array.isArray(doc)&&doc.schema===VERSION&&Array.isArray(doc.goals)&&doc.firstAccess&&doc.settings;}
+function mergeClosures(preferred,other){
+ const merged=JSON.parse(JSON.stringify(preferred));
+ const primary=merged.evolution?.closed||{},secondary=other?.evolution?.closed||{};
+ merged.evolution=merged.evolution||{};
+ merged.evolution.closed=merged.evolution.closed||{};
+ for(const [date,snapshot] of Object.entries(secondary)){
+  if(date in primary&&stringify(primary[date])!==stringify(snapshot))
+   throw Error("O mesmo dia foi finalizado com registros diferentes nos dispositivos: "+date+". Exporte os dois backups para conferir.");
+  if(!(date in primary))merged.evolution.closed[date]=snapshot;
+ }
+ merged.planner=merged.planner||{version:2,entries:[],blocks:[],records:{},overrides:{},dayPauses:{},closedDays:[]};
+ merged.planner.closedDays=Array.from(new Set([...(merged.planner.closedDays||[]),...(other?.planner?.closedDays||[]),...Object.keys(merged.evolution.closed)])).sort();
+ if(other?.firstAccess&&(!merged.firstAccess||other.firstAccess<merged.firstAccess))merged.firstAccess=other.firstAccess;
+ return merged;
+}
 function checkFrozenCompatibility(local,remote){
  const left=local?.evolution?.closed||{},right=remote?.evolution?.closed||{};
  for(const [date,record] of Object.entries(right)){
@@ -192,6 +207,11 @@ async function signOut(){
   if(!window.confirm("A sincronização não está confirmada. Exporte um backup antes de continuar. Sair mesmo assim apagará os dados locais deste dispositivo."))return;
   exportBackup();
  }
+ if(user&&mode==="ready"){
+  clearTimeout(saveTimer);
+  if(checksum(currentDoc())!==boundMeta()?.hash)await push(currentDoc());
+  if(mode!=="ready")return notify("Não foi possível confirmar a sincronização. Exporte um backup antes de sair.");
+ }
  if(!window.confirm("Sair da conta e limpar os dados deste navegador? Os dados sincronizados continuarão na nuvem."))return;
  // Evita que dados de uma conta apareçam para o próximo visitante do dispositivo.
  await Storage.persistNow();
@@ -233,15 +253,23 @@ async function receiveBackup(file){
 }
 async function chooseRemote(){
  if(!conflict?.remote?.document)return notify("Nenhum documento disponível na nuvem.");
- if(!window.confirm("Usar o arquivo da nuvem neste dispositivo? Faça backup dos dados locais antes. Essa opção não apaga o banco."))return;
- await importState(conflict.remote.document,conflict.remote.version);
+ if(!window.confirm("Usar a nuvem como base? Dias já finalizados neste dispositivo serão preservados. Outras edições locais podem ser perdidas; faça um backup antes."))return;
+ const latest=await fetchRemote();
+ if(latest.version!==conflict.remote.version){conflict.remote=latest;status("conflict");return notify("A nuvem mudou; confira novamente.");}
+ const merged=mergeClosures(latest.document,currentDoc());
+ if(checksum(merged)!==checksum(latest.document)){
+  const {data,error}=await client.rpc("orbita_commit",{p_expected_version:latest.version,p_document:merged});
+  if(error)throw error;
+  if(data?.status!=="ok"){conflict.remote=await fetchRemote();status("conflict");return;}
+  await importState(merged,Number(data.version));
+ }else await importState(latest.document,latest.version);
 }
 async function chooseLocal(){
  if(!conflict||!user)return;
  if(!window.confirm("Enviar seus dados locais em substituição à nuvem? O servidor recusará alterações em dias finalizados. Exporte um backup da nuvem antes."))return;
  const remote=await fetchRemote();
  if(remote.version!==conflict.remote.version){conflict.remote=remote;status("conflict");return notify("A nuvem mudou novamente. Revise o conflito.");}
- const doc=conflict.local;
+ const doc=mergeClosures(currentDoc(),remote.document);
  const {data,error}=await client.rpc("orbita_commit",{p_expected_version:remote.version,p_document:doc});
  if(error){status("conflict",error);return;}
  if(data?.status!=="ok"){conflict.remote=await fetchRemote();status("conflict");return;}
