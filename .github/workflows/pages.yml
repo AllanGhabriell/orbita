@@ -19,8 +19,8 @@ jobs:
         with:
           node-version: '22'
       - name: Sintaxe do JavaScript
-        run: node --check app.js && node --check stage2.js && node --check stage3.js && node --check stage4.js
-      - name: Testes das etapas 1 a 4
+        run: node --check app.js && node --check stage2.js && node --check stage3.js && node --check stage4.js && node --check boot.js && node --check stage5.js && node --check sw.js
+      - name: Testes das etapas 1 a 5
         run: node --test tests/*.test.mjs
   deploy:
     needs: test
