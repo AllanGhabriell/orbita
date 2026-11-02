@@ -1,0 +1,19 @@
+{
+  "name": "Órbita — Planejamento e evolução",
+  "short_name": "Órbita",
+  "description": "Planejamento pessoal, ciclos de estudo e análise de evolução.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080913",
+  "theme_color": "#8f76f5",
+  "icons": [
+    {
+      "src": "./assets/orbita.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
