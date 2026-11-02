@@ -330,7 +330,7 @@ document.addEventListener("submit",event=>{
  localStorage.setItem(KEY,JSON.stringify(candidate));window.location.reload();
 });
 window.addEventListener("online",()=>{if(user&&mode!=="conflict"){clearTimeout(networkTimer);networkTimer=setTimeout(()=>initialReconcile().catch(err=>status("error",err)),600);}});
-window.OrbitaStage5={decorate,inspect:{checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client}}};
+window.OrbitaStage5={decorate,inspect:{checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client},mergeClosures}};
 C.render();
 create();
 })();
