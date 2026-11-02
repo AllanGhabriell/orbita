@@ -176,11 +176,48 @@ function checkFrozenCompatibility(local,remote){
  }
  return true;
 }
+function normalizeImportedDoc(doc){
+ // Documentos antigos podem não possuir todos os módulos.
+ // Nunca preencher lacunas com dados da pessoa que usava este navegador antes.
+ const source=JSON.parse(JSON.stringify(doc));
+ source.availability||={weekly:[null,null,null,null,null,null,null],overrides:{}};
+ source.planner||={version:2,blocks:[],entries:[],records:{},overrides:{},dayPauses:{},closedDays:[],events:[]};
+ source.studies||={version:3,cycles:[],subjects:[],methods:[],sessions:[],events:[]};
+ source.evolution||={version:4,closed:{},visitedDays:{},settings:{reminders:true,strictness:"firm"},milestones:[]};
+ source.extension||={version:6,busyWeekly:[[],[],[],[],[],[],[]],busyDates:{}};
+ return source;
+}
+function hydrateInPlace(target,source){
+ // O restante do Órbita guarda referências para planner, studies e evolution.
+ // Substituir C.state diretamente deixaria esses módulos apontando para dados antigos.
+ if(Array.isArray(target)&&Array.isArray(source)){
+  target.splice(0,target.length,...source.map(x=>JSON.parse(JSON.stringify(x))));
+  return;
+ }
+ if(target&&source&&typeof target==="object"&&typeof source==="object"&&
+   !Array.isArray(target)&&!Array.isArray(source)){
+  for(const key of Object.keys(target))if(!Object.prototype.hasOwnProperty.call(source,key))delete target[key];
+  for(const [key,value] of Object.entries(source)){
+   const old=target[key];
+   if(old&&value&&typeof old==="object"&&typeof value==="object"&&
+      Array.isArray(old)===Array.isArray(value))hydrateInPlace(old,value);
+   else target[key]=JSON.parse(JSON.stringify(value));
+  }
+ }
+}
 async function importState(doc,version=0){
  if(!isValidDoc(doc))throw Error("Documento de nuvem inválido. Nenhum dado foi substituído.");
- await Storage.replaceDocument(doc);
+ const normalized=normalizeImportedDoc(doc);
+ // Importar na memória e no disco SEM recarregar a aba.
+ // Um reload antigo podia iniciar a mesma importação indefinidamente.
+ await Storage.replaceDocument(normalized);
+ hydrateInPlace(C.state,normalized);
  if(user)setLastSync(doc,version);
- window.location.reload();
+ conflict=null;
+ status("ready");
+ C.render();
+ // Se um documento legado precisou receber campos novos, enviá-los depois.
+ if(checksum(currentDoc())!==checksum(doc))scheduleSync();
 }
 async function initialReconcile(){
  let remote;
