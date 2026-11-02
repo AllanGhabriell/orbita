@@ -44,7 +44,7 @@ assert.equal(snap.plan.totalMin,90,"foco vinculado não conta em dobro");
 assert.equal(V.isClosed(previous),true);
 assert.throws(()=>V.finalize(previous),/já foi finalizado/,"fechamento irreversível");
 assert.throws(()=>T.setSessionStatus(study.id,"pending",null,""),/finalizado/,"não alterar sessão antiga");
-assert.throws(()=>T.addSessions({kind:"supplement",date:previous,area:"ENEM",discipline:"Física",plannedMin:"60"}),/finalizado/);
+assert.throws(()=>T.addSessions({kind:"supplement",date:previous,area:"ENEM",discipline:"Física",plannedMin:"60"}),/finalizado|Data fechada/);
 assert.equal(V.periodData("day",previous).count.studyActualMin,65);
 
 focus.title="Título alterado fora do histórico";
