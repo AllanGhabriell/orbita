@@ -38,14 +38,21 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [ ] Revisar casos extremos de repetição e cópia em mudanças de mês após teste real
 
 ## Etapa 3 — Estudos
-- [ ] Múltiplos ciclos e rotações independentes
-- [ ] Matérias e assuntos editáveis/pausáveis/arquiváveis
-- [ ] Sessões extras, repetidas e parciais, tempo e avanço correto
-- [ ] Estudos complementares e área/matéria/assunto/finalidade
-- [ ] Modalidades personalizadas e métodos opcionais
-- [ ] Analisador de carga baseado em sessões, disponibilidade e horas reais
-- [ ] Estatísticas detalhadas por ciclo
-- [ ] Auditoria contra ESCOPO.md
+- [x] Múltiplos ciclos e rotações independentes
+- [x] Matérias e assuntos editáveis/pausáveis/arquiváveis
+- [x] Sessões extras, repetidas e parciais, tempo e avanço correto
+- [x] Estudos complementares e área/matéria/assunto/finalidade
+- [x] Modalidades personalizadas e métodos opcionais
+- [x] Analisador de carga baseado em sessões, disponibilidade e horas reais
+- [x] Estatísticas detalhadas por ciclo
+- [x] Auditoria contra ESCOPO.md
+
+### QA e integração futura da Etapa 3
+- [x] Testes automatizados de sequência, sessões parciais, pausas, reforços, horas e vínculo com focos
+- [ ] Testes manuais com mouse/toque, calendário em meses diferentes e aparelhos reais
+- [ ] Validação de acessibilidade/teclado do fluxo completo de cadastro e sessões
+- [ ] Recomendações adaptativas de método e revisão contextual (motor orientador da Etapa 4)
+- [ ] Sincronização e persistência entre dispositivos (Etapa 5)
 
 ## Etapa 4 — Evolução
 - [ ] Fechamento com conferência, bloqueio imutável e dias atrasados
