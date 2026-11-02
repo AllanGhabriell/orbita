@@ -354,7 +354,8 @@ document.addEventListener("change",event=>{
  }
 });
 document.addEventListener("submit",event=>{
- const id=event.target?.id;
+ // Campos internos name="id" podem sombrear HTMLFormElement.id no navegador real.
+ const id=event.target?.getAttribute?.("id")||event.target?.id;
  if(!["s6-step-form","s6-busy-form","s6-review-form"].includes(id))return;
  event.preventDefault();
  const d=new FormData(event.target);
