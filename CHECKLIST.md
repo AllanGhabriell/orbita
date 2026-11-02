@@ -6,7 +6,7 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [x] Estrutura inicial do site estático no repositório
 - [x] Layout escuro e claro com preferência persistida
 - [x] Fundo animado com luz do cursor e preferência de movimento reduzido
-- [x] Desktop/móvel, navegação acessível e menus avançados discretos
+- [ ] Revisar navegação e acessibilidade em navegador real no computador e celular (estrutura e CSS responsivo já implementados)
 - [x] Tela Início vazia, sem qualquer meta/tarefa demonstrativa
 - [x] Disponibilidade semanal por horas e múltiplos intervalos
 - [x] Descanso semanal e exceções por data
