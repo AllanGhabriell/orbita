@@ -122,6 +122,7 @@
 
 /* Painel de execução diária. Agendamento e edição permanecem em Estudos. */
 .study-daily-panel{gap:13px;min-height:0}
+.dashboard-panels>.study-daily-panel{grid-column:1/-1}
 .study-daily-panel .card-head{flex-wrap:wrap;row-gap:8px}
 .study-daily-summary{display:flex;gap:7px;flex-wrap:wrap}
 .study-daily-summary span{border-radius:9px;background:var(--surface2);border:1px solid var(--border);padding:7px 9px;font-size:11px;color:var(--muted)}
