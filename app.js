@@ -53,6 +53,7 @@ else if(route==="organizar")content=renderOrganize();
 else if(route==="perfil")content=renderProfile();
 else if(route==="disponibilidade")content=renderAvailability();
 else content=renderSettings();
+if(window.OrbitaStage2&&typeof window.OrbitaStage2.decorate==="function")content=window.OrbitaStage2.decorate(route,content);
 $("view").innerHTML=page(content);}
 function dateNavigator(){return '<div class="date-nav"><button class="btn square" data-action="prevDay" '+(addDays(state.date,-1)<state.firstAccess?"disabled":"")+' aria-label="Dia anterior">‹</button><button class="btn date-button" data-action="jumpDate" title="Escolher data">'+esc(shortDate(state.date))+' ▾</button><button class="btn square" data-action="nextDay" aria-label="Próximo dia">›</button></div>';}
 function renderHome(){
@@ -216,5 +217,6 @@ if(window.matchMedia&&window.matchMedia("(hover:hover) and (pointer:fine)").matc
 document.addEventListener("pointermove",(e)=>{if(state.settings.motion===false)return;glowTarget.x=e.clientX-135;glowTarget.y=e.clientY-135;if(!glowIsActive){glowIsActive=true;$("cursor-glow").classList.add("active");if(!glowFrame)glowFrame=requestAnimationFrame(glowLoop);}},{passive:true});
 document.addEventListener("pointerleave",()=>{$("cursor-glow").classList.remove("active");});
 }
+window.OrbitaCore={get state(){return state},save,render,go,openModal,closeModal,notify,dateLabel,iso,parse,addDays,today,esc,attr,tag,btn,hoursLabel,resolveAvailability,availabilityMinutes,availabilityReady,activeGoal,firstDayOfWeek,dateNavigator};
 save();render();
 })();
