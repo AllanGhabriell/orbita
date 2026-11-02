@@ -389,7 +389,7 @@ document.addEventListener("click",event=>{
  event.preventDefault();try{actions[b.dataset.s4]?.(b);}catch(err){C.notify(err.message||"Erro ao consultar dados.");}
 });
 document.addEventListener("submit",event=>{
- if(event.target.id!=="s4-finalize")return;
+ if((event.target?.getAttribute?.("id")||event.target?.id)!=="s4-finalize")return;
  event.preventDefault();try{confirmSubmit(new FormData(event.target));}catch(err){C.notify(err.message||"Confira a confirmação.");}
 });
 document.addEventListener("change",event=>{
