@@ -78,7 +78,7 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 
 ## Etapa 5 — Integração
 - [x] Migração SQL pronta em `supabase/migrations/20261102_000001_orbita.sql`, com tabelas, RLS e função transacional de sincronização
-- [x] Chaves secretas proibidas no frontend; configuração de URL e chave pública pelo próprio site
+- [x] Chaves secretas proibidas no frontend; URL e chave pública pré-configuradas em `config.js`, sem formulário de conexão
 - [x] Implementação do login Google com Supabase Auth OAuth/PKCE
 - [x] Armazenamento offline IndexedDB, ponte de compatibilidade localStorage e recuperação de dados locais
 - [x] Controle otimista de versão da nuvem, prevenção de sobrescrita silenciosa e escolha manual em conflitos
