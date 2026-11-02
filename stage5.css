@@ -1,0 +1,16 @@
+/* Órbita etapa 5 — conta, integração e backups */
+.s5-panel{display:flex;flex-direction:column;gap:13px}
+.s5-panel .card-head{margin-bottom:0}
+.s5-user{display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface2);border-radius:12px;border:1px solid var(--border)}
+.s5-user strong{font-size:13px;overflow-wrap:anywhere}
+.s5-user small{display:block;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.45}
+.s5-conflict{border:1px solid rgba(228,174,87,.4);border-radius:13px;background:rgba(224,161,72,.08);padding:14px;display:flex;flex-direction:column;gap:10px}
+.s5-conflict strong{font-size:13px}
+.s5-conflict .note{margin:0}
+.s5-panel .btn{max-width:100%}
+#s5-status{max-width:180px;text-align:center;white-space:normal}
+@media(max-width:720px){
+ .s5-panel .row{gap:8px}
+ .s5-panel .row .btn{flex:1}
+ .s5-panel .card-head{align-items:flex-start}
+}
