@@ -145,7 +145,7 @@ try{
  assert.equal(state.curr,"Matemática");
  await page.evaluate(()=>window.OrbitaCore.go("inicio"));
  await page.waitForSelector(".study-daily-entry");
- assert.equal(await page.$(".study-daily-entry").then(a=>a.length),3);
+ assert.equal(await page.evaluate(()=>document.querySelectorAll(".study-daily-entry").length),3);
  for(let i=0;i<3;i++){
   await page.click('.study-daily-entry:nth-child('+(i+1)+') [data-s3="quickDone"]');
   await page.waitForFunction((n)=>[...document.querySelectorAll('.study-daily-entry.is-done')].length===n,{timeout:5000},i+1);
