@@ -3,7 +3,7 @@
 const STORAGE="orbita:stage1:v1";
 const DAYS=["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
 const SHORT=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-const PAGES={inicio:["SEU ESPAÇO","Meu dia"],planejamento:["CALENDÁRIO","Planejamento"],organizar:["SUAS ÁREAS","Organizar"],perfil:["SEU HISTÓRICO","Perfil e evolução"],disponibilidade:["SEU TEMPO","Disponibilidade"],configuracoes:["PREFERÊNCIAS","Configurações"]};
+const PAGES={inicio:["SEU ESPAÇO","Meu dia"],planejamento:["CALENDÁRIO","Planejamento"],organizar:["SUAS ÁREAS","Organizar"],perfil:["SEU HISTÓRICO","Perfil e evolução"],disponibilidade:["SEU TEMPO","Disponibilidade"],configuracoes:["PREFERÊNCIAS","Configurações"],estudos:["ESTUDOS","Ciclos de estudo"]};
 const $=(id)=>document.getElementById(id);
 const iso=(d)=>{const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,"0");const day=String(d.getDate()).padStart(2,"0");return y+"-"+m+"-"+day;};
 const parse=(s)=>{const a=String(s).split("-").map(Number);return new Date(a[0],a[1]-1,a[2],12);};
@@ -54,6 +54,7 @@ else if(route==="perfil")content=renderProfile();
 else if(route==="disponibilidade")content=renderAvailability();
 else content=renderSettings();
 if(window.OrbitaStage2&&typeof window.OrbitaStage2.decorate==="function")content=window.OrbitaStage2.decorate(route,content);
+if(window.OrbitaStage3&&typeof window.OrbitaStage3.decorate==="function")content=window.OrbitaStage3.decorate(route,content);
 $("view").innerHTML=page(content);}
 function dateNavigator(){return '<div class="date-nav"><button class="btn square" data-action="prevDay" '+(addDays(state.date,-1)<state.firstAccess?"disabled":"")+' aria-label="Dia anterior">‹</button><button class="btn date-button" data-action="jumpDate" title="Escolher data">'+esc(shortDate(state.date))+' ▾</button><button class="btn square" data-action="nextDay" aria-label="Próximo dia">›</button></div>';}
 function renderHome(){
