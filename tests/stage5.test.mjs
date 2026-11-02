@@ -35,6 +35,7 @@ window.OrbitaStorage={
  supportsIndexedDB:true,
  onSave(){},async replaceDocument(){},async persistNow(){},async clearDocument(){}
 };
+vm.runInContext(read("config.js"),context,{filename:"config.js"});
 vm.runInContext(read("stage5.js"),context,{filename:"stage5.js"});
 const S=window.OrbitaStage5.inspect;
 const good={url:"https://example.supabase.co",key:"sb_publishable_ABCdef_123"};
@@ -43,7 +44,14 @@ assert.equal(S.isConfigured({...good,key:"sb_secret_NOT_ALLOWED"}),false);
 assert.equal(S.isConfigured({...good,url:"http://example.supabase.co"}),false);
 assert.equal(S.isConfigured({...good,url:"https://example.supabase.co.evil.com"}),false);
 assert.equal(S.isConfigured({...good,key:""}),false);
-assert.equal(S.mode,"unconfigured");
+assert.equal(S.isConfigured(window.ORBITA_SUPABASE),true,"o projeto Supabase é fornecido automaticamente");
+assert.notEqual(S.mode,"unconfigured","o navegador não depende de formulário");
+window.OrbitaCore.go("configuracoes");
+assert.ok(!node("view").innerHTML.includes("Conectar Supabase"),"formulário retirado");
+assert.ok(!node("view").innerHTML.includes("Publishable key"),"chave não exibida em campo");
+const boot=read("boot.js"),worker=read("sw.js");
+assert.match(boot,/"config\.js","app\.js"/,"configuração carrega antes do aplicativo");
+assert.match(worker,/"\.\/config\.js"/,"configuração disponível offline");
 assert.ok(window.OrbitaCore.state.goals.length===0,"não gera usuário falso");
 
 const x={schema:1,firstAccess:"2026-11-02",goals:[],settings:{theme:"dark"},evolution:{closed:{"2026-11-01":{date:"2026-11-01",confirmed:"2026-11-02"}}}};
