@@ -79,3 +79,43 @@
  .study-subject-row>.row{justify-content:flex-start}
  .study-session-controls{width:100%;justify-content:flex-start}
 }
+
+/* Modalidades de estudo: os botões usam texto completo, nunca os 30px
+   reservados aos ícones de tarefas em stage2.css. Escopo exclusivo. */
+.study-method-row{
+  display:grid;
+  grid-template-columns:31px minmax(0,1fr) auto;
+  align-items:center;
+  column-gap:12px;
+  row-gap:8px;
+}
+.study-method-row .task-main{min-width:0;overflow-wrap:anywhere}
+.study-method-row .study-method-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+  gap:8px;
+  min-width:0;
+}
+.study-method-row .study-method-actions .btn{
+  width:auto;
+  min-width:max-content;
+  flex:0 0 auto;
+  padding:8px 11px;
+  font-size:11px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+@media(max-width:1020px){
+  .study-method-row{grid-template-columns:31px minmax(0,1fr)}
+  .study-method-row .study-method-actions{
+    grid-column:2;
+    justify-content:flex-start;
+  }
+}
+@media(max-width:440px){
+  .study-method-row{column-gap:9px}
+  .study-method-row .study-method-actions{gap:6px}
+  .study-method-row .study-method-actions .btn{padding:7px 9px}
+}
