@@ -193,3 +193,40 @@ input[type=date],input[type=time]{color-scheme:inherit}
   .ambient-blob,#cursor-glow{display:none!important}
 }
 body.motion-off .ambient-blob,body.motion-off #cursor-glow{display:none!important}
+
+/* Correções restritas ao celular: sem interferir no layout desktop. */
+.day-meta-compact{display:none}
+@media(max-width:720px){
+  /* Impede rolagem residual produzida pelo min-height:100% mais padding da tela. */
+  .view[data-route="inicio"] .view-inner{min-height:0;gap:11px}
+  .view[data-route="inicio"] .hero-row{gap:9px}
+  .view[data-route="inicio"] .hero-row h1{font-size:clamp(20px,5.6vw,26px);line-height:1.17;overflow-wrap:break-word}
+  /* Estado inicial: prioriza a configuração da disponibilidade e não desperdiça altura. */
+  .view[data-route="inicio"]:has(.empty-state) .empty-state{padding:15px 16px;gap:9px}
+  .view[data-route="inicio"]:has(.empty-state) .empty-state h2{font-size:18px}
+  .view[data-route="inicio"]:has(.empty-state) .empty-state p{font-size:12px;line-height:1.4}
+  .view[data-route="inicio"]:has(.empty-state) .dashboard-panels .module{min-height:105px;padding:12px}
+  .view[data-route="inicio"]:has(.empty-state) .dashboard-panels .module .card-head{margin-bottom:5px}
+  .view[data-route="inicio"]:has(.empty-state) .dashboard-panels .module .card-head h2{font-size:12px}
+  .view[data-route="inicio"]:has(.empty-state) .dashboard-panels .module .module-empty{margin:3px 0 0;font-size:11px;line-height:1.4}
+  .view[data-route="inicio"]:has(.empty-state) .dashboard-panels .module-foot{display:none}
+  /* Mostra o estado de cada dia de forma legível dentro das sete colunas. */
+  .view[data-route="planejamento"] .week-grid{gap:5px}
+  .view[data-route="planejamento"] .week-grid .day-tile{
+    min-width:0;min-height:94px;padding:9px 2px;border-radius:11px;
+    align-items:center;justify-content:flex-start;gap:6px;overflow:hidden;
+  }
+  .view[data-route="planejamento"] .week-grid .day-tile .dow{font-size:10px;line-height:1.25;white-space:nowrap}
+  .view[data-route="planejamento"] .week-grid .day-tile .day-number{font-size:19px;line-height:1.2}
+  .view[data-route="planejamento"] .week-grid .day-tile .day-meta{display:none}
+  .view[data-route="planejamento"] .week-grid .day-tile .day-meta-compact{
+    display:block;margin-top:auto;max-width:100%;font-size:9.5px;line-height:1.1;
+    color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .view[data-route="planejamento"] .week-grid .day-tile.selected .day-meta-compact{color:var(--text)}
+}
+@media(max-width:375px){
+  .view[data-route="planejamento"] .week-grid{gap:3px}
+  .view[data-route="planejamento"] .week-grid .day-tile{min-height:84px;padding:7px 1px}
+  .view[data-route="planejamento"] .week-grid .day-tile .day-number{font-size:17px}
+}
