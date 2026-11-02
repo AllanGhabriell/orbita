@@ -52,6 +52,14 @@ assert.equal(S.checksum(x),S.checksum(y),"ordem das chaves não gera conflitos")
 assert.equal(S.checkFrozenCompatibility(y,x),true);
 const z=structuredClone(x);z.evolution.closed["2026-11-01"].confirmed="muda";
 assert.equal(S.checkFrozenCompatibility(z,x),false,"não substitui dia finalizado");
+const both=S.mergeClosures(
+ {schema:1,firstAccess:"2026-11-02",planner:{closedDays:["2026-11-02"]},evolution:{closed:{"2026-11-02":{date:"2026-11-02",confirmed:"A"}}}},
+ {schema:1,firstAccess:"2026-11-01",planner:{closedDays:["2026-11-01"]},evolution:{closed:{"2026-11-01":{date:"2026-11-01",confirmed:"B"}}}}
+);
+assert.deepEqual(Object.keys(both.evolution.closed).sort(),["2026-11-01","2026-11-02"],"fechamentos dos dois dispositivos preservados");
+assert.equal(both.firstAccess,"2026-11-01","histórico mais antigo acessível");
+assert.deepEqual(Array.from(both.planner.closedDays),["2026-11-01","2026-11-02"]);
+assert.throws(()=>S.mergeClosures(x,z),/mesmo dia foi finalizado/,"dias divergentes não são sobrescritos");
 assert.equal(S.meaningful(x),true);
 assert.equal(S.meaningful({goals:[],planner:{entries:[]},studies:{cycles:[]},evolution:{closed:{}}}),false);
 
