@@ -55,7 +55,7 @@ function capture(date){
   area:x.area,discipline:x.discipline,topic:x.topic,purpose:x.purpose,
   method:studies.methods.find(m=>m.id===x.methodId)?.title||"",
   plannedMin:x.plannedMin??null,actualMin:x.actualMin??null,
-  status:x.status||"pending",startTime:x.startTime||"",actualTime:x.actualTime||"",focusId:x.focusId||""
+  status:x.status||"pending",startTime:x.startTime||"",actualTime:x.actualTime||"",focusId:x.focusId||"",evidence:clone(x.evidence||{questions:null,correct:null,quality:null})
  }));
  const attached=new Set(sessions.filter(x=>x.focusId).map(x=>x.focusId));
  const plannedStudy=sessions.reduce((a,x)=>a+Number(x.plannedMin||0),0);
@@ -102,6 +102,13 @@ function pendingDates(until=today()){
  }
  return res;
 }
+function awardMilestones(){
+ const qualifying=Object.values(ev.closed).filter(x=>{const n=dailyCounts(x);return n.foci>0&&n.doneFocus===n.foci;}).length;
+ for(const threshold of [5,10,20,50]){
+  const id="focus-fulfilled-"+threshold;
+  if(qualifying>=threshold&&!ev.milestones.some(m=>m.id===id))ev.milestones.push({id,title:threshold+" dias com focos cumpridos",count:threshold,awardedAt:now()});
+ }
+}
 function finalize(date){
  if(!validDate(date)||date<first()||!beforeNow(date))throw Error("Só é possível finalizar datas anteriores ou iguais a hoje.");
  if(isClosed(date))throw Error("Este dia já foi finalizado.");
@@ -112,6 +119,7 @@ function finalize(date){
  ev.closed[date]=clone(snap);
  if(!p.closedDays.includes(date))p.closedDays.push(date);
  ev.events||=[];ev.events.push({kind:"day_closed",date,at:snap.confirmed});
+ awardMilestones();
  C.save();return snap;
 }
 function periodData(kind,date,preview=true){
@@ -130,7 +138,7 @@ function periodData(kind,date,preview=true){
  const count={days:rows.length,closed:rows.filter(x=>!!x.confirmed).length,plannedActive:0,rest:0,unplannedPauses:0,focus:0,doneFocus:0,missedFocus:0,
   habits:0,habitDone:0,habitRecordedTimes:0,habitOnTime:0,tasks:0,tasksDone:0,study:0,studiesDone:0,partial:0,actualMin:0,
   studyActualMin:0,plannedMin:0,knownStudyMinutes:0,missingStudyTimes:0,missingActivityTimes:0,
-  changedPlans:0,lateRest:0,daysWithStudy:0,workDays:0,open,unobserved,elapsed:pastDays};
+  changedPlans:0,lateRest:0,daysWithStudy:0,workDays:0,questions:0,correct:0,questionSessions:0,qualityRated:0,qualitySum:0,open,unobserved,elapsed:pastDays};
  const byArea={};const byDiscipline={};const byMethod={};const byTopic={};
  const daily=[];
  for(const snap of rows){
@@ -152,6 +160,10 @@ function periodData(kind,date,preview=true){
    else{count.unplannedPauses++;if(snap.pause.declaredSameDay)count.lateRest++;}
   }else if(snap.availability?.mode==="rest")count.rest++;
   for(const ss of snap.studies){
+   if(Number.isInteger(ss.evidence?.questions)&&ss.evidence.questions>0&&Number.isInteger(ss.evidence?.correct)){
+    count.questions+=ss.evidence.questions;count.correct+=ss.evidence.correct;count.questionSessions++;
+   }
+   if(ss.evidence?.quality!=null&&Number.isInteger(ss.evidence.quality)){count.qualityRated++;count.qualitySum+=ss.evidence.quality;}
    if(ss.actualMin==null)continue;
    for(const [group,key] of [[byArea,ss.area],[byDiscipline,ss.discipline],[byMethod,ss.method],[byTopic,ss.topic]]){
     const name=key||"Não informado";group[name]=(group[name]||0)+Number(ss.actualMin);
@@ -186,6 +198,7 @@ function signals(x){
   else if(rate<60&&level!=="limited")messages.push({tone:"warning",title:"Planejamento pouco executado",body:"Apenas "+rate+"% dos focos previstos foram concluídos. Repetir compromissos sem executá-los não está ajudando seu objetivo.",action:"Reduzir ou redistribuir os compromissos até caberem na sua disponibilidade."});
  }
  if(c.study>=5&&c.studiesDone>=3&&c.missingStudyTimes>0)messages.push({tone:"neutral",title:"Horas não informadas",body:"Você deixou a duração efetiva de "+c.missingStudyTimes+" sessão(ões) sem registro. A conclusão foi contabilizada, mas o tempo não foi inventado.",action:"Informar a duração real quando souber; não estimar retroativamente dias finalizados."});
+ if(c.questions>=30&&c.questionSessions>=3&&level!=="limited")messages.push({tone:"neutral",title:"Exercícios registrados",body:"Você anotou "+c.correct+" acertos em "+c.questions+" questões ("+Math.round(c.correct/c.questions*100)+"%). O percentual é descritivo: dificuldade, assunto e condições das questões podem variar.",action:"Comparar resultados de exercícios equivalentes e revisar assuntos com mais erros."});
  if(c.unplannedPauses>=3&&level!=="limited")messages.push({tone:"warning",title:"Pausas extras recorrentes",body:"Foram registradas "+c.unplannedPauses+" pausas extraordinárias. Isso pode indicar imprevistos frequentes ou um planejamento incompatível com a rotina.",action:"Revisar compromissos e disponibilidade sem eliminar o descanso necessário."});
  if(c.plannedMin>0&&c.workDays>=5&&c.actualMin>0&&c.missingActivityTimes+c.missingStudyTimes===0&&c.actualMin<c.plannedMin*.5&&level!=="limited")
  messages.push({tone:"warning",title:"Previsões distantes da execução",body:"O tempo efetivamente registrado foi bem menor que o tempo planejado. Verifique se as metas estão superdimensionadas.",action:"Calibrar as próximas estimativas pelo histórico real."});
@@ -239,6 +252,8 @@ function overviewPeriod(x){
  reportRow("Rotinas concluídas",n.habitDone+" / "+n.habits)+
  reportRow("Pontualidade registrada",n.habitRecordedTimes?n.habitOnTime+"/"+n.habitRecordedTimes:"Não avaliada")+
  reportRow("Tarefas secundárias concluídas",String(n.tasksDone))+
+ reportRow("Questões registradas",n.questions?n.correct+" acertos de "+n.questions+" respostas":"Sem resultados registrados")+
+ reportRow("Qualidade percebida (autoavaliação)",n.qualityRated?(n.qualitySum/n.qualityRated).toFixed(1)+"/5 · "+n.qualityRated+" respostas":"Não informada")+
  reportRow("Tempo real de outras atividades",minutes(Math.max(0,n.actualMin-n.studyActualMin)))+
  reportRow("Dias efetivamente fechados",String(n.closed))+
  reportRow("Dias com compromissos abertos",String(n.open))+
@@ -254,7 +269,7 @@ function viewEvolution(){
  return '<div class="hero-row"><div><div class="overline">SEU HISTÓRICO</div><h1>Minha evolução</h1><p class="kicker">Os resultados vêm de registros reais. Constância conta tanto quanto aumentar a quantidade.</p></div><div class="row"><button class="btn small ghost" data-s4="backProfile">← Perfil</button><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Fechar dia</button></div></div>'+
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
  overviewPeriod(current)+
- '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
+ ' <section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
 }
 function yesterday(){return add(today(),-1);}
 function lastStudyDayOfWeek(d){
@@ -300,7 +315,7 @@ function profileDecor(base){
 }
 function overviewMini(){
  const closed=Object.keys(ev.closed);
- return '<div class="row"><span class="status">'+closed.length+' dia(s) finalizado(s)</span><span class="status">'+pendingDates().length+' fechamento(s) pendente(s)</span></div>';
+ return '<div class="row"><span class="status">'+closed.length+' dia(s) finalizado(s)</span><span class="status">'+pendingDates().length+' fechamento(s) pendente(s)</span><span class="status">'+ev.milestones.length+' conquista(s) fundamentada(s)</span></div>';
 }
 function calendarDecor(base){
  if(!isClosed(state.date))return base;
