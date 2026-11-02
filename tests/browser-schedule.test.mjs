@@ -52,6 +52,15 @@ try{
  assert.equal(setup.valid,true);
  assert.equal(setup.weekdays.join(","),"1,2,3,4,5");
  await page.click('#s6-busy-form button[type="submit"]');
+ console.log("BROWSER SUBMIT DIAGNOSTIC",JSON.stringify(await page.evaluate(()=>({
+  modalOpen:!!document.getElementById("s6-busy-form"),
+  errorMessage:document.getElementById("s6-form-error")?.textContent,
+  toast:document.getElementById("toast")?.textContent,
+  groups:window.OrbitaStage6.inspect.groupedWeekly().map(x=>({title:x.title,days:x.days})),
+  hasStorage:!!localStorage.getItem("orbita:stage1:v1"),
+  route:document.getElementById("view")?.dataset?.route,
+  validity:document.getElementById("s6-busy-form")?.checkValidity()
+ })),errors));
  await page.waitForFunction(()=>document.querySelector(".s6-busy-row")?.textContent.includes("IFPB - ELETRÔNICA"),{timeout:5000});
  assert.equal(await page.$eval(".s6-busy-row",el=>el.textContent.includes("Segunda a sexta")),true,"lista apresenta os cinco dias");
  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem("orbita:stage1:v1")).extension.busyWeekly);
