@@ -81,6 +81,93 @@ function removeBusy(kind,day,id){
  if(index<0)return;
  list.splice(index,1);save();
 }
+// Cadastro semanal com múltiplos dias; gravação única para evitar registros parciais.
+function weeklyGroup(item){return item.groupId||item.id;}
+function groupedWeekly(){
+ const result=new Map();
+ for(let d=0;d<7;d++)for(const item of X.busyWeekly[d]){
+  const key=weeklyGroup(item);
+  if(!result.has(key))result.set(key,{id:key,title:item.title,start:item.start,end:item.end,days:[],members:[]});
+  const group=result.get(key);
+  group.days.push(d);
+  group.members.push({day:d,id:item.id});
+ }
+ return [...result.values()].map(group=>({...group,days:[...new Set(group.days)].sort((a,b)=>a-b)}));
+}
+function normalizeDays(days){
+ if(!Array.isArray(days)||!days.length)throw Error("Selecione pelo menos um dia da semana.");
+ const chosen=[...new Set(days.map(Number))].sort((a,b)=>a-b);
+ if(chosen.some(d=>!Number.isInteger(d)||d<0||d>6))throw Error("Há um dia da semana inválido.");
+ return chosen;
+}
+function updateBusy(data,original=null){
+ const kind=String(data.kind||"weekly");
+ if(!["weekly","date"].includes(kind))throw Error("Tipo de compromisso inválido.");
+ const title=String(data.title||"").trim(),start=String(data.start||""),end=String(data.end||"");
+ if(!title||title.length>90)throw Error("Informe o nome do compromisso (até 90 caracteres).");
+ if(!validClock(start)||!validClock(end)||start>=end)throw Error("O fim do compromisso deve ser posterior ao início.");
+ const days=kind==="weekly"?normalizeDays(data.weekdays):[];
+ const date=kind==="date"?String(data.date||""):"";
+ if(kind==="date"){
+  if(!validDate(date)||date<s.firstAccess)throw Error("Selecione uma data válida a partir do primeiro acesso.");
+  if(dayLocked(date))throw Error("Esse dia já foi finalizado.");
+ }
+ let old=null,group=null;
+ if(original?.id){
+  if(original.kind==="weekly"){
+   group=groupedWeekly().find(g=>g.members.some(x=>x.day===Number(original.day)&&x.id===original.id));
+   if(!group)throw Error("Não foi possível localizar o compromisso original.");
+  }else{
+   const oldDate=String(original.day||"");
+   if(dayLocked(oldDate))throw Error("O compromisso de um dia finalizado não pode ser editado.");
+   old=(X.busyDates[oldDate]||[]).find(x=>x.id===original.id);
+   if(!old)throw Error("Não foi possível localizar o compromisso original.");
+  }
+ }
+ const sameGroup=group?.id||ID();
+ // Prepara todas as mudanças antes de alterar o estado real.
+ const weekly=X.busyWeekly.map(list=>list.map(x=>({...x})));
+ const dated=Object.fromEntries(Object.entries(X.busyDates).map(([k,list])=>[k,list.map(x=>({...x}))]));
+ const createdAt=old?.createdAt||group?.members?.length&&X.busyWeekly[group.members[0].day].find(x=>x.id===group.members[0].id)?.createdAt||now();
+ if(group)for(const {day,id} of group.members)weekly[day]=weekly[day].filter(x=>x.id!==id);
+ if(old)dated[original.day]=(dated[original.day]||[]).filter(x=>x.id!==original.id);
+ let result=null;
+ if(kind==="weekly"){
+  for(const day of days){
+   const item={id:ID(),groupId:sameGroup,title,start,end,createdAt};
+   weekly[day].push(item);
+   if(!result)result=item;
+  }
+ }else{
+  const item={id:kind==="date"&&old?old.id:ID(),title,start,end,createdAt};
+  (dated[date]||(dated[date]=[])).push(item);
+  result=item;
+ }
+ // Mantém os arrays originais, usados por outros módulos na sessão atual.
+ for(let i=0;i<7;i++)X.busyWeekly[i].splice(0,X.busyWeekly[i].length,...weekly[i]);
+ for(const day of Object.keys(X.busyDates))if(!(day in dated))delete X.busyDates[day];
+ for(const [day,list] of Object.entries(dated)){
+  if(!X.busyDates[day])X.busyDates[day]=[];
+  X.busyDates[day].splice(0,X.busyDates[day].length,...list);
+ }
+ C.save();
+ return result;
+}
+function deleteBusyGroup(kind,day,id){
+ if(kind!=="weekly"){removeBusy(kind,day,id);return;}
+ const group=groupedWeekly().find(g=>g.members.some(x=>x.day===Number(day)&&x.id===id));
+ if(!group)throw Error("Compromisso não encontrado.");
+ for(const x of group.members)X.busyWeekly[x.day]=X.busyWeekly[x.day].filter(entry=>entry.id!==x.id);
+ C.save();
+ C.render();
+}
+function busyDaysLabel(days){
+ const d=[...days].sort((a,b)=>a-b).join(",");
+ if(d==="0,1,2,3,4,5,6")return "Todos os dias";
+ if(d==="1,2,3,4,5")return "Segunda a sexta";
+ if(d==="1,2,3,4,5,6")return "Segunda a sábado";
+ return days.map(i=>["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"][i]).join(", ");
+}
 function goal(id){return s.goals.find(g=>g.id===id);}
 function steps(g){if(!Array.isArray(g.steps))g.steps=[];return g.steps;}
 function saveStep(goalId,title,id){
@@ -123,9 +210,10 @@ function busyPanel(){
  const today=C.today();
  let html='<section class="card s6-busy"><div class="card-head"><h2>Horários ocupados</h2><button class="btn small primary" data-s6="newBusy">+ Compromisso fixo</button></div><p class="note">Curso, estágio, deslocamento ou outros compromissos. Se você cadastrou faixas livres, elas são descontadas automaticamente. Se informou apenas horas livres totais, não haverá desconto duplicado.</p>';
  let count=0;
- for(let d=0;d<7;d++)for(const x of X.busyWeekly[d]){
+ for(const group of groupedWeekly()){
   count++;
-  html+='<div class="s6-busy-row"><div><strong>'+E(x.title)+'</strong><small>'+weekdays[d]+' · '+E(x.start)+'–'+E(x.end)+'</small></div><div class="row"><button class="btn small ghost" data-s6="editBusy" data-kind="weekly" data-day="'+d+'" data-id="'+A(x.id)+'">Editar</button><button class="btn small ghost" data-s6="deleteBusy" data-kind="weekly" data-day="'+d+'" data-id="'+A(x.id)+'">Excluir</button></div></div>';
+  const entry=group.members[0];
+  html+='<div class="s6-busy-row"><div><strong>'+E(group.title)+'</strong><small>'+E(busyDaysLabel(group.days))+' · '+E(group.start)+'–'+E(group.end)+'</small></div><div class="row"><button class="btn small ghost" data-s6="editBusy" data-kind="weekly" data-day="'+entry.day+'" data-id="'+A(entry.id)+'">Editar</button><button class="btn small ghost" data-s6="deleteBusy" data-kind="weekly" data-day="'+entry.day+'" data-id="'+A(entry.id)+'">Excluir</button></div></div>';
  }
  for(const [d,list] of Object.entries(X.busyDates).sort((a,b)=>a[0].localeCompare(b[0])))for(const x of list){
   count++;
@@ -202,11 +290,24 @@ function openStepForm(goalId,id){
  C.openModal(step?"Editar etapa":"Nova etapa",'<form id="s6-step-form" class="section-stack"><input type="hidden" name="goal" value="'+A(goalId)+'"><input type="hidden" name="id" value="'+A(id||"")+'"><div class="field"><label>Título da etapa</label><input name="title" required maxlength="150" value="'+A(step?.title||"")+'" placeholder="Ex.: Resolver um conjunto de exercícios"></div><div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar etapa</button></div></form>');
 }
 function openBusyForm(kind="weekly",weekday=null,id=null){
- const d=kind==="date"?String(weekday||s.date):Number(weekday??C.parse(s.date).getDay());
- const list=kind==="date"?(X.busyDates[d]||[]):X.busyWeekly[d];
- const b=list.find(x=>x.id===id);
- const options=weekdays.map((name,i)=>'<option value="'+i+'" '+(i===Number(d)?'selected':'')+'>'+E(name)+'</option>').join("");
- C.openModal(b?"Editar compromisso":"Registrar horário ocupado",'<form id="s6-busy-form" class="section-stack"><input type="hidden" name="id" value="'+A(id||"")+'"><input type="hidden" name="oldKind" value="'+A(kind)+'"><input type="hidden" name="oldDay" value="'+A(d)+'"><div class="field"><label>Compromisso</label><input name="title" maxlength="90" required value="'+A(b?.title||"")+'" placeholder="Ex.: Curso, estágio, deslocamento"></div><div class="field"><label>Frequência</label><select name="kind" id="s6-frequency"><option value="weekly" '+(kind==="weekly"?'selected':'')+'>Semanal</option><option value="date" '+(kind==="date"?'selected':'')+'>Data específica</option></select></div><div class="field" id="s6-day-field" '+(kind==="date"?'hidden':'')+'><label>Dia da semana</label><select name="weekday">'+options+'</select></div><div class="field" id="s6-date-field" '+(kind==="weekly"?'hidden':'')+'><label>Data</label><input type="date" name="date" value="'+A(kind==="date"?d:s.date)+'" min="'+A(s.firstAccess)+'"></div><div class="form-grid"><div class="field"><label>Início</label><input type="time" name="start" value="'+A(b?.start||"08:00")+'" required></div><div class="field"><label>Fim</label><input type="time" name="end" value="'+A(b?.end||"12:00")+'" required></div></div><p class="note">Esses períodos sinalizam conflitos. Em faixas livres, as horas coincidentes serão descontadas, sem mexer nas horas que já foram declaradas como livres.</p><div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar compromisso</button></div></form>');
+ const day=kind==="date"?String(weekday||s.date):Number(weekday??C.parse(s.date).getDay());
+ const entry=kind==="date"?(X.busyDates[day]||[]).find(x=>x.id===id):X.busyWeekly[day]?.find(x=>x.id===id);
+ if(id&&!entry)throw Error("Não foi possível localizar o compromisso para edição.");
+ const group=kind==="weekly"&&entry?groupedWeekly().find(g=>g.members.some(x=>x.day===day&&x.id===id)):null;
+ const selected=group?.days||[day];
+ const weekdaysHtml=weekdays.map((label,i)=>'<label class="s6-weekday-choice"><input type="checkbox" name="weekdays" value="'+i+'" '+(selected.includes(i)?'checked':'')+'><span>'+E(label)+'</span></label>').join("");
+ C.openModal(entry?"Editar compromisso":"Registrar horário ocupado",
+  '<form id="s6-busy-form" class="section-stack">'+
+  '<input type="hidden" name="id" value="'+A(id||"")+'">'+
+  '<input type="hidden" name="oldKind" value="'+A(kind)+'">'+
+  '<input type="hidden" name="oldDay" value="'+A(day)+'">'+
+  '<div class="field"><label for="s6-busy-title">Compromisso</label><input id="s6-busy-title" name="title" maxlength="90" required value="'+A(entry?.title||"")+'" placeholder="Ex.: IFPB - Eletrônica"></div>'+
+  '<div class="field"><label for="s6-frequency">Frequência</label><select name="kind" id="s6-frequency"><option value="weekly" '+(kind==="weekly"?'selected':'')+'>Semanal</option><option value="date" '+(kind==="date"?'selected':'')+'>Data específica</option></select></div>'+
+  '<fieldset class="s6-weekdays" id="s6-day-field" '+(kind==="date"?'hidden':'')+'><legend>Dias da semana</legend><div class="s6-weekday-actions"><button type="button" class="btn small ghost" data-s6="weekBusiness" data-selection="business">Segunda a sexta</button><button type="button" class="btn small ghost" data-s6="weekAll" data-selection="all">Todos os dias</button><button type="button" class="btn small ghost" data-s6="weekNone" data-selection="none">Limpar</button></div><div class="s6-weekday-grid">'+weekdaysHtml+'</div><small>Você pode marcar vários dias para o mesmo compromisso.</small></fieldset>'+
+  '<div class="field" id="s6-date-field" '+(kind==="weekly"?'hidden':'')+'><label for="s6-busy-date">Data</label><input id="s6-busy-date" type="date" name="date" value="'+A(kind==="date"?day:s.date)+'" min="'+A(s.firstAccess)+'"></div>'+
+  '<div class="form-grid"><div class="field"><label for="s6-busy-start">Início</label><input id="s6-busy-start" type="time" name="start" value="'+A(entry?.start||"08:00")+'" required></div><div class="field"><label for="s6-busy-end">Fim</label><input id="s6-busy-end" type="time" name="end" value="'+A(entry?.end||"12:00")+'" required></div></div>'+
+  '<p class="note">O compromisso fica registrado nos dias selecionados e sinaliza conflitos, sem criar tarefas automaticamente.</p>'+
+  '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar compromisso</button></div></form>');
 }
 function openReviewForm(i){
  const rec=pendingRecommendations[i],g=rec?.group;
@@ -230,7 +331,11 @@ function onAction(b){
  else if(type==="deleteStep"){if(window.confirm("Excluir esta etapa?"))removeStep(b.dataset.goal,id);}
  else if(type==="newBusy")openBusyForm();
  else if(type==="editBusy")openBusyForm(kind,day,id);
- else if(type==="deleteBusy"){if(window.confirm("Excluir este horário ocupado?"))removeBusy(kind,day,id);}
+ else if(type==="deleteBusy"){if(window.confirm("Excluir este compromisso dos dias selecionados?"))deleteBusyGroup(kind,day,id);}
+ else if(["weekBusiness","weekAll","weekNone"].includes(type)){
+  const chosen=type==="weekAll"?[0,1,2,3,4,5,6]:type==="weekBusiness"?[1,2,3,4,5]:[];
+  for(const input of document.querySelectorAll('#s6-busy-form input[name="weekdays"]'))input.checked=chosen.includes(Number(input.value));
+ }
  else if(type==="planReview")openReviewForm(Number(b.dataset.index));
 }
 document.addEventListener("click",event=>{
@@ -253,15 +358,11 @@ document.addEventListener("submit",event=>{
  try{
   if(id==="s6-step-form")saveStep(String(d.get("goal")),String(d.get("title")),String(d.get("id")||""));
   if(id==="s6-busy-form"){
-   const kind=String(d.get("kind")),day=kind==="weekly"?Number(d.get("weekday")):String(d.get("date"));
-   const oldId=String(d.get("id")||"");
-   const oldKind=String(d.get("oldKind")),oldDay=String(d.get("oldDay"));
-   const details={kind,weekday:day,date:day,title:d.get("title"),start:d.get("start"),end:d.get("end")};
-   if(oldId&&(oldKind!==kind||String(oldDay)!==String(day))){
-    if(oldKind==="date"&&dayLocked(oldDay))throw Error("O histórico do dia finalizado não pode ser alterado.");
-    addBusy(details);
-    removeBusy(oldKind,oldDay,oldId);
-   }else addBusy(details,oldId);
+   const kind=String(d.get("kind"));
+   const previousId=String(d.get("id")||"");
+   const previous=previousId?{id:previousId,kind:String(d.get("oldKind")),day:String(d.get("oldDay"))}:null;
+   updateBusy({kind,title:d.get("title"),start:d.get("start"),end:d.get("end"),
+      weekdays:d.getAll("weekdays"),date:d.get("date")},previous);
   }
   if(id==="s6-review-form"){
    const item=pendingRecommendations[Number(d.get("index"))]?.group;
@@ -276,6 +377,6 @@ document.addEventListener("submit",event=>{
   C.closeModal();C.render();C.notify("Registro salvo.");
  }catch(e){C.notify(e.message||"Confira os campos.");}
 });
-window.OrbitaStage6={decorate,inspect:{occupied,subtract,freeAvailability,warnCollisions,addBusy,removeBusy,saveStep,toggleStep,removeStep,analyzeStudy,currentGoalRelations,steps,get model(){return X;}}};
+window.OrbitaStage6={decorate,inspect:{occupied,subtract,freeAvailability,warnCollisions,addBusy,removeBusy,saveStep,toggleStep,removeStep,analyzeStudy,currentGoalRelations,steps,updateBusy,deleteBusyGroup,groupedWeekly,busyDaysLabel,get model(){return X;}}};
 C.render();
 })();
