@@ -23,15 +23,19 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [ ] Verificação visual final no domínio publicado (depende do Pages e revisão em dispositivos)
 
 ## Etapa 2 — Organização
-- [ ] Focos obrigatórios com estados e remanejamento auditável
-- [ ] Tarefas secundárias, prioridade, idade, concluídas no fim, continuidade
-- [ ] Blocos com cores e operações CRUD/arquivamento
-- [ ] Calendário com criação/edição diária/semanal/mensal
-- [ ] Repetições semanal/mensal, numeração das ocorrências e prévia
-- [ ] Cópias de tarefa/semana/bloco/mês sem duplicidade/status
-- [ ] Duração estimada, horário opcional e duração real
-- [ ] Rotinas/hábitos recorrentes, pontualidade, repouso e pausas de última hora
-- [ ] Auditoria contra ESCOPO.md
+- [x] Focos obrigatórios com estados e remanejamento auditável
+- [x] Tarefas secundárias, prioridade, idade, concluídas no fim, continuidade
+- [x] Blocos com cores e operações CRUD/arquivamento
+- [x] Calendário com criação/edição diária/semanal/mensal
+- [x] Repetições semanal/mensal, numeração das ocorrências e prévia
+- [x] Cópias de tarefa/semana/bloco/mês sem duplicidade/status
+- [x] Duração estimada, horário opcional e duração real
+- [x] Rotinas/hábitos recorrentes, pontualidade, repouso e pausas de última hora
+- [x] Auditoria contra ESCOPO.md
+- [x] Testes automatizados dos módulos de planejamento passaram no GitHub Actions
+- [ ] Testes visuais e ações completas em navegador real no PC e no celular
+- [ ] Validação da pontualidade como métrica nos relatórios (etapa 4; o horário real já pode ser registrado)
+- [ ] Revisar casos extremos de repetição e cópia em mudanças de mês após teste real
 
 ## Etapa 3 — Estudos
 - [ ] Múltiplos ciclos e rotações independentes
@@ -58,6 +62,6 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [ ] Offline-first, fila de sincronização e conflitos
 - [ ] Exportação/importação/backups
 - [ ] PWA instalável e funcionamento offline
-- [ ] GitHub Pages ativo e testado em domínio real
+- [ ] GitHub Pages ativo e testado em domínio real (workflow de implantação aprovado; navegador real ainda não verificado)
 - [ ] Testes e ajustes finais com dados reais
 - [ ] Revisão completa de 100% dos requisitos com evidências
