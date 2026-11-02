@@ -22,7 +22,7 @@ Quando a publicação automática do GitHub Pages estiver habilitada:
 
 **https://allanghabriell.github.io/orbita/**
 
-A publicação usa `.github/workflows/pages.yml`. Caso o workflow falhe na configuração inicial do Pages, abra **Settings → Pages → Build and deployment → GitHub Actions**, e execute novamente o workflow. Essa configuração depende das permissões da conta.
+A publicação usa `.github/workflows/pages.yml`. **A primeira tentativa falhou:** o GitHub recusou a ativação automática do Pages com o erro `Resource not accessible by integration`. Abra **Settings → Pages → Build and deployment → GitHub Actions** para habilitar o Pages uma única vez, depois execute novamente o workflow **Testar e publicar Órbita**. Os testes de código passaram; o endereço público ainda não foi confirmado.
 
 Também é possível abrir `index.html` em um navegador para testar a interface estática.
 
