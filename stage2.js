@@ -138,8 +138,13 @@ function decoratePlan(){
  out+='<div class="row-between"><div class="row"><button class="btn square" data-s2="prevPeriod">‹</button><button class="btn small ghost" data-s2="now">Hoje</button><button class="btn square" data-s2="nextPeriod">›</button></div><button class="btn small" data-s2="pause" data-date="'+s.date+'">Descanso / pausa</button></div>';
  if(calendarView==="week"){
   out+='<div class="week-grid">';
-  for(let i=0;i<7;i++){const d=D(start,i),count=allOn(d).filter(x=>x.type==="focus"||x.type==="habit").length;
-   out+='<button class="day-tile '+(s.date===d?"selected ":"")+(d===day()?"today ":"")+'" data-s2="chooseDate" data-date="'+d+'" '+(d<firstUse()?"disabled":"")+'><span class="dow">'+SHORT[C.parse(d).getDay()]+'</span><span class="day-number">'+C.parse(d).getDate()+'</span><span class="day-meta">'+e(restInfo(d)?"☾ Descanso":count?count+" previsto(s)":availabilityStatus(d))+'</span></button>';}
+  for(let i=0;i<7;i++){
+   const d=D(start,i),count=allOn(d).filter(x=>x.type==="focus"||x.type==="habit").length;
+   const fullStatus=restInfo(d)?"☾ Descanso":count?count+" previsto(s)":availabilityStatus(d);
+   const available=C.resolveAvailability(d),freeMin=available?C.availabilityMinutes(available):null;
+   const compactStatus=restInfo(d)?"☾":count?count+" ativ.":freeMin===null?"—":freeMin===0?"0h":freeMin%60===0?(freeMin/60)+"h":"✓";
+   out+='<button class="day-tile '+(s.date===d?"selected ":"")+(d===day()?"today ":"")+'" data-s2="chooseDate" data-date="'+d+'" aria-label="'+a(fmt(d,true)+" — "+fullStatus)+'" '+(d<firstUse()?"disabled":"")+'><span class="dow">'+SHORT[C.parse(d).getDay()]+'</span><span class="day-number">'+C.parse(d).getDate()+'</span><span class="day-meta">'+e(fullStatus)+'</span><span class="day-meta-compact" aria-hidden="true">'+e(compactStatus)+'</span></button>';
+  }
   out+='</div>';
  } else out+=monthCalendar();
  const all=allOn(s.date);
