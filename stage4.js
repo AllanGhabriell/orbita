@@ -221,7 +221,16 @@ function dayReview(date){
  const snap=ev.closed[date]||capture(date),n=dailyCounts(snap),closed=!!snap.confirmed,remaining=pendingDates(date);
  const unavailable=date>today();
  let content='<div class="hero-row"><div><div class="overline">FECHAMENTO DO DIA</div><h1>'+E(fmt(date,true))+'</h1><p class="kicker">'+(closed?"Registro finalizado e bloqueado para edição.":unavailable?"Um dia futuro não pode ser encerrado.":"Revise cada registro antes de tornar o dia definitivo.")+'</p></div><button class="btn small ghost" data-s4="backHome">← Voltar</button></div>';
- if(closed)content+='<div class="evo-alert evo-good">✓ Fechado em '+E(new Date(snap.confirmed).toLocaleString("pt-BR"))+'. Os registros desta data são somente leitura.</div>';
+ if(closed){
+  content+='<div class="evo-alert evo-good">✓ Fechado em '+E(new Date(snap.confirmed).toLocaleString("pt-BR"))+'. Os registros desta data são somente leitura.</div>';
+  content+='<section class="card"><div class="card-head"><h2>Balanço do dia</h2></div><p class="note">'+
+   (n.foci?"Você concluiu "+n.doneFocus+" de "+n.foci+" foco(s). ":"Nenhum foco obrigatório foi registrado. ")+
+   (n.plannedStudy?"Registrou "+minutes(snap.result.actualStudyMin)+" de tempo real em estudos; "+n.missingStudyTimes+" sessão(ões) sem tempo informado. ":"Não há sessões de estudo cadastradas. ")+
+   (snap.pause?"A pausa foi registrada sem apagar as atividades planejadas.":"")+
+   '</p><div class="row"><button class="btn small" data-s4="viewStats">Ver estatísticas</button>'+
+   (lastStudyDayOfWeek(date)?'<button class="btn small primary" data-s4="viewStats">Balanço da semana</button>':"")+
+   '</div></section>';
+ }
  if(!closed&&remaining.length)content+='<div class="evo-alert evo-warning">Há '+remaining.length+' dia(s) anteriores aguardando fechamento. Comece por '+E(fmt(remaining[0],false))+'. <button class="btn small" data-s4="reviewDate" data-date="'+A(remaining[0])+'">Revisar data</button></div>';
  content+='<div class="metrics-grid">'+metric("Focos concluídos",n.doneFocus+"/"+n.foci,n.missedFocus+" não realizados/remanejados")+metric("Estudos concluídos",n.studiesDone+"/"+n.plannedStudy,n.studiesPartial+" parcial(is)")+metric("Estudo real",minutes(snap.result.actualStudyMin),n.missingStudyTimes+" sem tempo registrado")+metric("Carga planejada",minutes(snap.plan.totalMin),"Tempo previsto, não execução")+'</div>';
  if(snap.pause)content+='<div class="evo-alert">☾ '+E(snap.pause.kind==="planejado"?"Descanso planejado":snap.pause.kind==="imprevisto"?"Pausa por imprevisto":"Descanso decidido no dia")+(snap.pause.reason?" — "+E(snap.pause.reason):"")+'</div>';
@@ -247,6 +256,8 @@ function overviewPeriod(x){
  html+='<div class="metrics-grid">'+metric("Compromissos",rate==null?"—":rate+"",n.doneFocus+" de "+n.focus+" focos concluídos")+metric("Horas reais de estudo",minutes(n.studyActualMin),n.missingStudyTimes+" sessões sem tempo")+metric("Horas planejadas",minutes(n.plannedMin),"Tarefas e estudos sem dupla contagem")+metric("Descansos",n.rest+" planejado(s)",n.unplannedPauses+" pausa(s) extraordinária(s)")+'</div>';
  html+='<section class="card evo-period-chart"><div class="card-head"><h2>Distribuição diária do estudo</h2><span class="note">Minutos realmente informados</span></div>'+chartDays(x)+'</section>';
  html+='<section class="card"><div class="card-head"><h2>Orientador</h2>'+C.tag(sampleLevel(x)==="limited"?"Poucos registros":sampleLevel(x)==="initial"?"Tendências iniciais":"Histórico suficiente")+'</div><div class="evo-insights">'+guidance(x).map(y=>'<div class="evo-insight '+A(y.tone)+'"><strong>'+E(y.title)+'</strong><p>'+E(y.body)+'</p><small>Próximo passo: '+E(y.action)+'</small></div>').join("")+'</div></section>';
+ if(ev.milestones.length)html+='<section class="card"><div class="card-head"><h2>Conquistas reais</h2></div><div class="evo-achievements">'+ev.milestones.slice(-5).reverse().map(m=>'<div class="evo-achievement"><span aria-hidden="true">✦</span><div><strong>'+E(m.title)+'</strong><small>Concedida uma única vez, com base em fechamentos completos de focos.</small></div></div>').join("")+'</div></section>';
+
  html+='<section class="card"><div class="card-head"><h2>Mais indicadores</h2></div><div class="evo-rows">'+
  reportRow("Sessões concluídas",n.studiesDone+" / "+n.study)+
  reportRow("Rotinas concluídas",n.habitDone+" / "+n.habits)+
@@ -299,14 +310,14 @@ function homeDecor(base){
  if(closed){
   const ct=dailyCounts(closed);
   return '<section class="hero-row"><div><div class="overline">REGISTRO DEFINITIVO</div><h1>'+E(fmt(date,true))+'</h1><p class="kicker">Histórico somente leitura; os dados abaixo foram preservados no fechamento.</p></div><div class="row">'+C.dateNavigator()+'<button class="btn small" data-s4="reviewDate" data-date="'+A(date)+'">Relatório diário</button></div></section>'+
-  '<div class="evo-alert evo-good">✓ Dia finalizado. Nenhuma alteração posterior modificará este registro.</div>'+
+  '<div class="evo-alert evo-good">✓ Dia finalizado. Os resultados mostrados pertencem ao registro preservado no fechamento.</div>'+
   '<div class="metrics-grid">'+metric("Focos",ct.doneFocus+"/"+ct.foci)+metric("Sessões",ct.studiesDone+"/"+ct.plannedStudy)+metric("Estudo real",minutes(closed.result.actualStudyMin))+metric("Carga prevista",minutes(closed.plan.totalMin))+'</div>'+
   '<section class="card"><h2 class="section-title">Atividades registradas</h2><div class="review-lines">'+(closed.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")||'<p class="note">Sem atividades.</p>')+'</div></section>'+
   '<section class="card"><h2 class="section-title">Estudos registrados</h2><div class="review-lines">'+(closed.studies.map(x=>reviewLine(x.discipline,x.status,x.plannedMin,x.actualMin)).join("")||'<p class="note">Sem sessões.</p>')+'</div></section>';
  }
  if(date>today())return base;
  const closeLink='<div class="evo-footer"><button class="btn primary" data-s4="reviewDate" data-date="'+A(date)+'">Revisar e finalizar o dia</button><button class="btn small ghost" data-s4="viewStats">Ver evolução</button></div>';
- const miniWeek=lastStudyDayOfWeek(date)?'<div class="evo-alert">Último dia de estudos previsto na semana. O balanço semanal ficará disponível após a revisão; será definitivo quando os dias restantes estiverem fechados.</div>':"";
+ const miniWeek=lastStudyDayOfWeek(date)?'<div class="evo-alert"><span>Último dia de estudos previsto na semana. O balanço semanal já pode ser consultado como prévia; será definitivo após fechar os dias restantes.</span><button class="btn small" data-s4="viewStats">Ver semana</button></div>':"";
  const remind=reminderEligible()?'<div class="evo-alert evo-reminder"><span>Seu desempenho merece uma revisão. Há novos registros para analisar.</span><button class="btn small" data-s4="viewStats">Ver estatísticas</button><button class="btn small ghost" data-s4="dismissReminder">Depois</button><button class="btn small ghost" data-s4="disableReminder">Desativar</button></div>':"";
  return upper+remind+base+miniWeek+closeLink;
 }
@@ -325,7 +336,7 @@ function calendarDecor(base){
  const firstSection=pos<0?base:base.slice(0,pos);
  const snapshot=ev.closed[state.date];
  if(!snapshot)return base;
- return firstSection+'<section class="card"><div class="card-head"><h2>Dia finalizado · somente leitura</h2><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Ver relatório</button></div><p class="note">Planejamento e resultados preservados no momento do fechamento.</p><div class="review-lines">'+snapshot.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")+snapshot.studies.map(x=>reviewLine(x.discipline,x.status,x.plannedMin,x.actualMin)).join("")+'</div></section>';
+ return firstSection.replace(/<button[^>]*data-s2="pause"[^>]*>[\s\S]*?<\/button>/g,"")+'<section class="card"><div class="card-head"><h2>Dia finalizado · somente leitura</h2><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Ver relatório</button></div><p class="note">Planejamento e resultados preservados no momento do fechamento.</p><div class="review-lines">'+snapshot.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")+snapshot.studies.map(x=>reviewLine(x.discipline,x.status,x.plannedMin,x.actualMin)).join("")+'</div></section>';
 }
 function decorate(route,base){
  if(route==="inicio")return homeDecor(base);
