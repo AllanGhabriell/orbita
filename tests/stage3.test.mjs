@@ -39,7 +39,7 @@ assert.throws(()=>T.saveCycle({title:"Sem disponibilidade",area:"ENEM",defaultMi
 assert.ok(element("view").innerHTML.includes("Primeiro, sua disponibilidade"));
 for(let i=0;i<7;i++)C.state.availability.weekly[i]={mode:"hours",hours:8};
 C.save();C.render();
-assert.ok(element("view").innerHTML.includes("Ciclos e estudos"));
+assert.ok(element("view").innerHTML.includes("Estudos de hoje"));
 
 const c=T.saveCycle({title:"Eletrônica",area:"Eletrônica",defaultMin:90});
 const math=T.saveSubject({cycleId:c.id,title:"Matemática",targetSessions:2});
@@ -138,5 +138,50 @@ assert.equal(T.cycleState(c).id,physics.id,"próxima matéria pode ser alterada 
 P.model.closedDays.push(following);
 assert.throws(()=>T.addSessions({kind:"supplement",date:following,area:"Pessoal",discipline:"Leitura",plannedMin:"30"}),/Data fechada|finalizado/);
 P.model.closedDays.pop();
+
+
+// Planejamento rápido de 3 sessões reais de Matemática — 4h30 no analisador.
+const batchCycle=T.saveCycle({title:"Ciclo semanal",area:"ENEM",defaultMin:90});
+const batchMath=T.saveSubject({cycleId:batchCycle.id,title:"Matemática",targetSessions:3});
+const batchPhysics=T.saveSubject({cycleId:batchCycle.id,title:"Física",targetSessions:1});
+const planned=T.addBatchSessions({cycleId:batchCycle.id,fromDate:date,toDate:date,count:3,plannedMin:90,weekdays:[C.parse(date).getDay()]});
+assert.equal(planned.length,3,"três sessões distintas agendadas no dia");
+assert.equal(planned.filter(x=>x.rotationSlot).length,3,"matéria futura não é fixada prematuramente");
+assert.equal(T.loadFor(date).studyPlanned,240+60+90+270,"três sessões de 90min entram separadamente na carga do dia");
+C.go("inicio");
+assert.match(element("view").innerHTML,/Estudos de hoje/);
+assert.match(element("view").innerHTML,/3 de|0 de 3/,"total de sessões é exibido no Início");
+assert.ok((element("view").innerHTML.match(/data-s3="quickDone"/g)||[]).length>=3,"concluir diretamente no Início");
+assert.doesNotMatch(element("view").innerHTML,/data-s3="newSession"/,"o Início não oferece configuração de sessões");
+T.setSessionStatus(planned[0].id,"done",null,"");
+T.setSessionStatus(planned[1].id,"done",null,"");
+assert.equal(T.cycleState(batchCycle).id,batchMath.id,"matéria não avança antes das três conclusões");
+T.setSessionStatus(planned[2].id,"done",null,"");
+assert.equal(T.cycleState(batchCycle).id,batchPhysics.id,"conclusão da terceira sessão avança Física");
+assert.equal(T.summarize().actualRecorded < T.summarize().sessions,true,"concluir sem duração não inventa horas reais");
+C.render();
+assert.match(element("view").innerHTML,/Física/,"a próxima matéria aparece no Início");
+T.setSessionStatus(planned[2].id,"pending",null,"");
+assert.equal(T.cycleState(batchCycle).id,batchMath.id,"desfazer última conclusão reabre Matemática");
+assert.equal(planned[2].status,"pending");
+T.setSessionStatus(planned[2].id,"done",50,"");
+assert.equal(T.cycleState(batchCycle).id,batchPhysics.id);
+const weekEnd=C.addDays(date,6);
+const batch=T.addBatchSessions({cycleId:batchCycle.id,fromDate:date,toDate:weekEnd,count:2,plannedMin:90,weekdays:[1,2,3,4,5]});
+const expected=Array.from({length:7},(_,i)=>C.addDays(date,i)).filter(d=>[1,2,3,4,5].includes(C.parse(d).getDay()));
+assert.equal(batch.length,expected.length*2,"segunda a sexta cria duas sessões por dia");
+assert.equal(batch.reduce((a,x)=>a+x.plannedMin,0),expected.length*180);
+assert.ok(batch.every(x=>x.status==="pending"&&x.subjectId===""),"planejar semana não altera o ciclo");
+assert.equal(T.cycleState(batchCycle).id,batchPhysics.id);
+assert.throws(()=>T.addBatchSessions({cycleId:batchCycle.id,fromDate:date,toDate:date,count:0,weekdays:[1]}),/quantidade|válida|inteira/i);
+assert.throws(()=>T.addBatchSessions({cycleId:batchCycle.id,fromDate:date,toDate:date,count:2,weekdays:[]}),/dia da semana/i);
+assert.throws(()=>T.addBatchSessions({cycleId:batchCycle.id,fromDate:date,toDate:C.addDays(date,32),count:1,weekdays:[1]}),/31 dias/);
+const nextOpen=expected.find(d=>d>date);
+if(nextOpen){
+ const dynamic=batch.find(x=>x.date===nextOpen);
+ T.setSessionStatus(dynamic.id,"done",null,"");
+ assert.equal(dynamic.discipline,"Física","a matéria futura assume o assunto ativo só quando concluída");
+ assert.equal(T.cycleState(batchCycle).id,batchMath.id,"próxima vaga segue a rotação real");
+}
 
 console.log("Etapa 3: ciclos, etapa multi-sessão, correção, pausa, reforço, vínculo com foco, estatísticas por dimensão e editor preservado.");
