@@ -58,7 +58,7 @@ if(window.OrbitaStage3&&typeof window.OrbitaStage3.decorate==="function")content
 if(window.OrbitaStage4&&typeof window.OrbitaStage4.decorate==="function")content=window.OrbitaStage4.decorate(route,content);
 if(window.OrbitaStage5&&typeof window.OrbitaStage5.decorate==="function")content=window.OrbitaStage5.decorate(route,content);
 if(window.OrbitaStage6&&typeof window.OrbitaStage6.decorate==="function")content=window.OrbitaStage6.decorate(route,content);
-$("view").innerHTML=page(content);}
+$("view").dataset.route=route;$("view").innerHTML=page(content);}
 function dateNavigator(){return '<div class="date-nav"><button class="btn square" data-action="prevDay" '+(addDays(state.date,-1)<state.firstAccess?"disabled":"")+' aria-label="Dia anterior">‹</button><button class="btn date-button" data-action="jumpDate" title="Escolher data">'+esc(shortDate(state.date))+' ▾</button><button class="btn square" data-action="nextDay" aria-label="Próximo dia">›</button></div>';}
 function renderHome(){
 const goal=activeGoal(),a=resolveAvailability(state.date),ready=availabilityReady();
