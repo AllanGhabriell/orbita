@@ -9,6 +9,7 @@ const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
 let client=null,user=null,cloudVersion=0,mode="unconfigured",busy=false,initialized=false,saveTimer=null,networkTimer=null,lastError="",conflict=null;
 let cfg=null;
+let authInitializing=true,oauthReturnError=null,authSnapshot=null;
 function readConfig(){
  // Configuração publica do próprio Órbita; não depende de formulário/localStorage.
  const config=window.ORBITA_SUPABASE;
@@ -65,32 +66,82 @@ function isConfigured(config){
  if(!config||typeof config!=="object")return false;
  try{const url=new URL(String(config.url));return url.protocol==="https:"&&/\.supabase\.co$/.test(url.hostname)&&/^sb_publishable_[A-Za-z0-9_-]+$|^eyJ[A-Za-z0-9_.-]+$/.test(String(config.key||""))&&!String(config.key).startsWith("sb_secret_");}catch{return false;}
 }
+function oauthCallback(){
+ const params=new URLSearchParams(window.location.search);
+ return {code:params.get("code"),error:params.get("error"),
+  description:params.get("error_description"),errorCode:params.get("error_code")};
+}
+function clearOAuthCallback(){
+ // O código PKCE só pode ser trocado uma vez. Limpar ANTES de qualquer
+ // recarregamento ou importação evita reutilizá-lo e derrubar a sessão.
+ const url=new URL(window.location.href);
+ for(const key of ["code","state","error","error_code","error_description"])url.searchParams.delete(key);
+ const clean=url.pathname+(url.search||"")+(url.hash||"");
+ window.history.replaceState(window.history.state||null,"",clean);
+}
+function explainOAuthError(err){
+ const message=String(err?.message||err||"Erro desconhecido");
+ if(/verifier|flow state|invalid.flow|pkce|code.*not.found/i.test(message))
+  return "Não foi possível recuperar a verificação de segurança do login Google. Abra o Órbita e conclua o login na mesma aba e navegador. Detalhe: "+message;
+ return "O retorno do Google não concluiu a autenticação. Detalhe: "+message;
+}
 async function create(){
  cfg=readConfig();
- if(!isConfigured(cfg)){status("unconfigured");return;}
+ if(!isConfigured(cfg)){authInitializing=false;status("unconfigured");return;}
  status("loading");
  try{
   const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.87.3/+esm");
-  client=createClient(cfg.url,cfg.key,{auth:{flowType:"pkce",detectSessionInUrl:true,autoRefreshToken:true,persistSession:true}});
+  // O código de retorno será trocado explicitamente, uma única vez.
+  // Não competir com a troca automática do SDK.
+  client=createClient(cfg.url,cfg.key,{auth:{flowType:"pkce",detectSessionInUrl:false,autoRefreshToken:true,persistSession:true}});
   client.auth.onAuthStateChange((event,session)=>{
-   // Evitar fazer consultas assíncronas dentro do callback do SDK.
+   if(authInitializing)return; // INITIAL_SESSION e SIGNED_IN durante a troca do código
    queueMicrotask(()=>{onSession(session,event).catch(err=>status("error",err));});
   });
+  const callback=oauthCallback();
+  if(callback.error){
+   oauthReturnError=explainOAuthError(callback.description||callback.errorCode||callback.error);
+   clearOAuthCallback();
+  }else if(callback.code){
+   try{
+    const {data,error}=await client.auth.exchangeCodeForSession(callback.code);
+    if(error)throw error;
+    authSnapshot=data?.session||null;
+    if(!authSnapshot?.user)throw Error("O Google retornou, mas não foi recebida uma sessão válida.");
+    clearOAuthCallback();
+   }catch(err){
+    oauthReturnError=explainOAuthError(err);
+    clearOAuthCallback();
+   }
+  }
   const {data,error}=await client.auth.getSession();
   if(error)throw error;
-  await onSession(data?.session,"initial");
+  authInitializing=false;
+  const session=authSnapshot||data?.session||null;
+  if(session?.user){
+   oauthReturnError=null;
+   await onSession(session,"initial");
+  }else{
+   user=null;
+   status(oauthReturnError?"error":"signedout",oauthReturnError||"");
+  }
   initialized=true;
- }catch(err){status(navigator.onLine?"error":"offline",err);}
+ }catch(err){
+  authInitializing=false;
+  oauthReturnError=explainOAuthError(err);
+  status(navigator.onLine?"error":"offline",oauthReturnError);
+ }
  C.render();
 }
 async function onSession(session,event){
  const next=session?.user||null;
  if(!next){
   user=null;cloudVersion=0;
-  status(isConfigured(readConfig())?"signedout":"guest");
+  status(oauthReturnError?"error":isConfigured(readConfig())?"signedout":"guest",oauthReturnError||"");
   C.render();return;
  }
- if(user?.id===next.id&&["loading","ready","syncing"].includes(mode))return;
+ if(user?.id===next.id)return;
+ oauthReturnError=null;
  user=next;
  status("loading");
  await initialReconcile();
@@ -194,9 +245,10 @@ async function syncNow(){
  notify(mode==="ready"?"Sincronização concluída.":"Verifique o status da conexão.");
 }
 async function signIn(){
- if(!client)return notify("Primeiro configure a URL e a chave pública do Supabase.");
+ if(!client)return notify("A conexão com o Supabase ainda está carregando. Aguarde um instante.");
  try{
   const redirectTo=window.location.origin+window.location.pathname;
+  // URL exata autorizada no Supabase; descarta fragmentos e query antigas.
   const {error}=await client.auth.signInWithOAuth({provider:"google",options:{redirectTo}});
   if(error)throw error;
  }catch(err){status("error",err);}
@@ -282,7 +334,7 @@ async function chooseLocal(){
 function settingsPanel(){
  const label=user?.user_metadata?.name||user?.email||"";
  return '<section class="card s5-panel"><div class="card-head"><h2>Dados e sincronização</h2><span class="status" id="s5-status">'+E({ready:"Sincronização ativa",syncing:"Enviando alterações",conflict:"Conflito de versões",loading:"Conectando",offline:"Offline",error:"Atenção",signedout:"Não conectado",unconfigured:"Não configurado"}[mode]||mode)+'</span></div>'+
- '<p class="note" id="s5-error" '+(!lastError?'hidden':'')+'>'+E(lastError)+'</p>'+
+ '<p class="note s5-auth-error" id="s5-error" role="alert" '+(!lastError?'hidden':'')+'>'+E(lastError)+'</p>'+
  (user?'<div class="s5-user"><div><strong>'+E(label)+'</strong><small>Dados privados da conta Google. O login do navegador é separado do banco local.</small></div></div><div class="row"><button class="btn primary" data-s5="sync">Sincronizar agora</button><button class="btn small" data-s5="logout">Sair da conta</button></div>':
  (client?'<div class="row"><button class="btn primary" data-s5="login">Continuar com Google</button><span class="note">Sem login, seus dados permanecem neste aparelho.</span></div>':'<p class="note">A conexão com o banco já está configurada no Órbita. Se o login não aparecer, confira sua conexão com a internet e atualize a página.</p>'))+
  '<div class="s5-conflict" id="s5-conflict-actions" '+(mode!=="conflict"?"hidden":"")+'><strong>Há duas versões dos seus dados.</strong><p class="note">Nada será sobrescrito automaticamente. Primeiro exporte um backup, depois escolha qual cópia utilizar. A proteção de dias finalizados é aplicada pelo banco.</p><div class="row"><button class="btn" data-s5="chooseRemote">Usar nuvem</button><button class="btn" data-s5="chooseLocal">Usar dispositivo</button></div></div>'+
@@ -315,7 +367,7 @@ document.addEventListener("change",event=>{
  receiveBackup(event.target.files?.[0]).catch(err=>{status(mode==="conflict"?"conflict":"error",err);notify(textError(err));});
 });
 window.addEventListener("online",()=>{if(user&&mode!=="conflict"){clearTimeout(networkTimer);networkTimer=setTimeout(()=>initialReconcile().catch(err=>status("error",err)),600);}});
-window.OrbitaStage5={decorate,inspect:{checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client},mergeClosures}};
+window.OrbitaStage5={decorate,inspect:{oauthCallback,clearOAuthCallback,explainOAuthError,checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client},mergeClosures}};
 C.render();
 create();
 })();
