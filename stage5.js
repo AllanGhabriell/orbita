@@ -1,0 +1,294 @@
+/* ÓRBITA — Etapa 5: configuração pública Supabase, Auth Google, backups e sincronização segura. */
+(function(){
+"use strict";
+const C=window.OrbitaCore,Storage=window.OrbitaStorage;
+if(!C||!Storage)throw Error("Órbita: inicialização incompleta");
+const KEY="orbita:supabase-config-v1",META="orbita:cloud-meta-v1";
+const VERSION=1;
+const E=C.esc,A=C.attr;
+const $=id=>document.getElementById(id);
+let client=null,user=null,cloudVersion=0,mode="unconfigured",busy=false,initialized=false,saveTimer=null,networkTimer=null,lastError="",conflict=null;
+let cfg=null;
+function readConfig(){
+ try{const saved=JSON.parse(localStorage.getItem(KEY)||"null");
+ const staticCfg=window.ORBITA_SUPABASE||null;
+ return staticCfg&&staticCfg.url&&staticCfg.key?staticCfg:saved;}catch{return null;}
+}
+function currentDoc(){return JSON.parse(JSON.stringify(C.state));}
+function stringify(doc){return JSON.stringify(doc);}
+function checksum(doc){
+ const str=stringify(doc);let hash=2166136261;
+ for(let i=0;i<str.length;i++){hash^=str.charCodeAt(i);hash=Math.imul(hash,16777619);}
+ return str.length.toString(36)+"-"+(hash>>>0).toString(36);
+}
+function cloudMeta(){
+ try{return JSON.parse(localStorage.getItem(META)||"null")||{};}catch{return {};}
+}
+function setCloudMeta(value){localStorage.setItem(META,JSON.stringify(value));}
+function boundMeta(){const meta=cloudMeta();return user&&meta.userId===user.id?meta:null;}
+function setLastSync(doc,version){cloudVersion=version;setCloudMeta({userId:user.id,version,hash:checksum(doc),at:new Date().toISOString()});}
+function meaningful(doc){
+ return !!(doc?.goals?.length||doc?.planner?.entries?.length||doc?.planner?.blocks?.length||
+ doc?.studies?.cycles?.length||doc?.studies?.sessions?.length||Object.keys(doc?.evolution?.closed||{}).length);
+}
+function textError(error){
+ if(!navigator.onLine)return "Você está offline. Os dados continuam neste dispositivo.";
+ const msg=String(error?.message||error||"Falha desconhecida");
+ if(/permission|42501|403/i.test(msg))return "Acesso negado pelo Supabase. Verifique o SQL e a sessão.";
+ if(/function.*not found|PGRST202|404/i.test(msg))return "A função orbita_commit não foi encontrada. Execute o SQL da migração.";
+ if(/dia finalizado|finalizados|23514|snapshot/i.test(msg))return "O banco protege dias encerrados. O documento enviado contém alterações incompatíveis com o histórico. Exporte um backup e utilize a cópia da nuvem.";
+ return msg.length>210?msg.slice(0,210)+"…":msg;
+}
+function status(newMode,error=""){
+ mode=newMode;lastError=error?textError(error):"";
+ const text={unconfigured:"Não configurado",loading:"Conectando",guest:"Uso local",offline:"Offline · dados locais",ready:"Sincronização ativa",syncing:"Enviando alterações",conflict:"Conflito de versões",error:"Atenção à sincronização",signedout:"Conecte sua conta"}[mode]||mode;
+ const node=$("s5-status");if(node)node.textContent=text;
+ const p=$("s5-error");if(p){p.textContent=lastError;p.hidden=!lastError;}
+ const controls=$("s5-conflict-actions");if(controls)controls.hidden=mode!=="conflict";
+}
+function notify(message){C.notify(message);}
+function isConfigured(config){
+ if(!config||typeof config!=="object")return false;
+ try{const url=new URL(String(config.url));return url.protocol==="https:"&&/\.supabase\.co$/.test(url.hostname)&&/^sb_publishable_[A-Za-z0-9_-]+$|^eyJ[A-Za-z0-9_.-]+$/.test(String(config.key||""))&&!String(config.key).startsWith("sb_secret_");}catch{return false;}
+}
+async function create(){
+ cfg=readConfig();
+ if(!isConfigured(cfg)){status("unconfigured");return;}
+ status("loading");
+ try{
+  const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm");
+  client=createClient(cfg.url,cfg.key,{auth:{flowType:"pkce",detectSessionInUrl:true,autoRefreshToken:true,persistSession:true}});
+  client.auth.onAuthStateChange((event,session)=>{
+   // Evitar fazer consultas assíncronas dentro do callback do SDK.
+   queueMicrotask(()=>{onSession(session,event).catch(err=>status("error",err));});
+  });
+  const {data,error}=await client.auth.getSession();
+  if(error)throw error;
+  await onSession(data?.session,"initial");
+  initialized=true;
+ }catch(err){status(navigator.onLine?"error":"offline",err);}
+ C.render();
+}
+async function onSession(session,event){
+ const next=session?.user||null;
+ if(!next){
+  user=null;cloudVersion=0;
+  status(isConfigured(readConfig())?"signedout":"guest");
+  C.render();return;
+ }
+ if(user?.id===next.id&&mode==="ready")return;
+ user=next;
+ status("loading");
+ await initialReconcile();
+ C.render();
+}
+async function fetchRemote(){
+ if(!client||!user)throw Error("Conecte sua conta Google.");
+ const {data,error}=await client.from("orbita_documents").select("version,content").eq("user_id",user.id).maybeSingle();
+ if(error)throw error;
+ return data?{version:Number(data.version),document:data.content}:{version:0,document:null};
+}
+function isValidDoc(doc){return doc&&typeof doc==="object"&&!Array.isArray(doc)&&doc.schema===VERSION&&Array.isArray(doc.goals)&&doc.firstAccess&&doc.settings;}
+function checkFrozenCompatibility(local,remote){
+ const left=local?.evolution?.closed||{},right=remote?.evolution?.closed||{};
+ for(const [date,record] of Object.entries(right)){
+  if(!(date in left)||stringify(left[date])!==stringify(record))return false;
+ }
+ return true;
+}
+async function importState(doc,version=0){
+ if(!isValidDoc(doc))throw Error("Documento de nuvem inválido. Nenhum dado foi substituído.");
+ await Storage.replaceDocument(doc);
+ if(user)setLastSync(doc,version);
+ window.location.reload();
+}
+async function initialReconcile(){
+ let remote;
+ try{remote=await fetchRemote();}catch(err){status(navigator.onLine?"error":"offline",err);return;}
+ const local=currentDoc(),meta=boundMeta(),localHash=checksum(local);
+ cloudVersion=remote.version;
+ if(!remote.document){
+  // Não há dados na nuvem; nunca importar dados de outra conta sem confirmação.
+  if(meta&&meta.version>0){conflict={remote,local};status("conflict");return;}
+  mode="ready";await push(local);return;
+ }
+ if(!isValidDoc(remote.document)){status("error","O documento na nuvem tem estrutura inválida.");return;}
+ const remoteHash=checksum(remote.document);
+ if(localHash===remoteHash){setLastSync(local,remote.version);status("ready");return;}
+ if(!meaningful(local)){
+  await importState(remote.document,remote.version);return;
+ }
+ if(meta&&meta.version===remote.version&&meta.hash===remoteHash){
+  // Servidor está na mesma revisão confirmada; só o dispositivo mudou.
+  cloudVersion=remote.version;status("ready");await push(local);return;
+ }
+ if(meta&&meta.hash===localHash){
+  // Nenhuma alteração local depois do último sync: baixar revisão mais recente.
+  await importState(remote.document,remote.version);return;
+ }
+ conflict={remote,local};
+ status("conflict");
+}
+function scheduleSync(){
+ if(mode!=="ready"||!client||!user)return;
+ clearTimeout(saveTimer);
+ saveTimer=setTimeout(()=>push(currentDoc()).catch(err=>status(navigator.onLine?"error":"offline",err)),1300);
+}
+Storage.onUserSave=()=>scheduleSync();
+async function push(doc){
+ if(busy||!user||!client||mode==="conflict")return;
+ busy=true;status("syncing");
+ try{
+  const {data,error}=await client.rpc("orbita_commit",{p_expected_version:cloudVersion,p_document:doc});
+  if(error)throw error;
+  if(data?.status==="conflict"){
+   const remote=await fetchRemote();
+   conflict={remote,local:currentDoc()};
+   status("conflict");return;
+  }
+  if(data?.status!=="ok")throw Error("Resposta desconhecida de sincronização.");
+  setLastSync(doc,Number(data.version));
+  status("ready");
+  if(checksum(currentDoc())!==checksum(doc))scheduleSync();
+ }catch(err){status(navigator.onLine?"error":"offline",err);}
+ finally{busy=false;}
+}
+async function syncNow(){
+ if(!user)return notify("Entre com Google antes de sincronizar.");
+ if(mode==="conflict")return notify("Resolva o conflito antes de sincronizar.");
+ if(mode==="syncing")return;
+ if(mode==="error"||mode==="offline"){
+  await initialReconcile();
+  if(mode!=="ready")return;
+ }
+ await push(currentDoc());
+ notify(mode==="ready"?"Sincronização concluída.":"Verifique o status da conexão.");
+}
+async function signIn(){
+ if(!client)return notify("Primeiro configure a URL e a chave pública do Supabase.");
+ try{
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await client.auth.signInWithOAuth({provider:"google",options:{redirectTo}});
+  if(error)throw error;
+ }catch(err){status("error",err);}
+}
+async function signOut(){
+ if(!client)return;
+ if(mode==="syncing"||mode==="conflict"||mode==="error"||mode==="offline"){
+  notify("Há dados que talvez não estejam na nuvem. Exporte um backup antes de sair.");
+  return;
+ }
+ if(!window.confirm("Sair da conta e limpar os dados deste navegador? Os dados sincronizados continuarão na nuvem."))return;
+ // Evita que dados de uma conta apareçam para o próximo visitante do dispositivo.
+ await Storage.persistNow();
+ const {error}=await client.auth.signOut();
+ if(error){status("error",error);return;}
+ await Storage.clearDocument();
+ localStorage.removeItem(META);
+ window.location.reload();
+}
+function exportBackup(){
+ const doc=currentDoc();
+ const backup={format:"orbita-backup",version:1,exportedAt:new Date().toISOString(),content:doc};
+ const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+ const href=URL.createObjectURL(blob);
+ const link=document.createElement("a");link.href=href;link.download="orbita-backup-"+C.today()+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(href),4000);
+ notify("Backup preparado. Guarde o arquivo com segurança.");
+}
+async function receiveBackup(file){
+ if(!file)return;
+ if(file.size>6000000)throw Error("O backup excede o limite de 6 MB.");
+ const input=JSON.parse(await file.text());
+ if(input.format!=="orbita-backup"||input.version!==1||!isValidDoc(input.content))throw Error("Este arquivo não é um backup Órbita compatível.");
+ const local=currentDoc(),incoming=input.content;
+ // Nenhum backup antigo pode apagar ou modificar dias já encerrados no dispositivo.
+ if(!checkFrozenCompatibility(incoming,local))throw Error("O backup removeria ou alteraria dias finalizados. Importe uma cópia que preserve esse histórico.");
+ if(!window.confirm("Substituir seus dados locais por este backup? Exporte uma cópia atual antes de continuar."))return;
+ if(user&&mode==="ready"){
+  // A gravação remota é verificada pelo CAS e pela proteção do banco.
+  const existing=await fetchRemote();
+  if(existing.version!==cloudVersion){conflict={remote:existing,local:incoming};status("conflict");throw Error("A nuvem mudou. Resolva o conflito antes de importar.");}
+  const {data,error}=await client.rpc("orbita_commit",{p_expected_version:cloudVersion,p_document:incoming});
+  if(error)throw error;
+  if(data?.status!=="ok"){conflict={remote:await fetchRemote(),local:incoming};status("conflict");throw Error("Conflito de versões durante a importação.");}
+  setLastSync(incoming,Number(data.version));
+ }else if(user){
+  throw Error("Para importar conectado, restabeleça a sincronização ou saia após exportar um backup.");
+ }
+ await importState(incoming,user?cloudVersion:0);
+}
+async function chooseRemote(){
+ if(!conflict?.remote?.document)return notify("Nenhum documento disponível na nuvem.");
+ if(!window.confirm("Usar o arquivo da nuvem neste dispositivo? Faça backup dos dados locais antes. Essa opção não apaga o banco."))return;
+ await importState(conflict.remote.document,conflict.remote.version);
+}
+async function chooseLocal(){
+ if(!conflict||!user)return;
+ if(!window.confirm("Enviar seus dados locais em substituição à nuvem? O servidor recusará alterações em dias finalizados. Exporte um backup da nuvem antes."))return;
+ const remote=await fetchRemote();
+ if(remote.version!==conflict.remote.version){conflict.remote=remote;status("conflict");return notify("A nuvem mudou novamente. Revise o conflito.");}
+ const doc=conflict.local;
+ const {data,error}=await client.rpc("orbita_commit",{p_expected_version:remote.version,p_document:doc});
+ if(error){status("conflict",error);return;}
+ if(data?.status!=="ok"){conflict.remote=await fetchRemote();status("conflict");return;}
+ setLastSync(doc,Number(data.version));conflict=null;status("ready");
+ if(checksum(currentDoc())!==checksum(doc))await importState(doc,Number(data.version));
+ else C.render();
+ notify("Dados locais sincronizados.");
+}
+function configForm(){
+ const url=cfg?.url||"",key=cfg?.key||"";
+ return '<section class="card"><div class="card-head"><h2>Conectar Supabase</h2></div>'+
+ '<form id="s5-config" class="section-stack"><div class="field"><label>Project URL</label><input name="url" type="url" required placeholder="https://seu-projeto.supabase.co" value="'+A(url)+'"></div>'+
+ '<div class="field"><label>Publishable key / chave pública</label><input name="key" type="text" required autocomplete="off" spellcheck="false" placeholder="sb_publishable_..." value="'+A(key)+'"></div>'+
+ '<p class="note">Não use sb_secret_*, service_role ou senha de banco. A URL e a chave pública não dão acesso aos dados privados sem autenticação e RLS.</p><button class="btn primary" type="submit">Salvar configuração</button></form></section>';
+}
+function settingsPanel(){
+ const label=user?.user_metadata?.name||user?.email||"";
+ return '<section class="card s5-panel"><div class="card-head"><h2>Dados e sincronização</h2><span class="status" id="s5-status">'+E({ready:"Sincronização ativa",syncing:"Enviando alterações",conflict:"Conflito de versões",loading:"Conectando",offline:"Offline",error:"Atenção",signedout:"Não conectado",unconfigured:"Não configurado"}[mode]||mode)+'</span></div>'+
+ '<p class="note" id="s5-error" '+(!lastError?'hidden':'')+'>'+E(lastError)+'</p>'+
+ (user?'<div class="s5-user"><div><strong>'+E(label)+'</strong><small>Dados privados da conta Google. O login do navegador é separado do banco local.</small></div></div><div class="row"><button class="btn primary" data-s5="sync">Sincronizar agora</button><button class="btn small" data-s5="logout">Sair da conta</button></div>':
+ (client?'<div class="row"><button class="btn primary" data-s5="login">Continuar com Google</button><span class="note">Sem login, seus dados permanecem neste aparelho.</span></div>':'<p class="note">Configure a conexão abaixo. O aplicativo continua funcionando sem login.</p>'))+
+ '<div class="s5-conflict" id="s5-conflict-actions" '+(mode!=="conflict"?"hidden":"")+'><strong>Há duas versões dos seus dados.</strong><p class="note">Nada será sobrescrito automaticamente. Primeiro exporte um backup, depois escolha qual cópia utilizar. A proteção de dias finalizados é aplicada pelo banco.</p><div class="row"><button class="btn" data-s5="chooseRemote">Usar nuvem</button><button class="btn" data-s5="chooseLocal">Usar dispositivo</button></div></div>'+
+ '<div class="row" style="margin-top:12px"><button class="btn" data-s5="export">Exportar backup JSON</button><button class="btn" data-s5="import">Importar backup JSON</button><input id="s5-import-file" type="file" accept=".json,application/json" hidden></div>'+
+ '<p class="note">Armazenamento offline: '+(Storage.supportsIndexedDB?"IndexedDB com cópia compatível no navegador.":"armazenamento local de compatibilidade.")+' Se limpar dados do navegador, poderá perder registros ainda não sincronizados. Faça backups periódicos.</p></section>'+
+ (!client?configForm():'<section class="card"><div class="card-head"><h2>Configuração do banco</h2></div><p class="note">URL: '+E(cfg?.url||"—")+'</p><button class="btn ghost small" data-s5="reconfigure">Alterar conexão</button></section>');
+}
+function decorate(route,base){
+ if(route==="configuracoes")return base+settingsPanel();
+ if(route==="perfil")return base+'<section class="card"><div class="card-head"><h2>Conta e backups</h2></div><p class="note">'+E(user?"Conectado a "+(user.email||"Google"):"Use os dados localmente ou conecte sua conta Google nas Preferências.")+'</p><button class="btn small" data-s5="openSettings">Gerenciar conta e backups</button></section>';
+ return base;
+}
+async function handleAction(type){
+ switch(type){
+ case "login":await signIn();break;
+ case "logout":await signOut();break;
+ case "sync":await syncNow();break;
+ case "export":exportBackup();break;
+ case "import":$("s5-import-file")?.click();break;
+ case "chooseRemote":await chooseRemote();break;
+ case "chooseLocal":await chooseLocal();break;
+ case "openSettings":C.go("configuracoes");break;
+ case "reconfigure":if(!window.confirm("Alterar configuração? A sessão atual poderá ser desconectada."))return;localStorage.removeItem(KEY);window.location.reload();break;
+ }
+}
+document.addEventListener("click",event=>{
+ const target=event.target.closest("[data-s5]");if(!target)return;
+ event.preventDefault();handleAction(target.dataset.s5).catch(err=>status("error",err));
+});
+document.addEventListener("change",event=>{
+ if(event.target?.id!=="s5-import-file")return;
+ receiveBackup(event.target.files?.[0]).catch(err=>{status(mode==="conflict"?"conflict":"error",err);notify(textError(err));});
+});
+document.addEventListener("submit",event=>{
+ if(event.target.id!=="s5-config")return;
+ event.preventDefault();
+ const data=new FormData(event.target),candidate={url:String(data.get("url")||"").trim().replace(/\/+$/,""),key:String(data.get("key")||"").trim()};
+ if(!isConfigured(candidate)){notify("Informe uma Project URL Supabase válida e apenas a chave pública.");return;}
+ localStorage.setItem(KEY,JSON.stringify(candidate));window.location.reload();
+});
+window.addEventListener("online",()=>{if(user&&mode!=="conflict"){clearTimeout(networkTimer);networkTimer=setTimeout(()=>initialReconcile().catch(err=>status("error",err)),600);}});
+window.OrbitaStage5={decorate,inspect:{checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client}}};
+C.render();
+create();
+})();
