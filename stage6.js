@@ -297,14 +297,14 @@ function openBusyForm(kind="weekly",weekday=null,id=null){
  const selected=group?.days||[day];
  const weekdaysHtml=weekdays.map((label,i)=>'<label class="s6-weekday-choice"><input type="checkbox" name="weekdays" value="'+i+'" '+(selected.includes(i)?'checked':'')+'><span>'+E(label)+'</span></label>').join("");
  C.openModal(entry?"Editar compromisso":"Registrar horário ocupado",
-  '<form id="s6-busy-form" class="section-stack">'+
+  '<form id="s6-busy-form" class="section-stack" novalidate>'+
   '<input type="hidden" name="id" value="'+A(id||"")+'">'+
   '<input type="hidden" name="oldKind" value="'+A(kind)+'">'+
   '<input type="hidden" name="oldDay" value="'+A(day)+'">'+
   '<div class="field"><label for="s6-busy-title">Compromisso</label><input id="s6-busy-title" name="title" maxlength="90" required value="'+A(entry?.title||"")+'" placeholder="Ex.: IFPB - Eletrônica"></div>'+
   '<div class="field"><label for="s6-frequency">Frequência</label><select name="kind" id="s6-frequency"><option value="weekly" '+(kind==="weekly"?'selected':'')+'>Semanal</option><option value="date" '+(kind==="date"?'selected':'')+'>Data específica</option></select></div>'+
   '<fieldset class="s6-weekdays" id="s6-day-field" '+(kind==="date"?'hidden':'')+'><legend>Dias da semana</legend><div class="s6-weekday-actions"><button type="button" class="btn small ghost" data-s6="weekBusiness" data-selection="business">Segunda a sexta</button><button type="button" class="btn small ghost" data-s6="weekAll" data-selection="all">Todos os dias</button><button type="button" class="btn small ghost" data-s6="weekNone" data-selection="none">Limpar</button></div><div class="s6-weekday-grid">'+weekdaysHtml+'</div><small>Você pode marcar vários dias para o mesmo compromisso.</small></fieldset>'+
-  '<div class="field" id="s6-date-field" '+(kind==="weekly"?'hidden':'')+'><label for="s6-busy-date">Data</label><input id="s6-busy-date" type="date" name="date" value="'+A(kind==="date"?day:s.date)+'" min="'+A(s.firstAccess)+'"></div>'+
+  '<div class="field" id="s6-date-field" '+(kind==="weekly"?'hidden':'')+'><label for="s6-busy-date">Data</label><input id="s6-busy-date" type="date" name="date" value="'+A(kind==="date"?day:s.date)+'" min="'+A(s.firstAccess)+'" '+(kind==="weekly"?'disabled':'')+'></div>'+
   '<div class="form-grid"><div class="field"><label for="s6-busy-start">Início</label><input id="s6-busy-start" type="time" name="start" value="'+A(entry?.start||"08:00")+'" required></div><div class="field"><label for="s6-busy-end">Fim</label><input id="s6-busy-end" type="time" name="end" value="'+A(entry?.end||"12:00")+'" required></div></div>'+
   '<p class="note">O compromisso fica registrado nos dias selecionados e sinaliza conflitos, sem criar tarefas automaticamente.</p>'+
   '<p id="s6-form-error" class="s6-form-error" role="alert" hidden></p>'+
@@ -349,6 +349,8 @@ document.addEventListener("change",event=>{
   const isDate=event.target.value==="date";
   const a=$("s6-day-field"),b=$("s6-date-field");
   if(a)a.hidden=isDate;if(b)b.hidden=!isDate;
+  const dateInput=$("s6-busy-date");
+  if(dateInput)dateInput.disabled=!isDate;
  }
 });
 document.addEventListener("submit",event=>{
@@ -362,8 +364,13 @@ document.addEventListener("submit",event=>{
    const kind=String(d.get("kind"));
    const previousId=String(d.get("id")||"");
    const previous=previousId?{id:previousId,kind:String(d.get("oldKind")),day:String(d.get("oldDay"))}:null;
-   updateBusy({kind,title:d.get("title"),start:d.get("start"),end:d.get("end"),
+   const saved=updateBusy({kind,title:d.get("title"),start:d.get("start"),end:d.get("end"),
       weekdays:d.getAll("weekdays"),date:d.get("date")},previous);
+   // Evita apresentar "salvo" se a operação não ficou registrada na coleção.
+   if(kind==="weekly"&&!groupedWeekly().some(g=>g.members.some(member=>member.id===saved.id)))
+    throw Error("O compromisso não apareceu na lista após o salvamento.");
+   if(kind==="date"&&!(X.busyDates[String(d.get("date"))]||[]).some(x=>x.id===saved.id))
+    throw Error("O compromisso não apareceu na data cadastrada.");
   }
   if(id==="s6-review-form"){
    const item=pendingRecommendations[Number(d.get("index"))]?.group;
