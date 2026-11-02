@@ -655,6 +655,119 @@ function methodModal(id){
  const x=id?method(id):null;
  modal(x?"Editar modalidade":"Nova modalidade",'<form id="s3-method" class="section-stack"><input name="id" value="'+A(id||"")+'" type="hidden">'+field("Nome","title",x?.title||"","text",'required maxlength="80" placeholder="Ex.: Revisão ativa"')+'<div class="field"><label>Descrição opcional</label><textarea name="description" maxlength="500">'+E(x?.description||"")+'</textarea></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>');
 }
+// Formulários rápidos: área/objetivo/matéria vêm da biblioteca, nunca de digitação livre.
+function planQuickModal(id="",presetDate=""){
+ const x=id?session(id):null;
+ if(x){planIsEditable(x);if(!x.cycleId)return sessionModal(id);}
+ const cycles=db.cycles.filter(z=>!z.archived&&activeSubjects(z).length);
+ const selected=cycle(x?.cycleId)||cycles[0];
+ if(!selected){notify("Cadastre um ciclo com matérias na Biblioteca antes de planejar.");screen="library";C.go("estudos");return;}
+ const mode=x?(x.rotationSlot?"rotation":"specific"):"rotation",dt=presetDate||x?.date||s.date;
+ const chosen=x?.subjectId||"",sub=subject(chosen);
+ const cycleOptions=cycles.map(z=>'<option value="'+A(z.id)+'" '+(selected.id===z.id?"selected":"")+'>'+E(z.title)+'</option>').join("");
+ const subOpts=studiedSubjects(selected).filter(z=>!z.archived).map(z=>'<option value="'+A(z.id)+'" '+(sub?.id===z.id?"selected":"")+'>'+E(z.title)+(z.paused?" (pausada)":"")+'</option>').join("");
+ const topicOpts=sub?planTopics(sub.id).map(t=>'<option value="'+A(t.id)+'" '+(x?.topicId===t.id?"selected":"")+'>'+E(t.title)+'</option>').join(""):"";
+ const methodOpts=db.methods.filter(m=>!m.archived||m.id===x?.methodId).map(m=>'<option value="'+A(m.id)+'" '+(m.id===x?.methodId?"selected":"")+'>'+E(m.title)+'</option>').join("");
+ modal(x?"Editar planejamento":"Adicionar estudo ao dia",
+  '<form id="s3-quick" class="section-stack"><input name="id" type="hidden" value="'+A(x?.id||"")+'">'+
+  '<div class="field"><label>Ciclo</label><select name="cycleId" id="s3-quick-cycle" required>'+cycleOptions+'</select></div>'+
+  '<div class="study-quick-cycle-meta" id="s3-quick-meta">Área: '+E(selected.area)+' · '+E(s.goals.find(g=>g.id===selected.goalId)?.title||"Sem objetivo vinculado")+'</div>'+
+  '<div class="field"><label>O que estudar?</label><select name="mode" id="s3-quick-mode"><option value="rotation" '+(mode==="rotation"?"selected":"")+'>Seguir a sequência do ciclo</option><option value="specific" '+(mode==="specific"?"selected":"")+'>Matéria específica (sem avançar o ciclo)</option></select></div>'+
+  '<div class="field" id="s3-quick-subject-field" '+(mode==="rotation"?"hidden":"")+'><label>Matéria cadastrada</label><select name="subjectId" id="s3-quick-subject"><option value="">Selecione uma matéria</option>'+subOpts+'</select></div>'+
+  '<div class="field" id="s3-quick-topic-field" '+(mode==="rotation"?"hidden":"")+'><label>Assunto cadastrado (opcional)</label><select name="topicId" id="s3-quick-topic"><option value="">Sem assunto definido</option>'+topicOpts+'</select></div>'+
+  '<div class="form-grid">'+field("Data","date",dt,"date",'min="'+A(first())+'" required')+
+  field("Duração (min)","plannedMin",x?.plannedMin??selected.defaultMin??90,"number",'min="1" max="720" required')+'</div>'+
+  (!x?'<div class="field"><label>Quantas sessões nesse dia?</label><select name="count">'+[1,2,3,4,5,6,7,8,9,10,11,12].map(i=>'<option value="'+i+'">'+i+' sessão(ões)</option>').join("")+'</select></div>':"")+
+  '<div class="field"><label>Modalidade cadastrada (opcional)</label><select name="methodId"><option value="">Sem modalidade definida</option>'+methodOpts+'</select></div>'+
+  '<p class="note">Você está configurando o que aparecerá no Início. Somente lá será possível iniciar, concluir, desfazer e registrar o estudo.</p>'+
+  '<p class="study-batch-error" id="s3-plan-error" role="alert" hidden></p>'+
+  '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar no planejamento</button></div></form>');
+ updateQuickFields();
+}
+function updateQuickFields(changed=""){
+ const form=$("s3-quick");if(!form)return;
+ const c=cycle(form.querySelector('[name="cycleId"]')?.value);
+ if(!c)return;
+ const mode=form.querySelector('[name="mode"]')?.value;
+ const subSelect=form.querySelector('[name="subjectId"]');
+ const oldSub=changed==="cycle"?"":subSelect.value;
+ const choices=studiedSubjects(c).filter(x=>!x.archived);
+ subSelect.innerHTML='<option value="">Selecione uma matéria</option>'+choices.map(x=>'<option value="'+A(x.id)+'">'+E(x.title)+(x.paused?" (pausada)":"")+'</option>').join("");
+ if(choices.some(x=>x.id===oldSub))subSelect.value=oldSub;
+ else if(mode==="specific"&&choices.length)subSelect.value=choices[0].id;
+ const sub=subject(subSelect.value),topicSelect=form.querySelector('[name="topicId"]');
+ const oldTopic=changed==="subject"||changed==="cycle"?"":topicSelect.value;
+ topicSelect.innerHTML='<option value="">Sem assunto definido</option>'+(sub?planTopics(sub.id).map(t=>'<option value="'+A(t.id)+'">'+E(t.title)+'</option>').join(""):"");
+ if(planTopics(sub?.id).some(t=>t.id===oldTopic))topicSelect.value=oldTopic;
+ $("s3-quick-subject-field").hidden=mode!=="specific";
+ $("s3-quick-topic-field").hidden=mode!=="specific";
+ $("s3-quick-meta").textContent="Área: "+c.area+" · "+(s.goals.find(g=>g.id===c.goalId)?.title||"Sem objetivo vinculado");
+ if(changed==="cycle")form.querySelector('[name="plannedMin"]').value=c.defaultMin||90;
+}
+function topicModal(id="",preSubject=""){
+ const topic=id?db.topics.find(x=>x.id===id):null;
+ const subjects=db.subjects.filter(x=>!x.archived&&db.cycles.some(c=>c.id===x.cycleId&&!c.archived));
+ if(!subjects.length)return notify("Cadastre pelo menos uma matéria na Biblioteca.");
+ const options=subjects.map(x=>'<option value="'+A(x.id)+'" '+((topic?.subjectId||preSubject||subjects[0].id)===x.id?"selected":"")+'>'+E(cycle(x.cycleId)?.title||"Ciclo")+' · '+E(x.title)+'</option>').join("");
+ modal(topic?"Editar assunto":"Cadastrar assunto",
+  '<form id="s3-topic" class="section-stack"><input type="hidden" name="id" value="'+A(topic?.id||"")+'">'+
+  '<div class="field"><label>Matéria</label><select name="subjectId">'+options+'</select></div>'+
+  field("Assunto","title",topic?.title||"","text",'required maxlength="100" placeholder="Ex.: Equações do 2º grau"')+
+  '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar assunto</button></div></form>');
+}
+function planCopyModal(kind="week",source=""){
+ const week=kind==="week",from=week?planWeekStart(plannerWeek):source||s.date;
+ const target=add(from,7);
+ modal(week?"Copiar semana completa":"Copiar programação de um dia",
+ '<form id="s3-plan-copy" class="section-stack"><input name="kind" type="hidden" value="'+kind+'"><input name="source" type="hidden" value="'+A(from)+'">'+
+ '<p class="note">Copiar sessões, ciclos e durações sem copiar conclusões, tempos realizados ou progresso. As matérias que seguem o ciclo continuarão dinâmicas.</p>'+
+ field(week?"Segunda-feira de destino":"Data de destino","target",target,"date",'min="'+A(first())+'" required')+
+ '<label class="study-batch-available"><input type="checkbox" name="replace" value="1">Substituir sessões pendentes no destino (preserva sessões já iniciadas/concluídas)</label>'+
+ '<p class="study-batch-error" id="s3-plan-error" role="alert" hidden></p>'+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Copiar '+(week?"semana":"dia")+'</button></div></form>');
+}
+function planMoveModal(id){
+ const x=session(id);planIsEditable(x);
+ modal("Mover sessão",'<form id="s3-plan-move" class="section-stack"><input type="hidden" name="id" value="'+A(id)+'">'+
+ '<p class="note">'+E(plannerLabel(x))+' · '+E(minuteLabel(x.plannedMin))+'</p>'+
+ field("Novo dia","date",x.date,"date",'min="'+A(first())+'" required')+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Mover sessão</button></div></form>');
+}
+function planBulkModal(){
+ if(!plannerSelection.size)return notify("Selecione primeiro as sessões.");
+ const cycles=db.cycles.filter(x=>!x.archived&&activeSubjects(x).length);
+ modal("Editar sessões selecionadas",'<form id="s3-plan-bulk" class="section-stack">'+
+ '<p class="note">Alterações aplicadas às '+plannerSelection.size+' sessões selecionadas. Deixe campos em branco para manter o valor atual.</p>'+
+ field("Mover todas para a data (opcional)","date","","date",'min="'+A(first())+'"')+
+ field("Duração para todas, em minutos (opcional)","plannedMin","","number",'min="1" max="720"')+
+ '<div class="field"><label>Matéria / ciclo</label><select name="mode" id="s3-bulk-mode"><option value="keep">Manter a matéria e o ciclo de cada sessão</option><option value="rotation">Seguir um ciclo selecionado</option><option value="specific">Escolher matéria específica</option></select></div>'+
+ '<div id="s3-bulk-target" hidden><div class="field"><label>Ciclo de destino</label><select name="cycleId" id="s3-bulk-cycle"><option value="">Manter ciclos atuais</option>'+cycles.map(x=>'<option value="'+A(x.id)+'">'+E(x.title)+'</option>').join("")+'</select></div>'+
+ '<div class="field" id="s3-bulk-subject-wrap" hidden><label>Matéria cadastrada</label><select name="subjectId" id="s3-bulk-subject"><option value="">Selecione uma matéria</option></select></div></div>'+
+ '<p class="study-batch-error" id="s3-plan-error" role="alert" hidden></p>'+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Aplicar às selecionadas</button></div></form>');
+}
+function updateBulkFields(){
+ const mode=$("s3-bulk-mode")?.value,group=$("s3-bulk-target"),wrap=$("s3-bulk-subject-wrap");
+ if(!group)return;
+ group.hidden=mode==="keep";wrap.hidden=mode!=="specific";
+ const id=$("s3-bulk-cycle")?.value,select=$("s3-bulk-subject");
+ if(select){
+  const subs=id?studiedSubjects(cycle(id)).filter(x=>!x.archived):[];
+  select.innerHTML='<option value="">Selecione uma matéria</option>'+subs.map(x=>'<option value="'+A(x.id)+'">'+E(x.title)+'</option>').join("");
+ }
+}
+function planTemplateModal(mode){
+ if(mode==="save")return modal("Salvar semana como modelo",
+ '<form id="s3-template-save" class="section-stack">'+field("Nome do modelo","title","","text",'required maxlength="60" placeholder="Ex.: Semana com foco no ENEM"')+
+ '<p class="note">O modelo guardará quantidades, dias, ciclos e durações, mas nunca conclusões.</p><div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar modelo</button></div></form>');
+ if(!db.templates.length)return notify("Você ainda não tem modelos salvos. Salve uma semana primeiro.");
+ modal("Aplicar modelo semanal",'<form id="s3-template-apply" class="section-stack">'+
+ '<div class="field"><label>Modelo salvo</label><select name="id">'+db.templates.map(x=>'<option value="'+A(x.id)+'">'+E(x.title)+' ('+x.items.length+' sessões)</option>').join("")+'</select></div>'+
+ field("Segunda-feira de destino","date",planWeekStart(plannerWeek),"date",'min="'+A(first())+'" required')+
+ '<label class="study-batch-available"><input type="checkbox" name="replace" value="1">Substituir sessões pendentes da semana (sem apagar conclusões)</label>'+
+ '<p class="study-batch-error" id="s3-plan-error" role="alert" hidden></p>'+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Aplicar planejamento</button></div></form>');
+}
 function batchModal(preferredCycle=""){
  const selected=db.cycles.find(x=>x.id===preferredCycle&&!x.archived&&activeSubjects(x).length)||db.cycles.find(x=>!x.archived&&activeSubjects(x).length);
  if(!selected)return notify("Crie um ciclo e ative ao menos uma matéria antes de planejar sessões.");
