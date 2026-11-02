@@ -119,6 +119,7 @@ function dateModal(){openModal("Escolher data",'<form id="date-form" class="sect
 function chooseMode(mode){const hours=$("hours-area"),slots=$("slots-area");if(hours)hours.hidden=mode!=="hours"&&mode!=="broad";if(slots)slots.hidden=mode!=="slots";}
 function slotRow(start,end){return '<div class="slot-row"><div class="field"><label>Início</label><input type="time" name="slotStart" value="'+attr(start||"08:00")+'" required></div><div class="field"><label>Fim</label><input type="time" name="slotEnd" value="'+attr(end||"12:00")+'" required></div><button class="btn small danger" type="button" data-action="removeSlot" aria-label="Remover intervalo">×</button></div>';}
 function availabilityModal(day,date){
+if(date&&(state.evolution?.closed?.[date]||state.planner?.closedDays?.includes(date)))return notify("A disponibilidade desse dia já finalizado não pode ser alterada.");
 const exception=!!date;const a=exception?state.availability.overrides[date]:state.availability.weekly[day];const mode=a?a.mode:"hours";let body='<form id="availability-form" class="section-stack"><input type="hidden" name="day" value="'+(exception?"":day)+'"><input type="hidden" name="exception" value="'+(exception?"yes":"no")+'">';
 if(exception)body+='<div class="field"><label>Data da exceção</label><input type="date" name="exceptionDate" min="'+state.firstAccess+'" value="'+attr(date)+'" required></div>';
 body+='<div class="field"><span class="label">Como é sua disponibilidade?</span><div class="mode-grid">';
@@ -193,7 +194,7 @@ slots.sort((a,b)=>a.start.localeCompare(b.start));for(let i=1;i<slots.length;i++
 entry.slots=slots;
 }
 if(data.get("exception")==="yes"){
-const date=String(data.get("exceptionDate")||"");if(!date||date<state.firstAccess)return notify("Selecione uma data válida.");
+const date=String(data.get("exceptionDate")||"");if(!date||date<state.firstAccess)return notify("Selecione uma data válida.");if(state.evolution?.closed?.[date]||state.planner?.closedDays?.includes(date))return notify("Esse dia já foi finalizado.");
 state.availability.overrides[date]=entry;
 }else{
 const day=Number(data.get("day"));if(day<0||day>6||!Number.isInteger(day))return notify("Dia inválido.");
