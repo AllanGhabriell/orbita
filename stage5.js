@@ -56,7 +56,7 @@ async function create(){
  if(!isConfigured(cfg)){status("unconfigured");return;}
  status("loading");
  try{
-  const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm");
+  const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.87.3/+esm");
   client=createClient(cfg.url,cfg.key,{auth:{flowType:"pkce",detectSessionInUrl:true,autoRefreshToken:true,persistSession:true}});
   client.auth.onAuthStateChange((event,session)=>{
    // Evitar fazer consultas assíncronas dentro do callback do SDK.
@@ -76,7 +76,7 @@ async function onSession(session,event){
   status(isConfigured(readConfig())?"signedout":"guest");
   C.render();return;
  }
- if(user?.id===next.id&&mode==="ready")return;
+ if(user?.id===next.id&&["loading","ready","syncing"].includes(mode))return;
  user=next;
  status("loading");
  await initialReconcile();
@@ -174,9 +174,10 @@ async function signIn(){
 }
 async function signOut(){
  if(!client)return;
- if(mode==="syncing"||mode==="conflict"||mode==="error"||mode==="offline"){
-  notify("Há dados que talvez não estejam na nuvem. Exporte um backup antes de sair.");
-  return;
+ if(mode==="syncing")return notify("Aguarde o término da sincronização.");
+ if(["conflict","error","offline"].includes(mode)){
+  if(!window.confirm("A sincronização não está confirmada. Exporte um backup antes de continuar. Sair mesmo assim apagará os dados locais deste dispositivo."))return;
+  exportBackup();
  }
  if(!window.confirm("Sair da conta e limpar os dados deste navegador? Os dados sincronizados continuarão na nuvem."))return;
  // Evita que dados de uma conta apareçam para o próximo visitante do dispositivo.
