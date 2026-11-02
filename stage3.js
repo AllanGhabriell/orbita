@@ -10,6 +10,7 @@ const $=id=>document.getElementById(id);
 const E=C.esc,A=C.attr, tag=C.tag, day=C.today, add=C.addDays,fmt=C.dateLabel;
 const unique=()=>((typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():"s"+Date.now().toString(36)+Math.random().toString(36).slice(2));
 const now=()=>new Date().toISOString();
+let lastHomeAdvance="";
 const clone=x=>JSON.parse(JSON.stringify(x));
 const notify=m=>C.notify(m), save=()=>C.save(),render=()=>C.render(),close=()=>C.closeModal();
 const datesOkay=x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(C.parse(x).getTime())&&C.iso(C.parse(x))===x;
@@ -173,6 +174,39 @@ function addSessions(data,count=1){
  logs("sessions_created",{ids:result.map(x=>x.id),cycleId:draft.cycleId,kind:draft.kind,date:draft.date});
  return result;
 }
+// Planejamento em lote: cada linha corresponde a UMA sessão real e tem duração própria.
+// Vagas de ciclo futuro recebem a matéria quando forem executadas, respeitando a rotação.
+function addBatchSessions(data){
+ const c=cycle(String(data.cycleId||""));ensureCycleActive(c);
+ const begin=String(data.fromDate||""),end=String(data.toDate||"");
+ if(!datesOkay(begin)||!datesOkay(end)||begin<first()||end<begin)throw Error("Selecione um período válido a partir do primeiro acesso.");
+ const totalDays=Math.round((C.parse(end)-C.parse(begin))/86400000)+1;
+ if(totalDays>31)throw Error("Planeje no máximo 31 dias por operação.");
+ const count=positiveInt(data.count,1,1,12),duration=positiveInt(data.plannedMin,c.defaultMin||90,1,720);
+ const useAvailable=!!data.onlyAvailable;
+ const selected=Array.isArray(data.weekdays)?[...new Set(data.weekdays.map(Number))]:[];
+ if(!useAvailable&&(!selected.length||selected.some(d=>!Number.isInteger(d)||d<0||d>6)))throw Error("Selecione pelo menos um dia da semana.");
+ const dates=[];
+ for(let i=0;i<totalDays;i++){
+  const date=add(begin,i),a=C.resolveAvailability(date);
+  if(blocked(date))continue;
+  if(useAvailable){
+   if(!a||a.mode==="rest"||C.availabilityMinutes(a)<=0)continue;
+  }else if(!selected.includes(C.parse(date).getDay()))continue;
+  dates.push(date);
+ }
+ if(!dates.length)throw Error("Nenhum dia aberto corresponde ao período e aos filtros escolhidos.");
+ const total=dates.length*count;
+ if(total>180)throw Error("Limite de 180 sessões por operação. Reduza o período ou a quantidade.");
+ const result=[];
+ for(const date of dates)for(let i=0;i<count;i++){
+  const sess={...defaultsForSession(c,null,"cycle",date),rotationSlot:true,stepNo:0,subjectId:"",
+   discipline:"Próxima matéria do ciclo",plannedMin:duration,actualMin:null,kind:"cycle",status:"pending"};
+  db.sessions.push(sess);result.push(sess);
+ }
+ logs("sessions_batch_scheduled",{cycleId:c.id,dates,count,duration,ids:result.map(x=>x.id)});
+ return result;
+}
 function updateSession(id,data){
  const x=session(id);if(!x||x.archived)throw Error("Sessão indisponível.");
  if(!editable(x.date))throw Error("Data fechada.");
@@ -193,12 +227,22 @@ function setSessionStatus(id,status,actualMin,actualTime){
  if(actualTime&&!validTime(actualTime))throw Error("Horário inválido.");
  if(x.status==="done"&&status!=="done"&&x.kind==="cycle")canUndoCompletedStep(x);
  const old=x.status;
+ // Vagas futuras seguem o próximo assunto REAL na hora da execução,
+ // sem fixar a matéria durante o planejamento de uma semana inteira.
+ if(x.rotationSlot&&status!=="pending"){
+  const c=cycle(x.cycleId);ensureCycleActive(c);
+  const sub=cycleState(c);
+  x.subjectId=sub.id;x.stepNo=c.stepNo;x.discipline=sub.title;
+  x.rotationSlot=false;x.resolvedAt=now();
+ }
  x.status=status;x.actualMin=minutes;x.actualTime=actualTime||"";
  if(status==="done")x.completedAt=x.completedAt||now();
  else x.completedAt=null;
  logs("session_status",{sessionId:id,from:old,to:status,actualMin:minutes});
  const c=x.kind==="cycle"?cycle(x.cycleId):null;
- if(c&&status==="done"&&x.stepNo===c.stepNo)progression(c);
+ if(c&&status==="done"&&x.stepNo===c.stepNo){
+  if(progression(c))lastHomeAdvance=c.id;
+ }
  return x;
 }
 function deleteSession(id){
@@ -246,7 +290,7 @@ function cycleProgress(c){
 }
 function cycleCard(c,compact=false){
  const {cur,count,required}=cycleProgress(c);
- return '<section class="card study-cycle-card"><div class="card-head"><div><div class="overline">'+E(c.area)+'</div><h2>'+E(c.title)+'</h2></div>'+tag(c.archived?"Arquivado":"Ciclo","")+'</div><div class="study-current"><div><span>PRÓXIMA MATÉRIA</span><strong>'+E(cur?.title||"Nenhuma matéria ativa")+'</strong><small>'+(cur?count+" de "+required+" sessão(ões) concluída(s) na etapa":"Adicione ou reative uma matéria")+'</small></div><div class="study-progress"><div style="width:'+(required?Math.round(count/required*100):0)+'%"></div></div></div><div class="row study-actions"><button class="btn small" data-s3="selectCycle" data-id="'+A(c.id)+'">Gerenciar</button>'+(cur&&!c.archived?'<button class="btn small primary" data-s3="newSession" data-cycle="'+A(c.id)+'">+ Sessão</button>':"")+'</div></section>';
+ return '<section class="card study-cycle-card"><div class="card-head"><div><div class="overline">'+E(c.area)+'</div><h2>'+E(c.title)+'</h2></div>'+tag(c.archived?"Arquivado":"Ciclo","")+'</div><div class="study-current"><div><span>PRÓXIMA MATÉRIA</span><strong>'+E(cur?.title||"Nenhuma matéria ativa")+'</strong><small>'+(cur?count+" de "+required+" sessão(ões) concluída(s) na etapa":"Adicione ou reative uma matéria")+'</small></div><div class="study-progress"><div style="width:'+(required?Math.round(count/required*100):0)+'%"></div></div></div><div class="row study-actions"><button class="btn small" data-s3="selectCycle" data-id="'+A(c.id)+'">Gerenciar</button>'+(cur&&!c.archived?'<button class="btn small primary" data-s3="planBatch" data-cycle="'+A(c.id)+'">Planejar sessões</button>':"")+'</div></section>';
 }
 function tinySessions(date){
  const list=db.sessions.filter(x=>x.date===date&&!x.archived).sort((a,b)=>(a.startTime||"99:99").localeCompare(b.startTime||"99:99"));
@@ -259,11 +303,38 @@ function sessionRow(x,compact=false){
  return '<div class="study-session-row '+(x.status==="done"?"done":"")+'"><div class="study-session-mark">'+(x.status==="done"?"✓":x.status==="progress"?"◷":"◉")+'</div><div class="study-session-body"><strong>'+E(x.discipline)+'</strong><small>'+E(desc)+'</small>'+((m||x.purpose)?'<small>'+E([m?.title,x.purpose].filter(Boolean).join(" • "))+'</small>':"")+'</div><div class="study-session-controls">'+(!blocked(x.date)?'<button class="btn small ghost" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Reabrir sessão":"Concluir sessão")+'">'+(x.status==="done"?"↶":"✓")+'</button>':"")+'<button class="btn small" data-s3="recordSession" data-id="'+A(x.id)+'">Registro</button><button class="btn small ghost" data-s3="editSession" data-id="'+A(x.id)+'" title="Editar sessão">✎</button><button class="btn small ghost" data-s3="copySession" data-id="'+A(x.id)+'" title="Copiar sessão">⧉</button><button class="btn small danger" data-s3="deleteSession" data-id="'+A(x.id)+'" title="Excluir sessão">×</button></div></div>';
 }
 function homePanel(){
- const date=s.date,load=loadFor(date),c=db.cycles.filter(c=>!c.archived),daily=db.sessions.filter(x=>x.date===date&&!x.archived),tot=summarize({from:date,to:date});
- return '<section class="card study-home-panel"><div class="card-head"><h2>◉ Ciclos e estudos</h2><button class="btn small ghost" data-s3="openStudies">Abrir ciclos ↗</button></div>'+
- (c.length?'<div class="study-home-next">'+c.slice(0,3).map(x=>{const p=cycleProgress(x);return '<button class="study-chip" data-s3="selectCycle" data-id="'+A(x.id)+'"><span>'+E(x.title)+'</span><strong>'+E(p.cur?.title||"Sem matéria")+'</strong></button>'}).join("")+'</div>':'<p class="note">Nenhum ciclo cadastrado. Crie seu primeiro ciclo quando quiser.</p>')+
- '<div class="study-stats-mini"><span>'+daily.length+' sessão(ões) planejada(s)</span><span>'+minuteLabel(tot.actualMin)+' efetivamente registradas</span></div>'+
- '<div class="row">'+(c.length?'<button class="btn small primary" data-s3="newSession">+ Sessão</button>':'<button class="btn small" data-s3="newCycle">+ Ciclo</button>')+'<button class="btn small ghost" data-s3="openStudies">Estudos complementares</button></div></section>';
+ const date=s.date,load=loadFor(date),activeCycles=db.cycles.filter(x=>!x.archived);
+ const daily=db.sessions.filter(x=>x.date===date&&!x.archived).sort((a,b)=>(a.startTime||"99:99").localeCompare(b.startTime||"99:99")||a.createdAt.localeCompare(b.createdAt));
+ const done=daily.filter(x=>x.status==="done").length;
+ const groups=[];
+ for(const x of daily){
+  const c=cycle(x.cycleId),key=c?.id||"extra";
+  let group=groups.find(g=>g.key===key);
+  if(!group){group={key,cycle:c,items:[]};groups.push(group);}
+  group.items.push(x);
+ }
+ // O painel inicial é exclusivamente de EXECUÇÃO. O planejamento fica em Estudos.
+ let body=groups.map(group=>{
+  const c=group.cycle,p=c&&!c.archived?cycleProgress(c):null;
+  const n=group.items.filter(x=>x.status==="done").length;
+  const flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
+  const labels=group.items.map((x,i)=>{
+   const sub=x.rotationSlot?p?.cur?.title||"Próxima matéria":x.discipline;
+   return '<div class="study-daily-step '+(x.status==="done"?"is-done":x.status==="progress"?"is-active":"")+'"><span class="study-daily-marker">'+(x.status==="done"?"✓":i+1)+'</span><strong>'+E(sub)+'</strong><small>'+E(x.plannedMin!=null?minuteLabel(x.plannedMin):"Sem previsão")+'</small></div>';
+  }).join('<div class="study-daily-link" aria-hidden="true"></div>');
+  const entries=group.items.map((x,i)=>{
+   const label=x.rotationSlot?p?.cur?.title||"Próxima matéria":x.discipline;
+   const desc=[x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista",x.startTime||"",x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":"Pendente"].filter(Boolean).join(" · ");
+   return '<div class="study-daily-entry '+(x.status==="done"?"is-done":"")+'"><span class="study-daily-number">'+(i+1)+'</span><div class="study-daily-label"><strong>'+E(label)+'</strong><small>'+E(desc)+'</small></div><div class="study-daily-controls">'+(!blocked(date)?'<button class="btn small '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button><button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>':'<span class="status">Dia fechado</span>')+'</div></div>';
+  }).join("");
+  return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><div><strong>'+E(c?.title||"Estudos complementares")+'</strong><small>'+n+' de '+group.items.length+' concluída(s)'+(p?.cur?' · próxima matéria: '+E(p.cur.title):"")+'</small></div></div><div class="study-daily-track" aria-label="Sequência das sessões do dia">'+labels+'</div><div class="study-daily-list">'+entries+'</div></div>';
+ }).join("");
+ if(!groups.length)body='<div class="study-daily-empty"><p class="note">Nenhuma sessão planejada para esta data.</p><p class="note">Organize a quantidade de sessões e os dias da semana na área de Estudos. Depois, acompanhe e conclua tudo aqui.</p></div>';
+ const real=summarize({from:date,to:date});
+ return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>◉ Estudos de hoje</h2><button class="btn small ghost" data-s3="openStudies">Configurar estudos ↗</button></div>'+
+  '<div class="study-daily-summary"><span>'+done+' de '+daily.length+' concluída(s)</span><span>'+minuteLabel(load.studyPlanned)+' planejadas</span><span>'+minuteLabel(real.actualMin)+' reais registradas</span></div>'+
+  body+(activeCycles.length&&!groups.length?'<div class="study-daily-next"><strong>Próxima matéria do ciclo</strong><span>'+E(activeCycles.slice(0,3).map(x=>x.title+" · "+(cycleProgress(x).cur?.title||"Sem matéria")).join(" | "))+'</span></div>':"")+
+  '</section>';
 }
 function loadPanel(date){
  const v=loadFor(date),base=C.resolveAvailability(date),warning=v.available>0&&v.totalPlanned>v.available;
@@ -280,11 +351,11 @@ function studyView(){
  const cycles=db.cycles.filter(x=>!x.archived),archived=db.cycles.filter(x=>x.archived);
  const tot=summarize(),forDay=summarize({from:s.date,to:s.date});
  const inMonth=summarize({from:s.date.slice(0,7)+"-01",to:s.date.slice(0,7)+"-31"});
- return '<div class="hero-row"><div><div class="overline">SEQUÊNCIA E APRENDIZAGEM</div><h1>Meus estudos</h1><p class="kicker">Os ciclos avançam com sessões concluídas, nunca automaticamente com a passagem dos dias.</p></div><div class="row"><button class="btn primary" data-s3="newCycle">+ Ciclo</button><button class="btn" data-s3="newSession">+ Sessão</button></div></div>'+
+ return '<div class="hero-row"><div><div class="overline">SEQUÊNCIA E APRENDIZAGEM</div><h1>Meus estudos</h1><p class="kicker">Os ciclos avançam com sessões concluídas, nunca automaticamente com a passagem dos dias.</p></div><div class="row"><button class="btn primary" data-s3="newCycle">+ Ciclo</button><button class="btn" data-s3="planBatch">Distribuir sessões</button><button class="btn ghost" data-s3="newSession">Sessão avulsa</button></div></div>'+
  '<div class="study-dashboard-grid">'+statCard("Estudado no dia",minuteLabel(forDay.actualMin),forDay.actualRecorded+" com tempo informado")+statCard("Estudado no mês",minuteLabel(inMonth.actualMin),inMonth.unrecorded+" sem tempo registrado")+statCard("Sessões concluídas",String(tot.completed),tot.sessions+" cadastradas")+'</div>'+
  '<section class="card study-area"><div class="card-head"><h2>Seus ciclos</h2>'+tag(cycles.length+" ativos")+'</div>'+(cycles.length?'<div class="study-cycle-grid">'+cycles.map(x=>cycleCard(x)).join("")+'</div>':'<div class="study-empty"><p class="note">Nenhum ciclo criado. Cadastre uma área e as matérias na sequência que desejar.</p><button class="btn primary" data-s3="newCycle">Criar ciclo</button></div>')+'</section>'+
  (archived.length?'<section class="card"><div class="card-head"><h2>Ciclos arquivados</h2></div><div class="simple-list">'+archived.map(x=>'<div class="list-entry"><div class="list-main"><strong>'+E(x.title)+'</strong><small>'+E(x.area)+' · histórico preservado</small></div><button class="btn small" data-s3="restoreCycle" data-id="'+A(x.id)+'">Reativar</button><button class="btn small ghost" data-s3="selectCycle" data-id="'+A(x.id)+'">Consultar</button></div>').join("")+'</div></section>':'')+
- '<section class="card"><div class="card-head"><h2>Sessões · '+E(fmt(s.date,false))+'</h2><div class="row"><button class="btn small ghost" data-s3="prevStudyDay">‹</button><button class="btn small ghost" data-s3="studyToday">Hoje</button><button class="btn small ghost" data-s3="nextStudyDay">›</button></div></div>'+tinySessions(s.date)+'<div class="row" style="margin-top:13px"><button class="btn small" data-s3="newSession">+ Agendar</button><button class="btn small ghost" data-s3="openMethods">Modalidades</button><button class="btn small ghost" data-s3="studyStats">Estatísticas</button></div></section>'+loadPanel(s.date);
+ '<section class="card"><div class="card-head"><h2>Sessões · '+E(fmt(s.date,false))+'</h2><div class="row"><button class="btn small ghost" data-s3="prevStudyDay">‹</button><button class="btn small ghost" data-s3="studyToday">Hoje</button><button class="btn small ghost" data-s3="nextStudyDay">›</button></div></div>'+tinySessions(s.date)+'<div class="row" style="margin-top:13px"><button class="btn small primary" data-s3="planBatch">Planejar vários dias</button><button class="btn small ghost" data-s3="newSession">Sessão avulsa</button><button class="btn small ghost" data-s3="openMethods">Modalidades</button><button class="btn small ghost" data-s3="studyStats">Estatísticas</button></div></section>'+loadPanel(s.date);
 }
 function cycleDetail(c){
  if(!c)return studyView();
@@ -292,7 +363,7 @@ function cycleDetail(c){
  const all=db.sessions.filter(x=>x.cycleId===c.id&&!x.archived);
  return '<div class="hero-row"><div><div class="overline">'+E(c.area)+'</div><h1>'+E(c.title)+'</h1><p class="kicker">'+(c.goalId?E(s.goals.find(g=>g.id===c.goalId)?.title||"Objetivo indisponível"):"Ciclo independente de metas")+'</p></div><div class="row"><button class="btn small ghost" data-s3="backStudies">← Ciclos</button><button class="btn small" data-s3="editCycle" data-id="'+A(c.id)+'">Editar ciclo</button></div></div>'+
  '<div class="study-dashboard-grid">'+statCard("Horas reais no ciclo",minuteLabel(stats.actualMin),stats.actualRecorded+" com tempo")+statCard("Horas planejadas",minuteLabel(stats.plannedMin),stats.sessions+" sessões")+statCard("Concluídas",String(stats.completed),stats.unrecorded+" sem tempo registrado")+'</div>'+
- '<section class="card study-highlight"><div class="overline">ETAPA ATUAL</div><h2>'+E(progress.cur?.title||"Nenhuma matéria ativa")+'</h2><p class="note">'+(progress.cur?progress.count+" de "+progress.required+" sessões concluídas nesta etapa.":"Adicione ou reative matérias para continuar.")+'</p><div class="study-progress"><div style="width:'+(progress.required?Math.round(progress.count/progress.required*100):0)+'%"></div></div><div class="row">'+(progress.cur?'<button class="btn primary" data-s3="newSession" data-cycle="'+A(c.id)+'">Agendar etapa atual</button>':"")+'<button class="btn" data-s3="newSession" data-cycle="'+A(c.id)+'" data-mode="reinforcement">Estudo de reforço</button><button class="btn ghost" data-s3="addSubject" data-cycle="'+A(c.id)+'">+ Matéria</button></div></section>'+
+ '<section class="card study-highlight"><div class="overline">ETAPA ATUAL</div><h2>'+E(progress.cur?.title||"Nenhuma matéria ativa")+'</h2><p class="note">'+(progress.cur?progress.count+" de "+progress.required+" sessões concluídas nesta etapa.":"Adicione ou reative matérias para continuar.")+'</p><div class="study-progress"><div style="width:'+(progress.required?Math.round(progress.count/progress.required*100):0)+'%"></div></div><div class="row">'+(progress.cur?'<button class="btn primary" data-s3="planBatch" data-cycle="'+A(c.id)+'">Planejar várias sessões</button><button class="btn" data-s3="newSession" data-cycle="'+A(c.id)+'">Agendar sessão</button>':"")+'<button class="btn" data-s3="newSession" data-cycle="'+A(c.id)+'" data-mode="reinforcement">Estudo de reforço</button><button class="btn ghost" data-s3="addSubject" data-cycle="'+A(c.id)+'">+ Matéria</button></div></section>'+
  '<section class="card"><div class="card-head"><h2>Sequência das matérias</h2>'+tag(active.length+" cadastradas")+'</div>'+(
  active.length?'<div class="study-subject-list">'+active.map((x,i)=>'<div class="study-subject-row '+(progress.cur?.id===x.id?"is-current":"")+'"><div class="study-subject-number">'+(i+1)+'</div><div class="study-subject-desc"><strong>'+E(x.title)+'</strong><small>'+x.targetSessions+' sessão(ões) por etapa'+(x.paused?" · pausada"+(x.reason?" · "+E(x.reason):""):"")+(x.returnDate?" · retorno opcional "+E(x.returnDate):"")+(x.archived?" · arquivada":"")+'</small></div><div class="row">'+(x.paused?tag("Pausada","warn"):progress.cur?.id===x.id?tag("Atual","main"):"")+'<button class="btn small ghost" data-s3="moveSubject" data-id="'+A(x.id)+'" data-move="-1" '+(i===0?"disabled":"")+' title="Subir matéria">↑</button><button class="btn small ghost" data-s3="moveSubject" data-id="'+A(x.id)+'" data-move="1" '+(i===active.length-1?"disabled":"")+' title="Descer matéria">↓</button><button class="btn small ghost" data-s3="editSubject" data-id="'+A(x.id)+'">Editar</button><button class="btn small" data-s3="'+(x.paused?"resumeSubject":"pauseSubject")+'" data-id="'+A(x.id)+'">'+(x.paused?"Reativar":"Pausar")+'</button><button class="btn small ghost" data-s3="chooseNext" data-id="'+A(x.id)+'" title="Escolher próxima matéria">Próxima</button><button class="btn small ghost" data-s3="copySubject" data-id="'+A(x.id)+'" title="Copiar matéria">Copiar</button><button class="btn small ghost" data-s3="archiveSubject" data-id="'+A(x.id)+'">'+(x.archived?"Restaurar":"Arquivar")+'</button><button class="btn small danger" data-s3="deleteSubject" data-id="'+A(x.id)+'">Excluir</button></div></div>').join("")+'</div>':'<p class="note">Cadastre matérias para montar a sequência.</p>')+'</section>'+
  '<section class="card"><div class="card-head"><h2>Histórico de sessões</h2>'+tag(all.length+" sessões")+'</div>'+(all.length?'<div class="study-session-list">'+all.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30).map(x=>sessionRow(x)).join("")+'</div>':'<p class="note">Nenhuma sessão registrada neste ciclo.</p>')+'</section>'+
@@ -355,6 +426,22 @@ function methodModal(id){
  const x=id?method(id):null;
  modal(x?"Editar modalidade":"Nova modalidade",'<form id="s3-method" class="section-stack"><input name="id" value="'+A(id||"")+'" type="hidden">'+field("Nome","title",x?.title||"","text",'required maxlength="80" placeholder="Ex.: Revisão ativa"')+'<div class="field"><label>Descrição opcional</label><textarea name="description" maxlength="500">'+E(x?.description||"")+'</textarea></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>');
 }
+function batchModal(preferredCycle=""){
+ const selected=cycle(preferredCycle)||db.cycles.find(x=>!x.archived&&cycleState(x));
+ if(!selected)return notify("Crie um ciclo e ative ao menos uma matéria antes de planejar sessões.");
+ const start=s.date<first()?first():s.date,end=add(start,6);
+ const options=db.cycles.filter(x=>!x.archived&&activeSubjects(x).length).map(x=>'<option value="'+A(x.id)+'" '+(selected.id===x.id?"selected":"")+'>'+E(x.title)+'</option>').join("");
+ const weekdays=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+ const days=weekdays.map((x,i)=>'<label class="study-batch-day"><input type="checkbox" name="weekdays" value="'+i+'" '+(i>=1&&i<=5?"checked":"")+'><span>'+x+'</span></label>').join("");
+ modal("Distribuir sessões de estudo",'<form id="s3-batch" class="section-stack"><div class="field"><label>Ciclo de estudo</label><select name="cycleId" required>'+options+'</select></div>'+
+ '<div class="form-grid">'+field("De","fromDate",start,"date",'min="'+A(first())+'" required')+field("Até (máximo 31 dias)","toDate",end,"date",'min="'+A(first())+'" required')+'</div>'+
+ '<div class="form-grid">'+field("Sessões por dia","count",1,"number",'min="1" max="12" required')+field("Minutos por sessão","plannedMin",selected.defaultMin||90,"number",'min="1" max="720" required')+'</div>'+
+ '<div class="study-batch-days"><strong>Dias da semana</strong><div class="study-batch-shortcuts"><button class="btn small ghost" type="button" data-s3="batchWeekdays">Segunda a sexta</button><button class="btn small ghost" type="button" data-s3="batchAll">Todos os dias</button><button class="btn small ghost" type="button" data-s3="batchClear">Limpar</button></div><div class="study-batch-days-grid">'+days+'</div></div>'+
+ '<label class="study-batch-available"><input type="checkbox" name="onlyAvailable" value="1">Usar somente os dias com disponibilidade (substitui a seleção acima)</label>'+
+ '<p class="note">Cada sessão será contada separadamente no analisador de carga. A matéria de cada vaga acompanha o ciclo na hora de estudar, sem avançá-lo apenas porque os dias passaram. Nada será marcado como concluído automaticamente.</p>'+
+ '<p class="study-batch-error" id="s3-batch-error" role="alert" hidden></p>'+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Criar sessões</button></div></form>');
+}
 function sessionModal(id,overrideCycle="",kind="",date=""){
  const x=id?session(id):null;
  const firstCycle=cycle(x?.cycleId||overrideCycle),selection=x?.kind||kind||(firstCycle?"cycle":"supplement");
@@ -406,6 +493,10 @@ function ask(title,description,action,extra=""){
  modal(title,'<p class="note">'+E(description)+'</p><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="button" class="btn danger" data-s3="'+action+'" '+extra+'>Confirmar</button></div>');
 }
 const actions={
+ planBatch(el){if(!C.availabilityReady())return notify("Configure a disponibilidade antes de planejar.");batchModal(el?.dataset?.cycle||"");},
+ batchWeekdays(){for(const input of document.querySelectorAll('#s3-batch input[name="weekdays"]'))input.checked=Number(input.value)>=1&&Number(input.value)<=5;},
+ batchAll(){for(const input of document.querySelectorAll('#s3-batch input[name="weekdays"]'))input.checked=true;},
+ batchClear(){for(const input of document.querySelectorAll('#s3-batch input[name="weekdays"]'))input.checked=false;},
  copyCycle(el){const x=cycle(el.dataset.id);if(!x)return;const y=saveCycle({title:x.title+" (cópia)",area:x.area,defaultMin:x.defaultMin,goalId:x.goalId});for(const old of studiedSubjects(x)){const copy=saveSubject({cycleId:y.id,title:old.title,targetSessions:old.targetSessions});if(old.paused)pauseSubject(copy.id,true,old.reason,old.returnDate&&old.returnDate>=day()?old.returnDate:"");}detailCycle=y.id;screen="cycle";save();render();notify("Ciclo duplicado sem copiar resultados.");},
  copySubject(el){const x=subject(el.dataset.id);if(!x)return;saveSubject({cycleId:x.cycleId,title:x.title+" (cópia)",targetSessions:x.targetSessions});save();render();notify("Matéria copiada.");},
  chooseNext(el){const x=subject(el.dataset.id),c=x&&cycle(x.cycleId);if(!c||x.paused||x.archived)return notify("Reative a matéria primeiro.");if(c.currentSubjectId!==x.id){const pending=stepSessions(c);if(pending.length)c.stepNo++;c.currentSubjectId=x.id;logs("cycle_next_manual",{cycleId:c.id,subjectId:x.id,previousStepSessions:pending.map(q=>q.id)});save();render();notify("Próxima matéria ajustada manualmente.");}},
@@ -460,6 +551,12 @@ const actions={
  studyToday(){s.date=day();save();render()}
 };
 function submission(id,data){
+ if(id==="s3-batch"){
+  const selected=String(data.get("cycleId")||""),group=cycle(selected);
+  const ids=addBatchSessions({cycleId:selected,fromDate:data.get("fromDate"),toDate:data.get("toDate"),count:data.get("count"),plannedMin:data.get("plannedMin"),weekdays:data.getAll("weekdays"),onlyAvailable:data.get("onlyAvailable")==="1"});
+  save();close();render();notify(ids.length+" sessões planejadas. Execute-as na tela Início.");
+  return;
+ }
  if(id==="s3-cycle"){const x=saveCycle({title:data.get("title"),area:data.get("area"),defaultMin:data.get("defaultMin"),goalId:data.get("goalId")},String(data.get("id")||""));detailCycle=x.id;screen="cycle";save();close();C.go("estudos");render();notify("Ciclo salvo.");return;}
  if(id==="s3-subject"){const x=saveSubject({cycleId:String(data.get("cycleId")),title:data.get("title"),targetSessions:data.get("targetSessions")},String(data.get("id")||""));save();close();render();notify("Matéria salva.");return;}
  if(id==="s3-pause"){pauseSubject(String(data.get("id")),true,String(data.get("reason")||""),String(data.get("returnDate")||""));save();close();render();notify("Matéria pausada.");return;}
@@ -488,7 +585,7 @@ document.addEventListener("click",event=>{
 document.addEventListener("submit",event=>{
  const id=event.target?.getAttribute?.("id")||event.target?.id;
  if(!String(id||"").startsWith("s3-"))return;
- event.preventDefault();try{submission(id,new FormData(event.target));}catch(err){notify(err.message||"Verifique os dados preenchidos.");}
+ event.preventDefault();try{submission(id,new FormData(event.target));}catch(err){const alert=$("s3-batch-error");if(alert){alert.textContent=err.message||"Confira os campos.";alert.hidden=false;}notify(err.message||"Verifique os dados preenchidos.");}
 });
 document.addEventListener("change",event=>{
  const el=event.target;if(el?.id==="s3-cycle-choice"||el?.id==="s3-kind")updateSessionChoices();
@@ -496,6 +593,6 @@ document.addEventListener("change",event=>{
   const sub=subject(el.value),form=$("s3-session");if(sub&&form){const discipline=form.querySelector('[name="discipline"]');if(discipline)discipline.value=sub.title;}
  }
 });
-window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
+window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
 render();
 })();
