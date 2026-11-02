@@ -6,7 +6,7 @@ import {spawnSync} from "node:child_process";
 import {resolve,extname,sep} from "node:path";
 import puppeteer from "puppeteer-core";
 
-const chrome=["google-chrome","google-chrome-stable","chromium","chromium-browser"].find(name=>spawnSync("which",[name]).status===0);
+const chrome=["google-chrome","google-chrome-stable","chromium","chromium-browser"].map(name=>spawnSync("which",[name],{encoding:"utf8"})).find(r=>r.status===0)?.stdout.trim();
 if(!chrome)throw Error("É necessário Chrome/Chromium para validar o clique real de salvamento.");
 const root=resolve(new URL("../",import.meta.url).pathname);
 const types={".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".html":"text/html; charset=utf-8",".svg":"image/svg+xml",".png":"image/png",".webmanifest":"application/manifest+json"};
