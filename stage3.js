@@ -952,6 +952,56 @@ const actions={
  studyToday(){s.date=day();save();render()}
 };
 function submission(id,data){
+ if(id==="s3-quick"){
+  const previous=String(data.get("id")||"");
+  const payload={cycleId:data.get("cycleId"),mode:data.get("mode"),subjectId:data.get("subjectId"),
+   topicId:data.get("topicId"),methodId:data.get("methodId"),date:data.get("date"),
+   plannedMin:data.get("plannedMin"),count:data.get("count")||1};
+  const saved=previous?planEdit(previous,payload):planCreate(payload);
+  plannerWeek=String(data.get("date"));plannerSelectedDate=plannerWeek;
+  plannerSelection.clear();close();render();notify(previous?"Planejamento atualizado.":saved.length+" sessão(ões) adicionada(s) à agenda.");
+  return;
+ }
+ if(id==="s3-topic"){
+  const previous=String(data.get("id")||""),sub=subject(String(data.get("subjectId")||""));
+  if(!sub||sub.archived)throw Error("Selecione uma matéria válida da Biblioteca.");
+  const title=validName(data.get("title"),100);
+  if(previous){
+   const t=db.topics.find(x=>x.id===previous);if(!t)throw Error("Assunto não encontrado.");
+   Object.assign(t,{title,subjectId:sub.id});
+  }else db.topics.push({id:unique(),title,subjectId:sub.id,archived:false,createdAt:now()});
+  logs("study_topic_saved",{id:previous||db.topics.at(-1).id});
+  save();close();render();notify("Assunto salvo na Biblioteca.");
+  return;
+ }
+ if(id==="s3-plan-copy"){
+  const days=data.get("kind")==="week"?7:1;
+  const copied=planCopyRange(String(data.get("source")),String(data.get("target")),days,data.get("replace")==="1");
+  plannerWeek=String(data.get("target"));plannerSelectedDate=plannerWeek;plannerSelection.clear();
+  close();render();notify(copied.length+" sessão(ões) copiadas. Conclusões não foram copiadas.");
+  return;
+ }
+ if(id==="s3-plan-move"){
+  const date=String(data.get("date"));planMove(String(data.get("id")),date);
+  plannerWeek=date;plannerSelectedDate=date;plannerSelection.clear();
+  close();render();notify("Sessão movida para "+fmt(date,false)+".");return;
+ }
+ if(id==="s3-plan-bulk"){
+  const changed=planBulk([...plannerSelection],{
+   date:data.get("date"),plannedMin:data.get("plannedMin"),mode:data.get("mode"),
+   cycleId:data.get("cycleId"),subjectId:data.get("subjectId")});
+  if(data.get("date")){plannerWeek=String(data.get("date"));plannerSelectedDate=plannerWeek;}
+  plannerSelection.clear();close();render();notify(changed.length+" sessões ajustadas.");return;
+ }
+ if(id==="s3-template-save"){
+  const template=planSaveTemplate(data.get("title"),plannerWeek);
+  close();render();notify("Modelo "+template.title+" salvo.");return;
+ }
+ if(id==="s3-template-apply"){
+  const n=planApplyTemplate(String(data.get("id")),String(data.get("date")),data.get("replace")==="1");
+  plannerWeek=String(data.get("date"));plannerSelectedDate=plannerWeek;plannerSelection.clear();
+  close();render();notify(n+" sessões aplicadas a partir do modelo.");return;
+ }
  if(id==="s3-batch"){
   const selected=String(data.get("cycleId")||""),group=cycle(selected);
   const ids=addBatchSessions({cycleId:selected,fromDate:data.get("fromDate"),toDate:data.get("toDate"),count:data.get("count"),plannedMin:data.get("plannedMin"),weekdays:data.getAll("weekdays"),onlyAvailable:data.get("onlyAvailable")==="1"});
@@ -986,14 +1036,53 @@ document.addEventListener("click",event=>{
 document.addEventListener("submit",event=>{
  const id=event.target?.getAttribute?.("id")||event.target?.id;
  if(!String(id||"").startsWith("s3-"))return;
- event.preventDefault();try{submission(id,new FormData(event.target));}catch(err){const alert=$("s3-batch-error");if(alert){alert.textContent=err.message||"Confira os campos.";alert.hidden=false;}notify(err.message||"Verifique os dados preenchidos.");}
+ event.preventDefault();try{submission(id,new FormData(event.target));}catch(err){const alert=$("s3-plan-error")||$("s3-batch-error");if(alert){alert.textContent=err.message||"Confira os campos.";alert.hidden=false;}notify(err.message||"Verifique os dados preenchidos.");}
 });
 document.addEventListener("change",event=>{
  const el=event.target;if(el?.id==="s3-cycle-choice"||el?.id==="s3-kind")updateSessionChoices();
+ if(el?.id==="s3-quick-cycle")updateQuickFields("cycle");
+ else if(el?.id==="s3-quick-mode")updateQuickFields("mode");
+ else if(el?.id==="s3-quick-subject")updateQuickFields("subject");
+ if(el?.id==="s3-bulk-mode"||el?.id==="s3-bulk-cycle")updateBulkFields();
+ if(el?.id==="s3-plan-go-date"&&datesOkay(el.value)){plannerWeek=el.value;plannerSelectedDate=el.value;render();}
  if(el?.name==="subjectId"){
   const sub=subject(el.value),form=$("s3-session");if(sub&&form){const discipline=form.querySelector('[name="discipline"]');if(discipline)discipline.value=sub.title;}
  }
 });
-window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
+// Desktop: arrastar sessão para outro dia ou mudar sua posição.
+// Celulares mantêm a opção equivalente Mover por data.
+document.addEventListener("dragstart",event=>{
+ const item=event.target.closest?.(".study-plan-item[draggable='true']");
+ if(!item||!event.dataTransfer)return;
+ event.dataTransfer.setData("text/plain",item.dataset.planId);
+ event.dataTransfer.effectAllowed="move";
+ item.classList.add("is-dragging");
+});
+document.addEventListener("dragover",event=>{
+ const zone=event.target.closest?.(".study-plan-day");
+ if(!zone||screen!=="planner")return;
+ event.preventDefault();
+ if(event.dataTransfer)event.dataTransfer.dropEffect="move";
+ zone.classList.add("is-drop-target");
+});
+document.addEventListener("drop",event=>{
+ const zone=event.target.closest?.(".study-plan-day");
+ if(!zone||screen!=="planner")return;
+ event.preventDefault();
+ const id=event.dataTransfer?.getData("text/plain")||"";
+ try{
+  if(!id)return;
+  const rows=[...zone.querySelectorAll(".study-plan-item")];
+  const target=event.target.closest?.(".study-plan-item");
+  const position=target?rows.indexOf(target)+1:0;
+  planMove(id,zone.dataset.planDate,position);
+  plannerSelectedDate=zone.dataset.planDate;plannerSelection.clear();
+  notify("Sessão reorganizada. Pode desfazer a última edição.");
+ }catch(err){notify(err.message||"Não foi possível mover.");}
+});
+document.addEventListener("dragend",()=>{
+ for(const n of document.querySelectorAll(".study-plan-day.is-drop-target,.study-plan-item.is-dragging"))n.classList.remove("is-drop-target","is-dragging");
+});
+window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
 render();
 })();
