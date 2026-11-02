@@ -180,7 +180,7 @@ function updateSession(id,data){
  // Editar o planejamento não apaga o tempo efetivamente registrado.
  next.actualMin=x.actualMin;
  if(x.kind==="cycle"&&x.stepNo!==cycle(x.cycleId)?.stepNo){
-  if(x.date!==next.date||next.plannedMin!==x.plannedMin||next.focusId!==x.focusId||next.methodId!==x.methodId)throw Error("Esta etapa já avançou. Preserve o planejamento histórico.");
+  if(x.date!==next.date||next.kind!=="cycle"||next.cycleId!==x.cycleId||next.subjectId!==x.subjectId)throw Error("Esta etapa já avançou. Preserve a data e a matéria do histórico; outros campos podem ser corrigidos.");
  }
  if(x.kind==="cycle"&&x.status==="done"&&x.stepNo===cycle(x.cycleId)?.stepNo&&next.date!==x.date)throw Error("Concluída: altere o plano antes de avançar.");
  Object.assign(x,next);logs("session_edited",{sessionId:id});return x;
