@@ -150,7 +150,7 @@ function updateBusy(data,original=null){
   if(!X.busyDates[day])X.busyDates[day]=[];
   X.busyDates[day].splice(0,X.busyDates[day].length,...list);
  }
- C.save();
+ if(!C.save())throw Error("Não foi possível gravar o compromisso neste navegador. Verifique o armazenamento disponível.");
  return result;
 }
 function deleteBusyGroup(kind,day,id){
@@ -307,6 +307,7 @@ function openBusyForm(kind="weekly",weekday=null,id=null){
   '<div class="field" id="s6-date-field" '+(kind==="weekly"?'hidden':'')+'><label for="s6-busy-date">Data</label><input id="s6-busy-date" type="date" name="date" value="'+A(kind==="date"?day:s.date)+'" min="'+A(s.firstAccess)+'"></div>'+
   '<div class="form-grid"><div class="field"><label for="s6-busy-start">Início</label><input id="s6-busy-start" type="time" name="start" value="'+A(entry?.start||"08:00")+'" required></div><div class="field"><label for="s6-busy-end">Fim</label><input id="s6-busy-end" type="time" name="end" value="'+A(entry?.end||"12:00")+'" required></div></div>'+
   '<p class="note">O compromisso fica registrado nos dias selecionados e sinaliza conflitos, sem criar tarefas automaticamente.</p>'+
+  '<p id="s6-form-error" class="s6-form-error" role="alert" hidden></p>'+
   '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar compromisso</button></div></form>');
 }
 function openReviewForm(i){
@@ -375,7 +376,11 @@ document.addEventListener("submit",event=>{
    save();
   }
   C.closeModal();C.render();C.notify("Registro salvo.");
- }catch(e){C.notify(e.message||"Confira os campos.");}
+ }catch(e){
+  const err=$("s6-form-error");
+  if(err){err.textContent=e.message||"Confira os campos.";err.hidden=false;}
+  C.notify(e.message||"Confira os campos.");
+ }
 });
 window.OrbitaStage6={decorate,inspect:{occupied,subtract,freeAvailability,warnCollisions,addBusy,removeBusy,saveStep,toggleStep,removeStep,analyzeStudy,currentGoalRelations,steps,updateBusy,deleteBusyGroup,groupedWeekly,busyDaysLabel,get model(){return X;}}};
 C.render();
