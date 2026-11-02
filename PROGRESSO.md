@@ -1,5 +1,41 @@
 # PROGRESSO — Órbita
 
+## Etapa 5 — Banco, conta, PWA e integração (2026-11-02)
+
+**Estado:** implementação de frontend, migração SQL e documentação no branch main. Integração real com um projeto Supabase ainda não executada, pois URL, publishable key e ativação do login dependem do proprietário. Não foram solicitados nem usados segredos de outro projeto.
+
+### Implementações realizadas
+- **Banco e segurança:** `supabase/migrations/20261102_000001_orbita.sql`, com tabelas `orbita_documents` e `orbita_closed_days`, permissões mínimas, RLS por `auth.uid()`, função `orbita_commit` com versão esperada e proteção transacional contra alteração/remoção de dias finalizados. SQL entregue no repositório, **não aplicado**.
+- **Autenticação:** `stage5.js` implementa conexão por Project URL e publishable key do próprio usuário, cliente Supabase Auth, Google OAuth/PKCE, redirecionamento ao domínio do GitHub Pages e acesso anônimo local sem conta.
+- **Sincronização offline-first:** `boot.js` carrega documentos no armazenamento local e recupera do IndexedDB; mantém pendência persistida das alterações para posterior sincronização. `stage5.js` envia documento completo via RPC de versão; quando há conflito, exige decisão explícita. Dias finalizados de ambas as cópias são combinados quando idênticos ou não sobrepostos; divergência na mesma data é rejeitada.
+- **Proteção de sessão:** logout remove documento local do dispositivo após checar sincronização, com aviso e exportação se houver pendências.
+- **Backup:** exportação/importação JSON com validação de formato e proteção de snapshots já finalizados.
+- **PWA:** manifesto, service worker com cache de arquivos estáticos, ícones PNG reais de 192×192 e 512×512 gerados e versionamento de cache.
+- **Interface:** Preferências adiciona seção de conexão, login, sincronização manual, estado de rede, resolução de conflito e ações de backup; Perfil oferece atalho.
+- **Manual:** `CONFIGURAR_SUPABASE.md` contém SQL exato, configuração Google Cloud/Supabase, URL e chave pública e testes de aceitação.
+
+### Testes e evidências
+- `tests/stage5.test.mjs` cobre rejeição de chaves secretas e URLs inválidas, preservação dos dados encerrados, hashes determinísticos compatíveis com JSONB, manifesto, ícones, arquivos offline e presença das regras SQL.
+- Workflow `Testar e publicar Órbita` executa verificações de sintaxe de `app.js`, `stage2.js`, `stage3.js`, `stage4.js`, `boot.js`, `stage5.js`, `sw.js` e os cinco arquivos de testes `node --test tests/*.test.mjs`.
+- O workflow também configura e envia o site estático ao GitHub Pages. Conferir o status do **último commit**, porque execuções anteriores são canceladas automaticamente após novos commits.
+- Os testes de frontend são automatizados em ambiente simulado de navegador; verificações estáticas de RLS não substituem a execução SQL em um banco real.
+
+### O que ainda falta para considerar a integração homologada
+- O usuário deve criar/conectar projeto Supabase, **executar a migração**, habilitar Google OAuth, configurar URL de callback/redirect e cadastrar URL + chave pública do projeto no Órbita.
+- Login Google, isolamento RLS entre duas contas, preservação de snapshots por RPC, sincronização real em dois aparelhos e conflitos precisam de teste com contas reais.
+- Revisar visualmente instalação da PWA, modo offline e retorno online em computador e celular; testar acessibilidade e casos extremos de dados e calendários.
+- A implementação é uma sincronização do **último estado inteiro com controle de versão**, não uma fusão automática de cada atividade alterada em diferentes dispositivos.
+- O banco só oferece garantia de imutabilidade depois da migração; `localStorage`/IndexedDB do usuário não são um armazenamento inviolável.
+
+### Links diretos
+- [Site](https://allanghabriell.github.io/orbita/)
+- [Guia Supabase](./CONFIGURAR_SUPABASE.md)
+- [SQL](./supabase/migrations/20261102_000001_orbita.sql)
+- [Checklist](./CHECKLIST.md)
+- [Ações do GitHub](https://github.com/AllanGhabriell/orbita/actions)
+
+---
+
 ## Etapa 4 — Inteligência, fechamento e evolução (2026-11-02)
 
 **Estado:** código da etapa 4 enviado ao branch `main`, incluindo lógica de fechamento e relatórios com testes automatizados. Verificar o último workflow em `Actions` e concluir inspeção visual em navegadores reais. **Não iniciar etapa 5 sem autorização.**
