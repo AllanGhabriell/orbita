@@ -224,6 +224,7 @@ function summarize(filter={}){
  return {sessions:entries.length,completed:entries.filter(x=>x.status==="done").length,inProgress:entries.filter(x=>x.status==="progress").length,plannedMin:planned,actualMin:actual,actualRecorded,unrecorded:entries.length-actualRecorded,groups};
 }
 function loadFor(date){
+ const frozen=s.evolution?.closed?.[date];if(frozen)return {studyPlanned:frozen.plan.studyMin,otherPlanned:frozen.plan.otherMin,totalPlanned:frozen.plan.totalMin,available:frozen.availableMin,overlap:[],linkedFocuses:new Set(frozen.studies.filter(x=>x.focusId).map(x=>x.focusId)).size};
  const active=db.sessions.filter(x=>x.date===date&&!x.archived);
  const studyPlanned=active.reduce((n,x)=>n+Number(x.plannedMin||0),0);
  const linked=new Set(active.filter(x=>x.focusId).map(x=>x.focusId));
