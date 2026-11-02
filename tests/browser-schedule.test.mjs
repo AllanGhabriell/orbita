@@ -115,6 +115,54 @@ try{
  await verifyMethods(900);
  await verifyMethods(390);
  console.log("Chromium: botões de modalidades sem sobreposição em 1440, 900 e 390px.");
+
+ // Agendamento em lote e execução diária: validar ações no browser real.
+ const testCycle=await page.evaluate(()=>{
+  const C=window.OrbitaCore,T=window.OrbitaStage3.inspect;
+  for(let i=0;i<7;i++)C.state.availability.weekly[i]={mode:"hours",hours:8};
+  const cycle=T.saveCycle({title:"Meu ciclo ENEM",area:"ENEM",defaultMin:90});
+  T.saveSubject({cycleId:cycle.id,title:"Matemática",targetSessions:3});
+  T.saveSubject({cycleId:cycle.id,title:"Física",targetSessions:1});
+  C.save();C.go("estudos");return cycle.id;
+ });
+ await page.waitForSelector('[data-s3="planBatch"]');
+ await page.click('[data-s3="planBatch"]');
+ await page.waitForSelector("#s3-batch");
+ await page.$eval('#s3-batch [name="cycleId"]',(el,id)=>{el.value=id},testCycle);
+ await page.$eval('#s3-batch [name="toDate"]',(el)=>{el.value=document.querySelector('#s3-batch [name="fromDate"]').value});
+ await page.$eval('#s3-batch [name="count"]',el=>{el.value="3"});
+ await page.$eval('#s3-batch [name="plannedMin"]',el=>{el.value="90"});
+ await page.$eval('#s3-batch [name="onlyAvailable"]',el=>{el.checked=true});
+ await page.click('#s3-batch [type="submit"]');
+ await page.waitForFunction(()=>!document.querySelector("#s3-batch"),{timeout:5000});
+ let state=await page.evaluate(id=>{
+  const C=window.OrbitaCore,T=window.OrbitaStage3.inspect;
+  const sessions=T.model.sessions.filter(x=>x.cycleId===id&&x.date===C.state.date);
+  return {sessions:sessions.length,minutes:T.loadFor(C.state.date).studyPlanned,curr:T.cycleState(T.cycle(id)).title};
+ },testCycle);
+ assert.equal(state.sessions,3,"três sessões foram criadas pelo formulário em lote");
+ assert.equal(state.minutes,270,"três sessões somam 4h30");
+ assert.equal(state.curr,"Matemática");
+ await page.evaluate(()=>window.OrbitaCore.go("inicio"));
+ await page.waitForSelector(".study-daily-entry");
+ assert.equal(await page.$(".study-daily-entry").then(a=>a.length),3);
+ for(let i=0;i<3;i++){
+  await page.click('.study-daily-entry:nth-child('+(i+1)+') [data-s3="quickDone"]');
+  await page.waitForFunction((n)=>[...document.querySelectorAll('.study-daily-entry.is-done')].length===n,{timeout:5000},i+1);
+ }
+ state=await page.evaluate(id=>{
+  const T=window.OrbitaStage3.inspect;
+  return {next:T.cycleState(T.cycle(id)).title,done:T.model.sessions.filter(x=>x.cycleId===id&&x.status==="done").length};
+ },testCycle);
+ assert.equal(state.done,3);
+ assert.equal(state.next,"Física","concluir última sessão na tela inicial avança a matéria");
+ await page.click('.study-daily-entry:nth-child(3) [data-s3="quickDone"]');
+ await page.waitForFunction(()=>document.querySelectorAll(".study-daily-entry.is-done").length===2,{timeout:5000});
+ assert.equal(await page.evaluate(id=>{
+  const T=window.OrbitaStage3.inspect;return T.cycleState(T.cycle(id)).title;
+ },testCycle),"Matemática","desfazer última conclusão reabre etapa anterior");
+ console.log("Chromium: planejamento 3x90min, três conclusões no Início, avanço e desfazer passaram.");
+
  assert.equal(errors.length,0,"nenhum erro JavaScript em fluxo de salvar e reabrir: "+errors.join("; "));
  console.log("Chromium: clique de salvar, cinco dias, persistência após recarga e edição passaram.");
 }finally{
