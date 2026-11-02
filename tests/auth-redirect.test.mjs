@@ -68,7 +68,7 @@ async function scenario(query,{fetchError=false,existingSession=false}={}){
  assert.equal(s.app.mode,"ready","sincronização nova criada sem falhas");
  assert.equal(s.location.search,"","remove o código OAuth após consumi-lo");
  s.window.OrbitaCore.go("configuracoes");
- assert.match(s.document.getElementById("view").innerHTML,/estudante@example.com/);
+ assert.match(s.document.getElementById("view").innerHTML,/Pessoa de teste/);
  assert.doesNotMatch(s.document.getElementById("view").innerHTML,/Continuar com Google/);
 }
 {
@@ -77,7 +77,7 @@ async function scenario(query,{fetchError=false,existingSession=false}={}){
  assert.equal(s.app.mode,"error");
  s.window.OrbitaCore.go("configuracoes");
  const html=s.document.getElementById("view").innerHTML;
- assert.match(html,/estudante@example.com/);
+ assert.match(html,/Pessoa de teste/);
  assert.match(html,/Network blocked/);
  assert.doesNotMatch(html,/Continuar com Google/);
 }
