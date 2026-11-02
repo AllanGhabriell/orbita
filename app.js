@@ -3,7 +3,7 @@
 const STORAGE="orbita:stage1:v1";
 const DAYS=["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
 const SHORT=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-const PAGES={inicio:["SEU ESPAÇO","Meu dia"],planejamento:["CALENDÁRIO","Planejamento"],organizar:["SUAS ÁREAS","Organizar"],perfil:["SEU HISTÓRICO","Perfil e evolução"],disponibilidade:["SEU TEMPO","Disponibilidade"],configuracoes:["PREFERÊNCIAS","Configurações"],estudos:["ESTUDOS","Ciclos de estudo"]};
+const PAGES={inicio:["SEU ESPAÇO","Meu dia"],planejamento:["CALENDÁRIO","Planejamento"],organizar:["SUAS ÁREAS","Organizar"],perfil:["SEU HISTÓRICO","Perfil e evolução"],disponibilidade:["SEU TEMPO","Disponibilidade"],configuracoes:["PREFERÊNCIAS","Configurações"],estudos:["ESTUDOS","Ciclos de estudo"],evolucao:["ANÁLISES","Minha evolução"],fechamento:["REGISTROS","Fechamento do dia"]};
 const $=(id)=>document.getElementById(id);
 const iso=(d)=>{const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,"0");const day=String(d.getDate()).padStart(2,"0");return y+"-"+m+"-"+day;};
 const parse=(s)=>{const a=String(s).split("-").map(Number);return new Date(a[0],a[1]-1,a[2],12);};
