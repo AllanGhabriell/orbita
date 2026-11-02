@@ -3,7 +3,7 @@
 ## Etapa 1 — Base, navegação e disponibilidade (2026-11-02)
 
 **Repositório:** https://github.com/AllanGhabriell/orbita  
-**Situação:** implementação inicial entregue no branch main; testes automatizados de inicialização, navegação, disponibilidade e objetivos aprovados no job de teste do GitHub Actions; publicação e QA visual ainda devem ser confirmados.  
+**Situação:** implementação inicial entregue no branch main; testes automatizados de inicialização, navegação, disponibilidade e objetivos aprovados no job de teste do GitHub Actions; publicação bloqueada por permissão do GitHub Pages e QA visual ainda pendente.  
 **Próxima etapa:** 2, somente após autorização expressa.
 
 ### Implementado
@@ -22,12 +22,12 @@
 
 ### Testes feitos
 - Verificação de sintaxe JavaScript no GitHub Actions: aprovada.
-- Testes automatizados de estado vazio, ausência de estatísticas fictícias, criação de disponibilidade com faixas múltiplas, cadastro/objetivo principal e navegação: aprovados no job de teste.
+- Testes automatizados de estado vazio, ausência de estatísticas fictícias, criação de disponibilidade com faixas múltiplas, cadastro/objetivo principal e navegação: aprovados no job de teste. O job de deploy falhou por permissão de ativação do Pages, não por falha dos testes.
 - Execução em ambiente simulado para confirmar a inicialização da tela sem dados predefinidos.
 - Correções efetuadas nos diálogos para evitar fechamento ao interagir dentro dos formulários.
 
 ### Pendências de qualidade
-- Verificar publicação real do GitHub Pages e acesso público ao endereço. A configuração depende das permissões do GitHub.
+- **GitHub Pages não foi publicado:** o job de deploy falhou em actions/configure-pages@v5 com `Resource not accessible by integration` ao tentar ativar o Pages automaticamente. É necessário habilitar Pages em Settings → Pages → Build and deployment → GitHub Actions uma vez na conta proprietária e reexecutar o workflow.
 - Revisão visual manual em navegadores desktop/mobile e teste de acessibilidade com teclado/leitor de tela. O CSS responsivo está implementado, mas isso não equivale a uma certificação visual.
 - Testar persistência e comportamento com mudanças reais em navegadores/dispositivos distintos. Sincronização multi-dispositivo não pertence à etapa 1.
 - Conferir interações de exceções e campos em navegadores reais antes de uso intensivo.
