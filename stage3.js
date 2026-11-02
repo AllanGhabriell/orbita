@@ -322,19 +322,27 @@ function planMove(id,date,order=0){
  logs("planner_moved",{id,date});finish();save();render();
 }
 function planBulk(ids,data){
- const list=[...new Set(ids)].map(session);
+ const list=[...new Set(ids.map(String))].map(session);
  if(!list.length)throw Error("Selecione as sessões que deseja editar.");
  list.forEach(planIsEditable);
  const dest=String(data.date||"");
  if(dest&&(!datesOkay(dest)||dest<first()||blocked(dest)))throw Error("Data de destino inválida ou finalizada.");
  const duration=String(data.plannedMin??"").trim()?positiveInt(data.plannedMin,90,1,720):null;
+ const mode=String(data.mode||"keep");
+ if(!["keep","rotation","specific"].includes(mode))throw Error("Escolha um tipo de estudo válido.");
+ const selectedCycle=String(data.cycleId||"");
+ const chosen=mode==="keep"?[]:list.map(x=>planValidate({
+  cycleId:selectedCycle||x.cycleId,date:dest||x.date,mode,
+  subjectId:data.subjectId||"",plannedMin:duration??x.plannedMin,methodId:x.methodId||""
+ }));
  const finish=planJournal();
- for(const x of list){
+ for(const [i,x] of list.entries()){
   if(dest&&dest!==x.date){x.date=dest;x.planOrder=planNextOrder(dest);}
   if(duration!==null)x.plannedMin=duration;
+  if(mode!=="keep"){const next=chosen[i];Object.assign(x,next,{planOrder:x.planOrder,status:"pending",actualMin:null,completedAt:null});}
  }
- logs("planner_bulk_edit",{ids:list.map(x=>x.id),date:dest,duration});finish();save();render();
- return list;
+ logs("planner_bulk_edit",{ids:list.map(x=>x.id),date:dest,duration,mode});
+ finish();save();render();return list;
 }
 function planSaveTemplate(name,date){
  const title=validName(name,60),start=planWeekStart(date);
