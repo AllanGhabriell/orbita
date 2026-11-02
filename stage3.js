@@ -209,7 +209,8 @@ function deleteSession(id){
  logs("session_deleted",{sessionId:id,cycleId:x.cycleId,date:x.date});
 }
 function summarize(filter={}){
- const entries=db.sessions.filter(x=>!x.archived&&(!filter.from||x.date>=filter.from)&&(!filter.to||x.date<=filter.to)&&(!filter.cycleId||x.cycleId===filter.cycleId)&&(!filter.area||x.area===filter.area));
+ const frozen=Object.values(s.evolution?.closed||{}).flatMap(snap=>(snap.studies||[]).map(x=>({...x,date:snap.date,methodLabel:x.method,cycleLabel:x.cycle,methodId:"",archived:false})));
+ const entries=[...db.sessions.filter(x=>!x.archived&&!s.evolution?.closed?.[x.date]),...frozen].filter(x=>(!filter.from||x.date>=filter.from)&&(!filter.to||x.date<=filter.to)&&(!filter.cycleId||x.cycleId===filter.cycleId)&&(!filter.area||x.area===filter.area));
  const planned=entries.reduce((sum,x)=>sum+Number(x.plannedMin||0),0);
  const actual=entries.reduce((sum,x)=>sum+Number(x.actualMin||0),0);
  const actualRecorded=entries.filter(x=>x.actualMin!=null).length;
@@ -217,8 +218,8 @@ function summarize(filter={}){
  function inc(key,name,x){let k=name||"Não especificado";if(!groups[key][k])groups[key][k]={minutes:0,sessions:0,completed:0,recorded:0};const v=groups[key][k];v.sessions++;if(x.status==="done")v.completed++;if(x.actualMin!=null){v.minutes+=Number(x.actualMin);v.recorded++;}}
  for(const x of entries){
   inc("areas",x.area,x);inc("disciplines",x.discipline,x);inc("topics",x.topic,x);
-  inc("methods",method(x.methodId)?.title||"Sem modalidade",x);
-  inc("cycles",cycle(x.cycleId)?.title||(x.cycleId?"Ciclo arquivado":"Complementar independente"),x);
+  inc("methods",x.methodLabel||method(x.methodId)?.title||"Sem modalidade",x);
+  inc("cycles",x.cycleLabel||cycle(x.cycleId)?.title||(x.cycleId?"Ciclo arquivado":"Complementar independente"),x);
  }
  return {sessions:entries.length,completed:entries.filter(x=>x.status==="done").length,inProgress:entries.filter(x=>x.status==="progress").length,plannedMin:planned,actualMin:actual,actualRecorded,unrecorded:entries.length-actualRecorded,groups};
 }
