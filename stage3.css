@@ -1,0 +1,81 @@
+/* Órbita — Etapa 3: estudos, rotação e análise de carga */
+.study-home-panel{display:flex;flex-direction:column;gap:13px;min-height:210px}
+.study-home-panel .card-head{margin-bottom:0}
+.study-home-next{display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin;padding-bottom:5px}
+.study-chip{display:flex;flex-direction:column;min-width:112px;text-align:left;gap:5px;flex:1;background:var(--surface2);border:1px solid var(--border);padding:11px;border-radius:12px;color:var(--text)}
+.study-chip:hover{border-color:var(--borderStrong);background:var(--surface3)}
+.study-chip span{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.study-chip strong{font-size:12px;overflow-wrap:anywhere}
+.study-stats-mini{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:10.5px}
+.study-stats-mini span{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 9px}
+.study-dashboard-grid,.study-load-numbers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.study-load-numbers{grid-template-columns:repeat(4,minmax(0,1fr))}
+.study-stat{display:flex;flex-direction:column;gap:7px;padding:14px 15px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);min-width:0}
+.study-stat>span{color:var(--muted);font-size:11px;line-height:1.3}
+.study-stat>strong{font-size:clamp(18px,2.4vw,27px);letter-spacing:-.045em;font-weight:740}
+.study-stat>small{color:var(--soft);font-size:10px}
+.study-cycle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.study-cycle-card{border-color:var(--borderStrong);display:flex;flex-direction:column;gap:14px}
+.study-cycle-card .card-head{margin:0}
+.study-cycle-card .card-head h2{margin-top:5px;font-size:18px;letter-spacing:-.03em}
+.study-current{background:var(--surface2);padding:14px;border:1px solid var(--border);border-radius:13px;display:flex;flex-direction:column;gap:11px}
+.study-current>div:first-child{display:flex;flex-direction:column;gap:4px}
+.study-current span{font-size:10px;color:var(--soft);letter-spacing:.1em;font-weight:700}
+.study-current strong{font-size:17px}
+.study-current small{font-size:11px;color:var(--muted)}
+.study-progress{background:var(--surface3);height:7px;border-radius:100px;overflow:hidden;width:100%}
+.study-progress>div{background:linear-gradient(90deg,var(--accent),var(--accent2));height:100%;border-radius:100px;transition:width .25s ease}
+.study-actions{margin-top:auto}
+.study-session-list{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;scrollbar-width:thin}
+.study-session-row{display:flex;align-items:center;gap:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);padding:12px}
+.study-session-row.done .study-session-mark{color:var(--good);background:rgba(73,185,136,.15)}
+.study-session-mark{flex:none;width:31px;height:31px;border-radius:9px;display:grid;place-items:center;background:var(--surface3);color:var(--accent)}
+.study-session-body{flex:1;display:flex;flex-direction:column;min-width:0;gap:4px}
+.study-session-body strong{font-size:12.5px;font-weight:710}
+.study-session-body small{font-size:10.5px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.study-session-controls{display:flex;align-items:center;gap:5px}
+.study-session-controls .btn{white-space:nowrap}
+.study-area,.study-highlight{display:flex;flex-direction:column;gap:14px}
+.study-highlight{border-color:var(--borderStrong);background:linear-gradient(110deg,rgba(145,118,246,.12),transparent),var(--surface)}
+.study-highlight h2{font-size:clamp(21px,3vw,29px);margin:0;letter-spacing:-.05em}
+.study-highlight .row{margin-top:5px}
+.study-subject-list{display:flex;flex-direction:column;gap:7px;max-height:480px;overflow-y:auto;scrollbar-width:thin}
+.study-subject-row{display:flex;align-items:center;gap:11px;background:var(--surface2);border:1px solid var(--border);padding:11px;border-radius:12px}
+.study-subject-row.is-current{border-color:var(--borderStrong)}
+.study-subject-number{display:grid;place-items:center;border-radius:10px;background:var(--surface3);width:31px;height:31px;flex:none;font-size:12px;color:var(--accent)}
+.study-subject-desc{min-width:0;flex:1}
+.study-subject-desc strong{display:block;font-size:12px}
+.study-subject-desc small{display:block;font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px;overflow-wrap:anywhere}
+.study-subject-row>.row{justify-content:flex-end}
+.study-load-panel{display:flex;flex-direction:column;gap:14px}
+.study-load-panel .card-head{margin:0}
+.study-notice{margin:0;padding:10px 12px;border-left:2px solid var(--warning);border-radius:8px;background:rgba(207,152,78,.07);font-size:11.5px;line-height:1.5}
+.study-summary-list{display:flex;flex-direction:column;gap:8px}
+.study-summary-line{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface2);border-radius:10px;padding:12px}
+.study-summary-line strong{display:block;font-size:12px;overflow-wrap:anywhere}
+.study-summary-line small{display:block;font-size:10px;color:var(--muted);margin-top:4px}
+.study-summary-line b{white-space:nowrap;font-size:14px}
+.study-empty{display:flex;align-items:flex-start;flex-direction:column;gap:12px}
+@media(max-width:1050px){
+ .study-cycle-grid{grid-template-columns:1fr}
+ .study-subject-row{align-items:flex-start;flex-wrap:wrap}
+ .study-subject-row>.row{flex-basis:100%;justify-content:flex-end}
+ .study-load-numbers{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:720px){
+ .study-dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .study-cycle-grid{grid-template-columns:1fr}
+ .study-session-row{flex-wrap:wrap;gap:8px}
+ .study-session-body{flex-basis:calc(100% - 43px)}
+ .study-session-controls{margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+ .study-home-next{max-width:100%}
+ .study-chip{min-width:120px}
+ .study-stat{padding:11px}
+ .study-stat>strong{font-size:20px}
+ .study-subject-row{gap:8px}
+}
+@media(max-width:380px){
+ .study-dashboard-grid,.study-load-numbers{grid-template-columns:1fr 1fr}
+ .study-subject-row>.row{justify-content:flex-start}
+ .study-session-controls{width:100%;justify-content:flex-start}
+}
