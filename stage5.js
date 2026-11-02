@@ -3,16 +3,16 @@
 "use strict";
 const C=window.OrbitaCore,Storage=window.OrbitaStorage;
 if(!C||!Storage)throw Error("Órbita: inicialização incompleta");
-const KEY="orbita:supabase-config-v1",META="orbita:cloud-meta-v1";
+const META="orbita:cloud-meta-v1";
 const VERSION=1;
 const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
 let client=null,user=null,cloudVersion=0,mode="unconfigured",busy=false,initialized=false,saveTimer=null,networkTimer=null,lastError="",conflict=null;
 let cfg=null;
 function readConfig(){
- try{const saved=JSON.parse(localStorage.getItem(KEY)||"null");
- const staticCfg=window.ORBITA_SUPABASE||null;
- return staticCfg&&staticCfg.url&&staticCfg.key?staticCfg:saved;}catch{return null;}
+ // Configuração publica do próprio Órbita; não depende de formulário/localStorage.
+ const config=window.ORBITA_SUPABASE;
+ return config?.url&&config?.key?config:null;
 }
 function currentDoc(){return JSON.parse(JSON.stringify(C.state));}
 function stringify(doc){
@@ -278,23 +278,15 @@ async function chooseLocal(){
  else C.render();
  notify("Dados locais sincronizados.");
 }
-function configForm(){
- const url=cfg?.url||"",key=cfg?.key||"";
- return '<section class="card"><div class="card-head"><h2>Conectar Supabase</h2></div>'+
- '<form id="s5-config" class="section-stack"><div class="field"><label>Project URL</label><input name="url" type="url" required placeholder="https://seu-projeto.supabase.co" value="'+A(url)+'"></div>'+
- '<div class="field"><label>Publishable key / chave pública</label><input name="key" type="text" required autocomplete="off" spellcheck="false" placeholder="sb_publishable_..." value="'+A(key)+'"></div>'+
- '<p class="note">Não use sb_secret_*, service_role ou senha de banco. A URL e a chave pública não dão acesso aos dados privados sem autenticação e RLS.</p><button class="btn primary" type="submit">Salvar configuração</button></form></section>';
-}
 function settingsPanel(){
  const label=user?.user_metadata?.name||user?.email||"";
  return '<section class="card s5-panel"><div class="card-head"><h2>Dados e sincronização</h2><span class="status" id="s5-status">'+E({ready:"Sincronização ativa",syncing:"Enviando alterações",conflict:"Conflito de versões",loading:"Conectando",offline:"Offline",error:"Atenção",signedout:"Não conectado",unconfigured:"Não configurado"}[mode]||mode)+'</span></div>'+
  '<p class="note" id="s5-error" '+(!lastError?'hidden':'')+'>'+E(lastError)+'</p>'+
  (user?'<div class="s5-user"><div><strong>'+E(label)+'</strong><small>Dados privados da conta Google. O login do navegador é separado do banco local.</small></div></div><div class="row"><button class="btn primary" data-s5="sync">Sincronizar agora</button><button class="btn small" data-s5="logout">Sair da conta</button></div>':
- (client?'<div class="row"><button class="btn primary" data-s5="login">Continuar com Google</button><span class="note">Sem login, seus dados permanecem neste aparelho.</span></div>':'<p class="note">Configure a conexão abaixo. O aplicativo continua funcionando sem login.</p>'))+
+ (client?'<div class="row"><button class="btn primary" data-s5="login">Continuar com Google</button><span class="note">Sem login, seus dados permanecem neste aparelho.</span></div>':'<p class="note">A conexão com o banco já está configurada no Órbita. Se o login não aparecer, confira sua conexão com a internet e atualize a página.</p>'))+
  '<div class="s5-conflict" id="s5-conflict-actions" '+(mode!=="conflict"?"hidden":"")+'><strong>Há duas versões dos seus dados.</strong><p class="note">Nada será sobrescrito automaticamente. Primeiro exporte um backup, depois escolha qual cópia utilizar. A proteção de dias finalizados é aplicada pelo banco.</p><div class="row"><button class="btn" data-s5="chooseRemote">Usar nuvem</button><button class="btn" data-s5="chooseLocal">Usar dispositivo</button></div></div>'+
  '<div class="row" style="margin-top:12px"><button class="btn" data-s5="export">Exportar backup JSON</button><button class="btn" data-s5="import">Importar backup JSON</button><input id="s5-import-file" type="file" accept=".json,application/json" hidden></div>'+
- '<p class="note">Armazenamento offline: '+(Storage.supportsIndexedDB?"IndexedDB com cópia compatível no navegador.":"armazenamento local de compatibilidade.")+' Se limpar dados do navegador, poderá perder registros ainda não sincronizados. Faça backups periódicos.</p></section>'+
- (!client?configForm():'<section class="card"><div class="card-head"><h2>Configuração do banco</h2></div><p class="note">URL: '+E(cfg?.url||"—")+'</p><button class="btn ghost small" data-s5="reconfigure">Alterar conexão</button></section>');
+ '<p class="note">Armazenamento offline: '+(Storage.supportsIndexedDB?"IndexedDB com cópia compatível no navegador.":"armazenamento local de compatibilidade.")+' Se limpar dados do navegador, poderá perder registros ainda não sincronizados. Faça backups periódicos.</p></section>';
 }
 function decorate(route,base){
  if(route==="configuracoes")return base+settingsPanel();
@@ -311,7 +303,6 @@ async function handleAction(type){
  case "chooseRemote":await chooseRemote();break;
  case "chooseLocal":await chooseLocal();break;
  case "openSettings":C.go("configuracoes");break;
- case "reconfigure":if(!window.confirm("Alterar configuração? A sessão atual poderá ser desconectada."))return;localStorage.removeItem(KEY);window.location.reload();break;
  }
 }
 document.addEventListener("click",event=>{
@@ -321,13 +312,6 @@ document.addEventListener("click",event=>{
 document.addEventListener("change",event=>{
  if(event.target?.id!=="s5-import-file")return;
  receiveBackup(event.target.files?.[0]).catch(err=>{status(mode==="conflict"?"conflict":"error",err);notify(textError(err));});
-});
-document.addEventListener("submit",event=>{
- if(event.target.id!=="s5-config")return;
- event.preventDefault();
- const data=new FormData(event.target),candidate={url:String(data.get("url")||"").trim().replace(/\/+$/,""),key:String(data.get("key")||"").trim()};
- if(!isConfigured(candidate)){notify("Informe uma Project URL Supabase válida e apenas a chave pública.");return;}
- localStorage.setItem(KEY,JSON.stringify(candidate));window.location.reload();
 });
 window.addEventListener("online",()=>{if(user&&mode!=="conflict"){clearTimeout(networkTimer);networkTimer=setTimeout(()=>initialReconcile().catch(err=>status("error",err)),600);}});
 window.OrbitaStage5={decorate,inspect:{checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client},mergeClosures}};
