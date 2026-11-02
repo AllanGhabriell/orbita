@@ -19,9 +19,9 @@ jobs:
         with:
           node-version: '22'
       - name: Sintaxe do JavaScript
-        run: node --check app.js
+        run: node --check app.js && node --check stage2.js
       - name: Testes da Etapa 1
-        run: node --test tests/stage1.test.mjs
+        run: node --test tests/*.test.mjs
   deploy:
     needs: test
     runs-on: ubuntu-latest
