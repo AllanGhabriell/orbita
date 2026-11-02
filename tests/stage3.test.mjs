@@ -110,7 +110,7 @@ const linked=T.addSessions({kind:"supplement",date,cycleId:"",subjectId:"",area:
 assert.equal(T.loadFor(date).linkedFocuses,1);
 assert.equal(T.loadFor(date).totalPlanned,T.loadFor(date).studyPlanned,"foco associado não é contado em dobro");
 assert.throws(()=>T.addSessions({kind:"supplement",date,area:"ENEM",discipline:"Matemática",plannedMin:"90",focusId:focus.id}),/já está vinculado/);
-assert.throws(()=>T.addSessions({kind:"cycle",cycleId:c.id,subjectId:math.id,date,area:"Eletrônica",discipline:"Matemática",plannedMin:"90"}),/matéria atual/);
+assert.throws(()=>T.addSessions({kind:"cycle",cycleId:c.id,subjectId:physics.id,date,area:"Eletrônica",discipline:"Física",plannedMin:"90"}),/matéria atual/);
 const local=T.addSessions({kind:"supplement",date:following,area:"Pessoal",discipline:"Leitura",plannedMin:"30"})[0];
 assert.equal(local.kind,"supplement");
 assert.ok(!T.summarize({from:date,to:date}).groups.areas.Pessoal);
