@@ -217,7 +217,12 @@ function updateSession(id,data){
   if(x.date!==next.date||next.kind!=="cycle"||next.cycleId!==x.cycleId||next.subjectId!==x.subjectId)throw Error("Esta etapa já avançou. Preserve a data e a matéria do histórico; outros campos podem ser corrigidos.");
  }
  if(x.kind==="cycle"&&x.status==="done"&&x.stepNo===cycle(x.cycleId)?.stepNo&&next.date!==x.date)throw Error("Concluída: altere o plano antes de avançar.");
- Object.assign(x,next);logs("session_edited",{sessionId:id});return x;
+ Object.assign(x,next);
+ if(x.rotationSlot){
+  if(x.kind==="cycle"){x.subjectId="";x.stepNo=0;x.discipline="Próxima matéria do ciclo";}
+  else x.rotationSlot=false;
+ }
+ logs("session_edited",{sessionId:id});return x;
 }
 function setSessionStatus(id,status,actualMin,actualTime){
  const x=session(id);if(!x||x.archived)throw Error("Sessão não encontrada.");
@@ -299,8 +304,8 @@ function tinySessions(date){
 }
 function sessionRow(x,compact=false){
  const c=cycle(x.cycleId),m=method(x.methodId);
- const desc=[c?.title||"Estudo complementar",x.topic,x.startTime?x.startTime:"",x.plannedMin!=null?minuteLabel(x.plannedMin)+" previstas":"",x.actualMin!=null?minuteLabel(x.actualMin)+" registradas":""].filter(Boolean).join(" · ");
- return '<div class="study-session-row '+(x.status==="done"?"done":"")+'"><div class="study-session-mark">'+(x.status==="done"?"✓":x.status==="progress"?"◷":"◉")+'</div><div class="study-session-body"><strong>'+E(x.discipline)+'</strong><small>'+E(desc)+'</small>'+((m||x.purpose)?'<small>'+E([m?.title,x.purpose].filter(Boolean).join(" • "))+'</small>':"")+'</div><div class="study-session-controls">'+(!blocked(x.date)?'<button class="btn small ghost" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Reabrir sessão":"Concluir sessão")+'">'+(x.status==="done"?"↶":"✓")+'</button>':"")+'<button class="btn small" data-s3="recordSession" data-id="'+A(x.id)+'">Registro</button><button class="btn small ghost" data-s3="editSession" data-id="'+A(x.id)+'" title="Editar sessão">✎</button><button class="btn small ghost" data-s3="copySession" data-id="'+A(x.id)+'" title="Copiar sessão">⧉</button><button class="btn small danger" data-s3="deleteSession" data-id="'+A(x.id)+'" title="Excluir sessão">×</button></div></div>';
+ const desc=[c?.title||"Estudo complementar",x.rotationSlot?"Segue a rotação na hora de estudar":"",x.topic,x.startTime?x.startTime:"",x.plannedMin!=null?minuteLabel(x.plannedMin)+" previstas":"",x.actualMin!=null?minuteLabel(x.actualMin)+" registradas":""].filter(Boolean).join(" · ");
+ return '<div class="study-session-row '+(x.status==="done"?"done":"")+'"><div class="study-session-mark">'+(x.status==="done"?"✓":x.status==="progress"?"◷":"◉")+'</div><div class="study-session-body"><strong>'+E(x.rotationSlot?(cycleState(c)?.title||"Próxima matéria")+" · a confirmar":x.discipline)+'</strong><small>'+E(desc)+'</small>'+((m||x.purpose)?'<small>'+E([m?.title,x.purpose].filter(Boolean).join(" • "))+'</small>':"")+'</div><div class="study-session-controls">'+(!blocked(x.date)?'<button class="btn small ghost" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Reabrir sessão":"Concluir sessão")+'">'+(x.status==="done"?"↶":"✓")+'</button>':"")+'<button class="btn small" data-s3="recordSession" data-id="'+A(x.id)+'">Registro</button><button class="btn small ghost" data-s3="editSession" data-id="'+A(x.id)+'" title="Editar sessão">✎</button><button class="btn small ghost" data-s3="copySession" data-id="'+A(x.id)+'" title="Copiar sessão">⧉</button><button class="btn small danger" data-s3="deleteSession" data-id="'+A(x.id)+'" title="Excluir sessão">×</button></div></div>';
 }
 function homePanel(){
  const date=s.date,load=loadFor(date),activeCycles=db.cycles.filter(x=>!x.archived);
@@ -427,7 +432,7 @@ function methodModal(id){
  modal(x?"Editar modalidade":"Nova modalidade",'<form id="s3-method" class="section-stack"><input name="id" value="'+A(id||"")+'" type="hidden">'+field("Nome","title",x?.title||"","text",'required maxlength="80" placeholder="Ex.: Revisão ativa"')+'<div class="field"><label>Descrição opcional</label><textarea name="description" maxlength="500">'+E(x?.description||"")+'</textarea></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>');
 }
 function batchModal(preferredCycle=""){
- const selected=cycle(preferredCycle)||db.cycles.find(x=>!x.archived&&cycleState(x));
+ const selected=db.cycles.find(x=>x.id===preferredCycle&&!x.archived&&activeSubjects(x).length)||db.cycles.find(x=>!x.archived&&activeSubjects(x).length);
  if(!selected)return notify("Crie um ciclo e ative ao menos uma matéria antes de planejar sessões.");
  const start=s.date<first()?first():s.date,end=add(start,6);
  const options=db.cycles.filter(x=>!x.archived&&activeSubjects(x).length).map(x=>'<option value="'+A(x.id)+'" '+(selected.id===x.id?"selected":"")+'>'+E(x.title)+'</option>').join("");
