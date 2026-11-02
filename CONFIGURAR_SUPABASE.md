@@ -46,16 +46,16 @@ https://allanghabriell.github.io/orbita/
 
 Esses caminhos devem corresponder exatamente ao endereço do site. O app utiliza OAuth com fluxo PKCE e redireciona para o próprio Órbita.
 
-## 4. Conectar pelo próprio site
+## 4. Acessar o site já conectado ao projeto
+
+A URL do Supabase e a chave **pública** estão incorporadas ao código do Órbita em `config.js`. O formulário "Conectar Supabase" foi removido: não é necessário copiar os dados novamente em outro navegador ou dispositivo.
 
 1. Abra **https://allanghabriell.github.io/orbita/**.
-2. Entre em **Preferências → Dados e sincronização → Conectar Supabase**.
-3. Cole **Project URL** e **Publishable key** (chave pública).
-4. Salve; a página será recarregada.
-5. Clique em **Continuar com Google**, faça o login e permita o retorno ao site.
-6. Se houver dados locais e remotos diferentes, **faça backup** e escolha qual base deseja usar. O aplicativo preserva os snapshots de dias finalizados e rejeita conflitos sem resolução.
+2. Em **Preferências → Dados e sincronização**, clique em **Continuar com Google**.
+3. Autentique-se e permita o retorno ao Órbita.
+4. Caso tenha históricos locais e na nuvem diferentes, exporte um backup e escolha explicitamente qual versão usar. Os dias finalizados são preservados.
 
-A configuração digitada fica salva **nesse navegador**. Sem editar o código, em outro aparelho será necessário inserir a mesma URL e chave pública mais uma vez. Caso queira configuração compartilhada para todos os dispositivos por padrão, poderemos adicionar a URL e a **chave pública** ao GitHub, com sua autorização; não são segredos, mas a operação exigirá alteração do repositório.
+**Ainda é necessário** executar o SQL da etapa 2 e configurar o login Google na etapa 3 deste guia. A chave pública no site não ativa automaticamente a autenticação ou as tabelas.
 
 ## 5. Testes finais obrigatórios
 
