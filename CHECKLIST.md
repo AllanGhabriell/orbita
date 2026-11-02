@@ -55,13 +55,26 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [ ] Sincronização e persistência entre dispositivos (Etapa 5)
 
 ## Etapa 4 — Evolução
-- [ ] Fechamento com conferência, bloqueio imutável e dias atrasados
-- [ ] Relatório diário e consolidação semanal/mensal/anual
-- [ ] Estatísticas sem dupla contagem, sem inferir tempos fictícios
-- [ ] Motor de métricas ajustado à qualidade e amostra
-- [ ] Orientador exigente com elogio, cobrança, evolução e descanso contextualizados
-- [ ] Lembretes e conquistas sem interrupção ou manipulação
-- [ ] Auditoria contra ESCOPO.md
+- [x] Fechamento com revisão obrigatória, confirmação por texto e bloqueio no aplicativo
+- [x] Snapshot histórico independente do planejamento vivo, preservando títulos, horas, pausas e situação
+- [x] Aviso consolidado de dias pendentes com acesso direto e bloqueio de fechamento fora da ordem
+- [x] Dias de descanso ou sem atividade podem ser finalizados sem inventar desempenho
+- [x] Análises diárias, semanais, mensais e anuais com consolidação dependente de dias fechados
+- [x] Comparação descritiva entre períodos com dados suficientes, sem equiparar percentuais a qualidade
+- [x] Estatísticas de focos, rotinas, pontualidade registrada, estudos, planejamento, descanso e tempo real sem dupla contagem
+- [x] Registro opcional de questões/acertos e autoavaliação, distinguindo qualidade declarada de aprendizagem comprovada
+- [x] Motor de feedback por amostra e contexto: elogio, cobrança fundamentada, consistência e pausa
+- [x] Avisos discretos de estatísticas, com adiar e desativar
+- [x] Conquistas por cinco ou mais dias de cumprimento real, sem recompensas por clique
+- [x] Auditoria de requisitos com comparação ao ESCOPO.md
+
+### Verificação e pendências
+- [x] Testes automatizados de fechamento imutável no aplicativo, precedência entre dias e relatórios congelados
+- [ ] Verificação visual e de teclado em navegador real (desktop e celular)
+- [ ] Análise exploratória de calendários antigos/extensos, recorrências e múltiplas abas
+- [ ] Bloqueio de escrita **no servidor** para dias finalizados: somente na Etapa 5 com RLS/funções SQL
+- [ ] IA generativa opcional não foi integrada: o orientador atual usa regras verificáveis sem serviço externo
+- [ ] Testar um mês inteiro de fechamento diário com registros reais, inclusive semanas iniciadas em diferentes dias
 
 ## Etapa 5 — Integração
 - [ ] Migrações SQL completas e políticas RLS
