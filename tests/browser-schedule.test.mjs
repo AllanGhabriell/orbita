@@ -56,7 +56,7 @@ try{
   modalOpen:!!document.getElementById("s6-busy-form"),
   errorMessage:document.getElementById("s6-form-error")?.textContent,
   toast:document.getElementById("toast")?.textContent,
-  groups:window.OrbitaStage6.inspect.groupedWeekly().map(x=>({title:x.title,days:x.days})),
+  groups:window.OrbitaStage6?.inspect?.groupedWeekly?.().map(x=>({title:x.title,days:x.days}))||[],
   hasStorage:!!localStorage.getItem("orbita:stage1:v1"),
   route:document.getElementById("view")?.dataset?.route,
   validity:document.getElementById("s6-busy-form")?.checkValidity(),
