@@ -30,7 +30,7 @@ let route=PAGES[location.hash.slice(1)]?location.hash.slice(1):"inicio";
 let modalReturnFocus=null;
 let glowTarget={x:-400,y:-400},glowAt={x:-400,y:-400},glowFrame=0,glowIsActive=false;
 let toastTimer;
-function save(){try{localStorage.setItem(STORAGE,JSON.stringify(state));$("storage-indicator").title="Salvo neste navegador";return true;}catch(e){$("storage-indicator").title="Não foi possível salvar";notify("Erro ao salvar. Verifique o armazenamento do navegador.");return false;}}
+function save(){try{const json=JSON.stringify(state);localStorage.setItem(STORAGE,json);if(window.OrbitaStorage?.onSave)window.OrbitaStorage.onSave(json);$("storage-indicator").title="Salvo neste navegador";return true;}catch(e){$("storage-indicator").title="Não foi possível salvar";notify("Erro ao salvar. Verifique o armazenamento do navegador.");return false;}}
 function notify(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),3500);}
 function availabilityReady(){return state.availability.weekly.some(Boolean)||Object.keys(state.availability.overrides).length>0;}
 function resolveAvailability(date){return state.availability.overrides[date]||state.availability.weekly[parse(date).getDay()]||null;}
@@ -56,6 +56,7 @@ else content=renderSettings();
 if(window.OrbitaStage2&&typeof window.OrbitaStage2.decorate==="function")content=window.OrbitaStage2.decorate(route,content);
 if(window.OrbitaStage3&&typeof window.OrbitaStage3.decorate==="function")content=window.OrbitaStage3.decorate(route,content);
 if(window.OrbitaStage4&&typeof window.OrbitaStage4.decorate==="function")content=window.OrbitaStage4.decorate(route,content);
+if(window.OrbitaStage5&&typeof window.OrbitaStage5.decorate==="function")content=window.OrbitaStage5.decorate(route,content);
 $("view").innerHTML=page(content);}
 function dateNavigator(){return '<div class="date-nav"><button class="btn square" data-action="prevDay" '+(addDays(state.date,-1)<state.firstAccess?"disabled":"")+' aria-label="Dia anterior">‹</button><button class="btn date-button" data-action="jumpDate" title="Escolher data">'+esc(shortDate(state.date))+' ▾</button><button class="btn square" data-action="nextDay" aria-label="Próximo dia">›</button></div>';}
 function renderHome(){
