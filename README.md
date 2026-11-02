@@ -4,7 +4,7 @@
 
 Planejador pessoal e de estudos, independente da Academia CFOP. O objetivo é organizar compromissos, disponibilidade, ciclos, hábitos e evolução com liberdade para editar tudo que não pertence a um dia já encerrado.
 
-## Etapa atual: 3 de 5
+## Etapa atual: 4 de 5
 
 **Disponível nesta etapa**
 - Página inicial zerada no primeiro acesso, com orientação contextual.
@@ -40,7 +40,22 @@ Planejador pessoal e de estudos, independente da Academia CFOP. O objetivo é or
 - Estatísticas reais por área, matéria, assunto, modalidade e ciclo; ausência de duração não é registrada como zero de estudo.
 - Painel de estudos acessível pelo Início e por Organizar; ciclos arquivados ficam disponíveis para consulta/reativação.
 
-**Ainda não disponíveis:** fechamento definitivo, relatório semanal/mensal/anual completo, motor de orientação com avaliação de aprendizado e recomendações adaptativas (etapa 4); autenticação Google, Supabase, SQL, PWA e sincronização (etapa 5).
+**Disponível na etapa 4**
+- Revisão dos compromissos e estudos por dia, com confirmação explícita `FINALIZAR`.
+- Fechamento **definitivo pela interface**: uma vez encerrado, o dia fica apenas para consulta; a versão congelada dos dados não é alterada por edições posteriores em tarefas, ciclos ou disponibilidade.
+- Alertas de datas anteriores pendentes e orientação para fechar na ordem, sem impedir registros do dia atual.
+- Relatórios diários, semanais, mensais e anuais; diferenciação entre **provisório** e **consolidado**. Semana personalizada respeitada.
+- Métricas por focos, hábitos, pontualidade, estudo, descanso e tempo estimado/real. Resultados ausentes não viram horas imaginárias.
+- Registros opcionais de questões, acertos e qualidade percebida nas sessões.
+- Orientador de desempenho baseado em regras rastreáveis, histórico e amostra; cobra o plano, reconhece constância e evita criticar descansos planejados.
+- Lembretes discretos que podem ser adiados ou desativados, e conquistas verificáveis que exigem vários dias de compromissos cumpridos.
+- Comparações descritivas entre períodos com pelo menos cinco dias fechados e metas comparáveis em cada período.
+
+**Pendente na etapa 5:** autenticação Google, banco Supabase, SQL e políticas de bloqueio também no **servidor**, exportação/importação, PWA e sincronização entre dispositivos.
+
+> Importante: até a etapa 5, a imutabilidade é **garantida pelo fluxo de uso do aplicativo**, não por um banco de dados com restrições. Quem edita manualmente o armazenamento local do navegador ainda pode interferir nos arquivos de dados. A proteção definitiva no servidor será aplicada na integração final.
+
+
 
 ### Abrir o site
 Quando a publicação automática do GitHub Pages estiver habilitada:
@@ -52,17 +67,18 @@ A publicação usa `.github/workflows/pages.yml`. **A primeira tentativa falhou:
 Também é possível abrir `index.html` em um navegador para testar a interface estática.
 
 ### Testes
-O repositório tem um workflow de verificação e os testes `tests/stage1.test.mjs`, `tests/stage2.test.mjs` e `tests/stage3.test.mjs`, executáveis com Node.js 22:
+O repositório tem um workflow de verificação e os testes `tests/stage1.test.mjs`, `tests/stage2.test.mjs` e `tests/stage3.test.mjs` e `tests/stage4.test.mjs`, executáveis com Node.js 22:
 
 ```bash
 node --check app.js
 node --check stage2.js
 node --check stage3.js
+node --check stage4.js
 node --test tests/*.test.mjs
 ```
 
 ### Dados e banco
-Durante as etapas 1–4, os registros são provisórios e locais (`localStorage`). A etapa 2 armazena atividades em `state.planner` e a etapa 3 armazena os estudos em `state.studies`; ambos possuem eventos de modificação. Uma migração será necessária na etapa 5. Não há SQL nesta fase. A integração Supabase, login Google, funcionamento offline com sincronização e regras RLS acontecerão **somente na etapa 5**, conforme combinado. Não confie no armazenamento local como backup definitivo; limpar dados do navegador pode apagar as configurações.
+Durante as etapas 1–4, os registros são provisórios e locais (`localStorage`). A etapa 2 armazena atividades em `state.planner` e a etapa 3 armazena os estudos em `state.studies` e a etapa 4 congela os registros em `state.evolution.closed`; os módulos também mantêm eventos de modificação. Uma migração será necessária na etapa 5. Não há SQL nesta fase. A integração Supabase, login Google, funcionamento offline com sincronização e regras RLS acontecerão **somente na etapa 5**, conforme combinado. Não confie no armazenamento local como backup definitivo; limpar dados do navegador pode apagar as configurações.
 
 ### Acompanhamento obrigatório
 - [ESCOPO.md](./ESCOPO.md) — requisitos completos do projeto, revisados a cada etapa.
