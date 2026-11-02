@@ -486,8 +486,9 @@ document.addEventListener("click",event=>{
  event.preventDefault();try{actions[t.dataset.s3]?.(t);}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}
 });
 document.addEventListener("submit",event=>{
- if(!event.target.id?.startsWith("s3-"))return;
- event.preventDefault();try{submission(event.target.id,new FormData(event.target));}catch(err){notify(err.message||"Verifique os dados preenchidos.");}
+ const id=event.target?.getAttribute?.("id")||event.target?.id;
+ if(!String(id||"").startsWith("s3-"))return;
+ event.preventDefault();try{submission(id,new FormData(event.target));}catch(err){notify(err.message||"Verifique os dados preenchidos.");}
 });
 document.addEventListener("change",event=>{
  const el=event.target;if(el?.id==="s3-cycle-choice"||el?.id==="s3-kind")updateSessionChoices();
