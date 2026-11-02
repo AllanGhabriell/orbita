@@ -172,7 +172,9 @@ case "moduleHelp":moduleModal(button.dataset.module);break;
 }}
 document.addEventListener("click",(event)=>{const nav=event.target.closest("[data-nav]");if(nav){go(nav.dataset.nav);return;}const act=event.target.closest("[data-action]");if(act)handleAction(act.dataset.action,act);});
 document.addEventListener("submit",(event)=>{
-if(!event.target.id)return;
+// Formulários dos módulos 2–6 possuem seus próprios controladores de envio.
+// Evita interceptar e validar indevidamente um formulário que não pertence à base.
+if(!["goal-form","date-form","exception-date-form","availability-form"].includes(event.target?.id))return;
 event.preventDefault();const form=event.target;const data=new FormData(form);
 if(form.id==="goal-form"){
 const title=String(data.get("title")||"").trim();if(!title)return notify("Informe o nome do objetivo.");
