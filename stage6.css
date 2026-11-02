@@ -33,3 +33,5 @@
 .s6-weekdays small{display:block;margin-top:9px;font-size:11px;color:var(--muted)}
 #s6-day-field[hidden],#s6-date-field[hidden]{display:none!important}
 @media(max-width:400px){.s6-weekday-grid{grid-template-columns:1fr}.s6-weekday-actions .btn{flex:1}}
+.s6-form-error{display:block;padding:10px 12px;border:1px solid rgba(231,117,117,.38);border-radius:10px;color:#f6a7a7;background:rgba(231,117,117,.08);font-size:12px;line-height:1.45}
+.s6-form-error[hidden]{display:none}
