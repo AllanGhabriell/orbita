@@ -15,7 +15,20 @@ function readConfig(){
  return staticCfg&&staticCfg.url&&staticCfg.key?staticCfg:saved;}catch{return null;}
 }
 function currentDoc(){return JSON.parse(JSON.stringify(C.state));}
-function stringify(doc){return JSON.stringify(doc);}
+function stringify(doc){
+ // JSONB do PostgreSQL normaliza a ordem das propriedades; comparar por ordem
+ // de inserção gera conflitos falsos depois de login ou recarga da nuvem.
+ function normalize(value){
+  if(Array.isArray(value))return value.map(normalize);
+  if(value&&typeof value==="object"){
+   const obj={};
+   for(const k of Object.keys(value).sort())obj[k]=normalize(value[k]);
+   return obj;
+  }
+  return value;
+ }
+ return JSON.stringify(normalize(doc));
+}
 function checksum(doc){
  const str=stringify(doc);let hash=2166136261;
  for(let i=0;i<str.length;i++){hash^=str.charCodeAt(i);hash=Math.imul(hash,16777619);}
