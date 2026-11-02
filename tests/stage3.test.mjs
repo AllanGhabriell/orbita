@@ -35,6 +35,7 @@ const form=values=>({get:k=>values[k]??null,getAll:k=>Array.isArray(values[k])?v
 assert.equal(T.model.cycles.length,0,"nenhum ciclo de exemplo");
 assert.equal(T.model.sessions.length,0,"nenhuma sessão de exemplo");
 assert.equal(T.model.methods.length,0,"nenhuma modalidade de exemplo");
+assert.throws(()=>T.saveCycle({title:"Sem disponibilidade",area:"ENEM",defaultMin:90}),/disponibilidade/,"sem disponibilidade não cria ciclos");
 assert.ok(element("view").innerHTML.includes("Primeiro, sua disponibilidade"));
 for(let i=0;i<7;i++)C.state.availability.weekly[i]={mode:"hours",hours:8};
 C.save();C.render();
