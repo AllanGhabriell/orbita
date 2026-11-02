@@ -39,7 +39,7 @@ function cloudMeta(){
 }
 function setCloudMeta(value){localStorage.setItem(META,JSON.stringify(value));}
 function boundMeta(){const meta=cloudMeta();return user&&meta.userId===user.id?meta:null;}
-function setLastSync(doc,version){cloudVersion=version;setCloudMeta({userId:user.id,version,hash:checksum(doc),at:new Date().toISOString()});Storage.markSynced?.();}
+function setLastSync(doc,version){cloudVersion=version;setCloudMeta({userId:user.id,version,hash:checksum(doc),at:new Date().toISOString()});if(checksum(currentDoc())===checksum(doc))Storage.markSynced?.();}
 function meaningful(doc){
  return !!(doc?.goals?.length||doc?.planner?.entries?.length||doc?.planner?.blocks?.length||
  doc?.studies?.cycles?.length||doc?.studies?.sessions?.length||Object.keys(doc?.evolution?.closed||{}).length);
