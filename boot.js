@@ -68,7 +68,7 @@ function load(src){
   const script=document.createElement("script");script.src=src;script.onload=resolve;script.onerror=()=>reject(Error("Não foi possível carregar "+src));document.head.appendChild(script);
  });
 }
-for(const file of ["app.js","stage2.js","stage3.js","stage4.js","stage5.js"]){
+for(const file of ["config.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js"]){
  try{await load("./"+file);}catch(err){
   console.error(err);
   const view=document.getElementById("view");if(view)view.textContent="Não foi possível carregar o aplicativo. Verifique a conexão e atualize a página.";
