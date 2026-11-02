@@ -5,7 +5,7 @@ const C=window.OrbitaCore;
 if(!C)throw Error("Órbita Core não inicializado");
 const s=C.state;
 const p=s.planner||(s.planner={version:2,blocks:[],entries:[],records:{},overrides:{},dayPauses:{},closedDays:[]});
-p.blocks||=[];p.entries||=[];p.records||={};p.overrides||={};p.dayPauses||={};p.closedDays||=[];
+p.blocks||=[];p.entries||=[];p.records||={};p.overrides||={};p.dayPauses||={};p.closedDays||=[];p.events||=[];
 const $=(id)=>document.getElementById(id);
 const e=C.esc, a=C.attr, D=C.addDays, iso=C.iso, day=C.today, fmt=C.dateLabel, tag=C.tag, button=C.btn;
 const ID=()=>((typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():"id-"+Date.now()+"-"+Math.random().toString(36).slice(2));
@@ -86,6 +86,7 @@ function kindOn(date,type){return allOn(date).filter(x=>x.type===type).sort((x,y
   if(type==="task"){const rank={high:0,medium:1,low:2};const diff=(rank[x.priority]??1)-(rank[y.priority]??1);if(diff)return diff;}
   return (x.startTime||"99:99").localeCompare(y.startTime||"99:99")||x.title.localeCompare(y.title);
  });}
+function overlapsFor(date){const items=allOn(date).filter(x=>x.startTime&&x.estimatedMin&&(x.type!=="task"||x.date===date));const windows=items.map(x=>({id:x.id,title:x.title,start:Number(x.startTime.slice(0,2))*60+Number(x.startTime.slice(3,5)),end:Number(x.startTime.slice(0,2))*60+Number(x.startTime.slice(3,5))+Number(x.estimatedMin)})).sort((x,y)=>x.start-y.start);const conflicts=[];for(let i=1;i<windows.length;i++)for(let j=0;j<i;j++)if(windows[i].start<windows[j].end&&windows[j].start<windows[i].end)conflicts.push([windows[j].title,windows[i].title]);return conflicts;}
 function hoursFor(date){const rows=allOn(date);const seen=new Set();return rows.reduce((total,x)=>{const k=x.id; if(seen.has(k))return total;seen.add(k);if(x.type==="task"&&x.date!==date)return total;return total+Number(x.estimatedMin||0)},0)}
 function availabilityStatus(date){const val=C.resolveAvailability(date);return val?(val.mode==="rest"?"Descanso":C.hoursLabel(C.availabilityMinutes(val)/60)+" livres"):"Sem disponibilidade definida"}
 function restInfo(date){const x=p.dayPauses[date];if(x)return x;const av=C.resolveAvailability(date);return av?.mode==="rest"?{kind:"planejado",reason:"Disponibilidade definida como descanso"}:null}
@@ -110,6 +111,7 @@ function decorateHome(){
  const pauses=Object.keys(p.dayPauses).length;
  html+='<div class="action-strip"><span class="icon">'+(rest?"☾":"◷")+'</span><p>'+e(rest?(rest.kind==="planejado"?"Dia de descanso planejado":rest.kind==="imprevisto"?"Pausa por imprevisto":"Pausa registrada no dia"):(avail?availabilityStatus(s.date):"Configure o tempo disponível para esta data"))+'. Não apaga compromissos registrados.</p><button class="btn small" data-s2="pause" data-date="'+s.date+'">'+(rest&&p.dayPauses[s.date]?"Editar pausa":"Descanso / pausa")+'</button></div>';
  const estimated=hoursFor(s.date),available=C.availabilityMinutes(avail);
+ if(overlapsFor(s.date).length)html+='<div class="action-strip warning-strip"><span class="icon">◷</span><p>Há '+overlapsFor(s.date).length+' sobreposição(ões) de horário. Elas são permitidas, mas convém revisar o dia.</p></div>';
  if(estimated&&available&&estimated>available)html+='<div class="action-strip warning-strip"><span class="icon">!</span><p>Você planejou '+C.hoursLabel(estimated/60)+' e informou '+C.hoursLabel(available/60)+' disponíveis. Revise se a carga é viável.</p></div>';
  html+='<div class="grid-2 dashboard-panels">';
  for(const [type,title] of [["focus","Focos do dia"],["task","Tarefas secundárias"]]){
@@ -140,6 +142,7 @@ function decoratePlan(){
   out+='</div>';
  } else out+=monthCalendar();
  const all=allOn(s.date);
+ if(overlapsFor(s.date).length)out+='<div class="action-strip warning-strip"><span class="icon">◷</span><p>'+overlapsFor(s.date).length+' conflito(s) de horários previstos. Nenhuma atividade foi bloqueada.</p></div>';
  out+='<section class="card board"><div class="card-head"><div><h2>'+e(fmt(s.date,true))+'</h2><small>'+e(availabilityStatus(s.date))+' · '+C.hoursLabel(hoursFor(s.date)/60)+' de carga estimada</small></div><div class="row"><button class="btn small" data-s2="newEntry" data-type="focus">+ Foco</button><button class="btn small" data-s2="newEntry" data-type="task">+ Tarefa</button><button class="btn small" data-s2="newEntry" data-type="habit">+ Rotina</button></div></div>';
  out+=all.length?'<div class="task-list">'+[...kindOn(s.date,"focus"),...kindOn(s.date,"habit"),...kindOn(s.date,"task")].map(x=>itemRow(x,s.date)).join("")+'</div>':emptyList("Nenhuma atividade planejada para esta data.");
  out+='</section>';
@@ -324,6 +327,7 @@ function quickRecord(id,date,status){
  if(rec.status==="moved"&&status!=="moved")return notify("Este foco foi remanejado. Consulte o destino ou edite o planejamento.");
  if(status==="pending"){delete p.records[uidKey(id,date)];}
  else p.records[uidKey(id,date)]={...rec,status,markedAt:new Date().toISOString()};
+ p.events.push({kind:"status_change",id,date,from:rec.status||"pending",to:status,at:new Date().toISOString()});
  save();render();notify(status==="done"?"Concluída. Você pode informar a duração real nos detalhes.":"Situação atualizada.");
 }
 const actions={
@@ -343,7 +347,7 @@ const actions={
  confirmDelete(b){const scope=$("s2-delete-scope")?.value||"all";deleteEntry(b.dataset.id,b.dataset.date,scope);save();C.closeModal();render();notify("Exclusão processada.")},
  moveFocus(b){moveModal(b.dataset.id,b.dataset.date)},
  pause(b){pauseModal(b.dataset.date||s.date)},
- removePause(b){if(!canChange(b.dataset.date))return;delete p.dayPauses[b.dataset.date];save();C.closeModal();render();notify("Pausa removida.")},
+ removePause(b){if(!canChange(b.dataset.date))return;const old=p.dayPauses[b.dataset.date];p.events.push({kind:"pause_removed",date:b.dataset.date,before:old?clone(old):null,at:new Date().toISOString()});delete p.dayPauses[b.dataset.date];save();C.closeModal();render();notify("Pausa removida.")},
  chooseDate(b){if(b.dataset.date<firstUse())return;s.date=b.dataset.date;save();render()},
  switchCalendar(b){calendarView=b.dataset.mode;monthAnchor=s.date;render()},
  prevPeriod(){if(calendarView==="week"){const d=D(s.date,-7);if(d>=firstUse())s.date=d;}else monthAnchor=addMonths(monthAnchor,-1);save();render()},
@@ -384,9 +388,11 @@ function submission(id,data){
   const x=find(item);if(!x||x.type!=="focus")throw Error("Foco inválido.");
   const reason=String(data.get("reason")||"").trim();
   const source=occurrence(x,date)||x;
+  if(source.status==="done")throw Error("O foco já foi concluído e não pode ser remanejado como pendente.");
   const next=baseEntry({...source,date:target,recurrence:{kind:"none"},origin:{type:"rescheduled",fromId:x.id,fromDate:date,reason}});
   p.entries.push(next);
   p.records[uidKey(item,date)]={status:"moved",markedAt:new Date().toISOString(),target,reason};
+  p.events.push({kind:"focus_rescheduled",id:item,date,target,reason,at:new Date().toISOString(),newId:next.id});
   save();C.closeModal();render();notify("Foco remanejado com registro da alteração.");return;
  }
  if(id==="s2-pause"){
@@ -395,6 +401,7 @@ function submission(id,data){
   if(!["planejado","imprevisto","mesmo_dia"].includes(kind))throw Error("Tipo inválido.");
   let old=p.dayPauses[date];
   p.dayPauses[date]={kind,reason,registeredAt:old?.registeredAt||new Date().toISOString(),updatedAt:new Date().toISOString(),declaredSameDay:date===day(),originalPlannedMinutes:old?.originalPlannedMinutes??hoursFor(date)};
+  p.events.push({kind:"pause_change",date,before:old?clone(old):null,after:clone(p.dayPauses[date]),at:new Date().toISOString()});
   save();C.closeModal();render();notify("Pausa registrada sem apagar o planejamento.");return;
  }
  if(id==="s2-copy-preview"){
