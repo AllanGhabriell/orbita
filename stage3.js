@@ -841,6 +841,55 @@ function ask(title,description,action,extra=""){
  modal(title,'<p class="note">'+E(description)+'</p><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="button" class="btn danger" data-s3="'+action+'" '+extra+'>Confirmar</button></div>');
 }
 const actions={
+ openPlanner(){screen="planner";plannerWeek=s.date;plannerSelectedDate=s.date;plannerSelection.clear();C.go("estudos");},
+ openLibrary(){screen="library";C.go("estudos");},
+ planPreviewDay(el){plannerSelectedDate=el.dataset.date;render();},
+ planPrevWeek(){plannerWeek=add(planWeekStart(plannerWeek),-7);plannerSelectedDate=planWeekStart(plannerWeek);render();},
+ planNextWeek(){plannerWeek=add(planWeekStart(plannerWeek),7);plannerSelectedDate=planWeekStart(plannerWeek);render();},
+ planCurrentWeek(){plannerWeek=s.date;plannerSelectedDate=s.date;render();},
+ planForCycle(el){screen="planner";plannerWeek=s.date;plannerSelectedDate=s.date;C.go("estudos");planQuickModal("",s.date);
+  const sel=$("s3-quick-cycle");if(sel&&el.dataset.cycle){sel.value=el.dataset.cycle;updateQuickFields("cycle");}},
+ planAdd(el){planQuickModal("",el?.dataset?.date||s.date);},
+ planEdit(el){planQuickModal(el.dataset.id);},
+ planDuplicate(el){
+  const x=session(el.dataset.id);planIsEditable(x);
+  if(!x.cycleId)return notify("Esta sessão antiga não possui ciclo. Edite-a antes de duplicar.");
+  const created=planCreate({cycleId:x.cycleId,date:x.date,
+   mode:x.rotationSlot||x.kind==="cycle"?"rotation":"specific",
+   subjectId:x.subjectId,plannedMin:x.plannedMin||cycle(x.cycleId)?.defaultMin||90,
+   methodId:x.methodId||"",topicId:x.topicId||"",count:1});
+  notify("Sessão duplicada sem copiar resultados.");
+ },
+ planMove(el){planMoveModal(el.dataset.id);},
+ planRemove(el){const x=session(el.dataset.id);planIsEditable(x);
+  ask("Excluir sessão do planejamento","Essa sessão será removida apenas da agenda. Você poderá desfazer em seguida.",
+    "planConfirmRemove",'data-id="'+A(x.id)+'"');},
+ planConfirmRemove(el){planDelete([el.dataset.id]);plannerSelection.delete(el.dataset.id);close();notify("Sessão removida. Você pode desfazer.");},
+ planSelect(el){const id=el.dataset.id;if(plannerSelection.has(id))plannerSelection.delete(id);else{planIsEditable(session(id));plannerSelection.add(id);}render();},
+ planUnselect(){plannerSelection.clear();render();},
+ planBulk(){planBulkModal();},
+ planRemoveSelected(){if(!plannerSelection.size)return;
+  ask("Excluir "+plannerSelection.size+" sessões?","A exclusão afeta somente as sessões pendentes selecionadas; você poderá desfazer.", "planConfirmRemoveSelected");},
+ planConfirmRemoveSelected(){planDelete([...plannerSelection]);plannerSelection.clear();close();notify("Sessões removidas. É possível desfazer a última edição.");},
+ planCopyDay(el){planCopyModal("day",el.dataset.date);},
+ planCopyWeek(){planCopyModal("week");},
+ planSaveTemplate(){planTemplateModal("save");},
+ planUseTemplate(){planTemplateModal("apply");},
+ planUndo(){planUndo();},
+ newTopic(el){topicModal("",el?.dataset?.subject||"");},
+ editTopic(el){topicModal(el.dataset.id);},
+ deleteTopic(el){
+  const t=db.topics.find(x=>x.id===el.dataset.id);if(!t)return;
+  ask("Excluir assunto", "O assunto deixará de aparecer nos seletores. Sessões já realizadas manterão o registro histórico.",
+  "confirmDeleteTopic",'data-id="'+A(t.id)+'"');
+ },
+ confirmDeleteTopic(el){
+  const id=el.dataset.id,t=db.topics.find(x=>x.id===id);if(!t)return;
+  if(db.sessions.some(x=>x.topicId===id))t.archived=true;
+  else db.topics.splice(db.topics.findIndex(x=>x.id===id),1);
+  logs("study_topic_deleted",{id});save();close();render();notify("Assunto atualizado.");
+ },
+
  planBatch(el){if(!C.availabilityReady())return notify("Configure a disponibilidade antes de planejar.");batchModal(el?.dataset?.cycle||"");},
  batchWeekdays(){for(const input of document.querySelectorAll('#s3-batch input[name="weekdays"]'))input.checked=Number(input.value)>=1&&Number(input.value)<=5;},
  batchAll(){for(const input of document.querySelectorAll('#s3-batch input[name="weekdays"]'))input.checked=true;},
@@ -851,7 +900,7 @@ const actions={
  copySession(el){const x=session(el.dataset.id);if(!x)return;const nextDate=add(x.date,1);if(!editable(nextDate))return;const kind=x.kind==="cycle"?"reinforcement":x.kind;const c=cycle(x.cycleId);if(c?.archived)return notify("Ciclo arquivado. Reative-o para copiar sessões.");const copy={...x,id:unique(),date:nextDate,kind,stepNo:0,status:"pending",actualMin:null,actualTime:"",completedAt:null,focusId:"",createdAt:now()};db.sessions.push(copy);logs("session_copied",{fromId:x.id,toId:copy.id,date:nextDate});save();render();notify("Sessão copiada para o dia seguinte como estudo complementar, sem duplicar conclusão.");},
  copyMethod(el){const x=method(el.dataset.id);if(!x)return;saveMethod({title:x.title+" (cópia)",description:x.description});save();render();notify("Modalidade copiada.");},
  openStudies(){screen="cycles";detailCycle="";C.go("estudos")},
- backStudies(){screen="cycles";detailCycle="";render()},
+ backStudies(){screen="cycles";detailCycle="";plannerSelection.clear();render()},
  selectCycle(el){screen="cycle";detailCycle=el.dataset.id;C.go("estudos")},
  newCycle(){if(!C.availabilityReady())return notify("Configure sua disponibilidade antes de criar ciclos.");cycleModal()},editCycle(el){cycleModal(el.dataset.id)},
  addSubject(el){subjectModal(null,el.dataset.cycle||detailCycle)},editSubject(el){subjectModal(el.dataset.id)},
@@ -882,9 +931,13 @@ const actions={
   if(db.sessions.some(q=>q.cycleId===x.id)){x.archived=true;logs("cycle_archived",{cycleId:x.id,reason:"history"});}
   else{db.cycles=db.cycles.filter(q=>q.id!==x.id);db.subjects=db.subjects.filter(q=>q.cycleId!==x.id);logs("cycle_deleted",{cycleId:x.id});}
   save();close();screen="cycles";detailCycle="";render();notify("Ciclo atualizado.");},
- newSession(el){if(!C.availabilityReady())return notify("Configure sua disponibilidade antes de criar sessões.");sessionModal(null,el.dataset.cycle||((location.hash==="#estudos"&&screen==="cycle")?detailCycle:""),el.dataset.mode||"",s.date);},
- editSession(el){sessionModal(el.dataset.id)},recordSession(el){recordModal(el.dataset.id)},
+ newSession(el){if(!C.availabilityReady())return notify("Configure sua disponibilidade antes de criar sessões.");screen="planner";plannerWeek=s.date;plannerSelectedDate=s.date;C.go("estudos");planQuickModal("",s.date);},
+ editSession(el){planQuickModal(el.dataset.id)},recordSession(el){
+ if(location.hash!=="#inicio")return notify("Registre estudos somente na tela Início.");
+ recordModal(el.dataset.id);
+},
  quickDone(el){
+  if(location.hash!=="#inicio")return notify("Conclua e desfaça sessões somente na tela Início.");
   const x=session(el.dataset.id);if(!x)return;
   try{setSessionStatus(x.id,x.status==="done"?"pending":"done",x.actualMin,x.actualTime);save();render();notify("Registro atualizado.");}catch(err){notify(err.message);}
  },
