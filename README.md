@@ -4,7 +4,7 @@
 
 Planejador pessoal e de estudos, independente da Academia CFOP. O objetivo é organizar compromissos, disponibilidade, ciclos, hábitos e evolução com liberdade para editar tudo que não pertence a um dia já encerrado.
 
-## Etapa atual: 4 de 5
+## Etapa atual: 5 de 5 — código preparado; conexão real pendente
 
 **Disponível nesta etapa**
 - Página inicial zerada no primeiro acesso, com orientação contextual.
@@ -25,7 +25,7 @@ Planejador pessoal e de estudos, independente da Academia CFOP. O objetivo é or
 - Copiar semana, mês ou programação de um bloco para mês-alvo, com prévia e opção para pular duplicatas ou substituir entradas sem registros.
 - Focos remanejados preservam a origem e o motivo; pausas registram motivo, momento e carga anterior; eventos mantidos para análises futuras.
 - Avisos de conflito entre horários e carga planejada superior à disponibilidade.
-- Todos esses registros são **locais**, ainda sem banco ou sincronização.
+- Sem login, esses registros permanecem locais. A etapa 5 acrescenta a integração com banco ao conectar a conta.
 
 **Disponível na etapa 3**
 - Múltiplos ciclos de estudos independentes, cada um com área própria e objetivo opcional.
@@ -51,9 +51,9 @@ Planejador pessoal e de estudos, independente da Academia CFOP. O objetivo é or
 - Lembretes discretos que podem ser adiados ou desativados, e conquistas verificáveis que exigem vários dias de compromissos cumpridos.
 - Comparações descritivas entre períodos com pelo menos cinco dias fechados e metas comparáveis em cada período.
 
-**Pendente na etapa 5:** autenticação Google, banco Supabase, SQL e políticas de bloqueio também no **servidor**, exportação/importação, PWA e sincronização entre dispositivos.
+**O código da etapa 5 está pronto;** autenticação real, aplicação do SQL e homologação de sincronização dependem de sua configuração no Supabase.
 
-> Importante: até a etapa 5, a imutabilidade é **garantida pelo fluxo de uso do aplicativo**, não por um banco de dados com restrições. Quem edita manualmente o armazenamento local do navegador ainda pode interferir nos arquivos de dados. A proteção definitiva no servidor será aplicada na integração final.
+> Importante: a imutabilidade já é aplicada na interface. O SQL da etapa 5 prepara proteção no banco, que só passa a valer após a migração ser executada no Supabase e os dados sincronizados.
 
 
 
@@ -67,23 +67,43 @@ A publicação usa `.github/workflows/pages.yml`. **A primeira tentativa falhou:
 Também é possível abrir `index.html` em um navegador para testar a interface estática.
 
 ### Testes
-O repositório tem um workflow de verificação e os testes `tests/stage1.test.mjs`, `tests/stage2.test.mjs` e `tests/stage3.test.mjs` e `tests/stage4.test.mjs`, executáveis com Node.js 22:
+O repositório tem um workflow de verificação e os testes `tests/stage1.test.mjs`, `tests/stage2.test.mjs` e `tests/stage3.test.mjs` e `tests/stage4.test.mjs` e `tests/stage5.test.mjs`, executáveis com Node.js 22:
 
 ```bash
 node --check app.js
 node --check stage2.js
 node --check stage3.js
 node --check stage4.js
+node --check stage5.js
+node --check boot.js
+node --check sw.js
 node --test tests/*.test.mjs
 ```
 
 ### Dados e banco
-Durante as etapas 1–4, os registros são provisórios e locais (`localStorage`). A etapa 2 armazena atividades em `state.planner` e a etapa 3 armazena os estudos em `state.studies` e a etapa 4 congela os registros em `state.evolution.closed`; os módulos também mantêm eventos de modificação. Uma migração será necessária na etapa 5. Não há SQL nesta fase. A integração Supabase, login Google, funcionamento offline com sincronização e regras RLS acontecerão **somente na etapa 5**, conforme combinado. Não confie no armazenamento local como backup definitivo; limpar dados do navegador pode apagar as configurações.
+Durante as etapas 1–4, os registros são provisórios e locais (`localStorage`). A etapa 2 armazena atividades em `state.planner` e a etapa 3 armazena os estudos em `state.studies` e a etapa 4 congela os registros em `state.evolution.closed`; a etapa 5 adiciona um espelho IndexedDB e prepara sincronização Supabase. O histórico de alterações permanece no modelo. Uma migração será necessária na etapa 5. Não há SQL nesta fase. A integração Supabase, login Google, funcionamento offline com sincronização e regras RLS acontecerão **somente na etapa 5**, conforme combinado. Não confie no armazenamento local como backup definitivo; limpar dados do navegador pode apagar as configurações.
 
 ### Acompanhamento obrigatório
 - [ESCOPO.md](./ESCOPO.md) — requisitos completos do projeto, revisados a cada etapa.
 - [CHECKLIST.md](./CHECKLIST.md) — o que está feito, pendente ou em validação.
 - [PROGRESSO.md](./PROGRESSO.md) — relatório por etapa, problemas e próximos passos.
+
+## Etapa 5 — banco, contas, offline e aplicativo instalável
+
+O Órbita está pronto para receber a **configuração do seu projeto Supabase** pelo próprio site. O SQL foi entregue, mas **ainda não foi executado**: não há banco nem autenticação real associados até você configurá-los.
+
+**[Guia de conexão: CONFIGURAR_SUPABASE.md](./CONFIGURAR_SUPABASE.md)**  
+**[SQL completo: supabase/migrations/20261102_000001_orbita.sql](./supabase/migrations/20261102_000001_orbita.sql)**
+
+Implementado no código:
+- Login Google com Supabase Auth por OAuth/PKCE (dependente de ativação do provedor).
+- Sincronização com versionamento e prevenção de sobrescrita silenciosa, resolução explícita de conflitos e proteção dos dias finalizados no banco.
+- IndexedDB como espelho durável dos dados, com acesso local offline e recuperação do estado; não depende de conexão para abrir a agenda já carregada.
+- Backup JSON por exportação e importação com validação e alerta de substituição.
+- PWA com manifesto, ícones PNG 192/512 e service worker para arquivos estáticos, instalável em navegadores compatíveis.
+- Sem chave secreta no GitHub. A configuração local só aceita URL Supabase e chave pública.
+
+**Limitação de validação:** o Google, a aplicação SQL e a sincronização entre aparelhos requerem um projeto Supabase conectado. Não foram testados com dados reais nesta etapa. O funcionamento offline e a instalação também precisam de teste em dispositivos reais.
 
 ## Etapas aprovadas
 1. **Base e UX:** estrutura, responsividade, navegação, disponibilidade, objetivos, documentação.
