@@ -123,7 +123,7 @@ try{
   const cycle=T.saveCycle({title:"Meu ciclo ENEM",area:"ENEM",defaultMin:90});
   T.saveSubject({cycleId:cycle.id,title:"Matemática",targetSessions:3});
   T.saveSubject({cycleId:cycle.id,title:"Física",targetSessions:1});
-  C.save();C.go("estudos");return cycle.id;
+  C.save();T.actions.backStudies();C.go("estudos");return cycle.id;
  });
  await page.waitForSelector('[data-s3="planBatch"]');
  await page.click('[data-s3="planBatch"]');
