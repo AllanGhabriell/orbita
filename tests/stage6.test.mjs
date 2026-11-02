@@ -64,6 +64,23 @@ Z.updateBusy({kind:"date",date,title:"Curso excepcional",start:"18:20",end:"21:3
 assert.equal(Z.groupedWeekly().some(x=>x.title==="Curso novo"),false,"troca semanal por data não deixa duplicatas");
 assert.ok(Z.model.busyDates[date].some(x=>x.title==="Curso excepcional"));
 
+// Integração: o SUBMIT real do formulário chama o salvamento e grava um único grupo.
+context.FormData=class{
+ constructor(form){this.data=form.data;}
+ get(key){return this.data[key]??null;}
+ getAll(key){return this.data[key] instanceof Array?this.data[key]:(this.data[key]==null?[]:[this.data[key]]);}
+ has(key){return Object.hasOwn(this.data,key);}
+};
+let submitted=false;
+const fakeForm={id:"s6-busy-form",data:{kind:"weekly",oldKind:"weekly",oldDay:"1",id:"",title:"IFPB - ELETRÔNICA",start:"18:20",end:"21:30",weekdays:["1","2","3","4","5"]}};
+for(const callback of handlers.submit||[])callback({target:fakeForm,preventDefault(){submitted=true;}});
+assert.equal(submitted,true,"formulário de compromisso tratado pelo event listener");
+assert.equal(Z.groupedWeekly().filter(x=>x.title==="IFPB - ELETRÔNICA").length,1,"submit salva o grupo semanal");
+assert.equal(Z.groupedWeekly().find(x=>x.title==="IFPB - ELETRÔNICA").days.join(","),"1,2,3,4,5");
+assert.equal(JSON.parse(store.get("orbita:stage1:v1")).extension.busyWeekly[5].some(x=>x.title==="IFPB - ELETRÔNICA"),true,"submit persistiu no navegador");
+const submittedGroup=Z.groupedWeekly().find(x=>x.title==="IFPB - ELETRÔNICA");
+Z.deleteBusyGroup("weekly",submittedGroup.members[0].day,submittedGroup.members[0].id);
+
 const g={id:"goal1",title:"Aprender eletrônica",archived:false};C.state.goals.push(g);
 Z.saveStep(g.id,"Estudar fundamentos");
 assert.equal(g.steps.length,1);
