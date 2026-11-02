@@ -15,7 +15,7 @@ function openDb(){
 function writeDoc(value){
  if(!database)return Promise.resolve(false);
  return new Promise(resolve=>{
-  try{const tx=database.transaction(STORE,"readwrite");tx.objectStore(STORE).put({value,at:Date.now()},"current");tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false);}
+  try{const tx=database.transaction(STORE,"readwrite");tx.objectStore(STORE).put({value,at:Date.now()},"current");tx.objectStore(STORE).put({at:Date.now(),checksum:value.length},"pending");tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false);}
  });
 }
 function readDoc(){
@@ -27,11 +27,18 @@ function readDoc(){
 function deleteDoc(){
  if(!database)return Promise.resolve(false);
  return new Promise(resolve=>{
-  try{const tx=database.transaction(STORE,"readwrite");tx.objectStore(STORE).delete("current");tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false);}
+  try{const tx=database.transaction(STORE,"readwrite");tx.objectStore(STORE).delete("current");tx.objectStore(STORE).delete("pending");tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false);}
+ });
+}
+function markSynced(){
+ if(!database)return Promise.resolve(false);
+ return new Promise(resolve=>{
+  try{const tx=database.transaction(STORE,"readwrite");tx.objectStore(STORE).delete("pending");tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false);}
  });
 }
 const storage={
  get supportsIndexedDB(){return !!database;},
+ markSynced,
  get currentKey(){return KEY;},
  async replaceDocument(doc){
   const serialized=JSON.stringify(doc);
