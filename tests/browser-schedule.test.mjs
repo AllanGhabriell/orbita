@@ -73,6 +73,48 @@ try{
  await page.click('.s6-busy-row [data-s6="editBusy"]');
  await page.waitForSelector("#s6-busy-form");
  assert.equal(await page.$eval("#s6-busy-form",form=>new FormData(form).getAll("weekdays").join(",")),"1,2,3,4,5");
+
+ // Regressão visual: ações de modalidades com texto não podem sobrepor-se.
+ await page.evaluate(()=>{
+  window.OrbitaCore.closeModal();
+  const methods=window.OrbitaStage3.inspect.model.methods;
+  methods.splice(0,methods.length,
+   {id:"m1",title:"ESTUDO PASSIVO",description:""},
+   {id:"m2",title:"REVISÃO ATIVA",description:""},
+   {id:"m3",title:"QUESTÕES",description:""},
+   {id:"m4",title:"EXERCÍCIOS",description:""});
+  window.OrbitaCore.go("organizar");
+ });
+ await page.waitForSelector('[data-s3="openMethods"]');
+ await page.click('[data-s3="openMethods"]');
+ await page.waitForSelector(".study-method-row");
+ async function verifyMethods(width){
+  await page.setViewport({width,height:850,deviceScaleFactor:1});
+  const measurements=await page.evaluate(()=>{
+   const rows=[...document.querySelectorAll(".study-method-row")];
+   return rows.map(row=>{
+    const parent=row.getBoundingClientRect();
+    const buttons=[...row.querySelectorAll(".study-method-actions .btn")];
+    const rects=buttons.map(btn=>btn.getBoundingClientRect());
+    const overlap=rects.some((a,i)=>rects.slice(i+1).some(b=>
+      Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 &&
+      Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1
+    ));
+    return {count:buttons.length,overlap,clipped:rects.some(r=>r.left<parent.left-1||r.right>parent.right+1||r.top<parent.top-1||r.bottom>parent.bottom+1),labels:buttons.map(x=>x.textContent.trim()),width:parent.width};
+   });
+  });
+  assert.equal(measurements.length,4,"deve haver quatro modalidades");
+  for(const row of measurements){
+   assert.equal(row.count,4,"quatro ações por modalidade com "+width+"px");
+   assert.equal(row.overlap,false,"nenhuma sobreposição com "+width+"px: "+JSON.stringify(row));
+   assert.equal(row.clipped,false,"ações contidas na linha com "+width+"px: "+JSON.stringify(row));
+   assert.equal(row.labels.join(","),"Editar,Copiar,Arquivar,Excluir");
+  }
+ }
+ await verifyMethods(1440);
+ await verifyMethods(900);
+ await verifyMethods(390);
+ console.log("Chromium: botões de modalidades sem sobreposição em 1440, 900 e 390px.");
  assert.equal(errors.length,0,"nenhum erro JavaScript em fluxo de salvar e reabrir: "+errors.join("; "));
  console.log("Chromium: clique de salvar, cinco dias, persistência após recarga e edição passaram.");
 }finally{
