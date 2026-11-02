@@ -7,7 +7,7 @@ const s=C.state;
 const db=s.studies||(s.studies={version:3,cycles:[],subjects:[],methods:[],sessions:[],events:[]});
 for(const key of ["cycles","subjects","methods","sessions","events"])if(!Array.isArray(db[key]))db[key]=[];
 const $=id=>document.getElementById(id);
-const E=C.esc,A=C.attr, day=C.today, add=C.addDays,fmt=C.dateLabel;
+const E=C.esc,A=C.attr, tag=C.tag, day=C.today, add=C.addDays,fmt=C.dateLabel;
 const unique=()=>((typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():"s"+Date.now().toString(36)+Math.random().toString(36).slice(2));
 const now=()=>new Date().toISOString();
 const clone=x=>JSON.parse(JSON.stringify(x));
