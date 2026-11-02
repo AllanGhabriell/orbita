@@ -1,5 +1,15 @@
 # PROGRESSO — Órbita
 
+## Complementos finais (2026-11-02)
+
+Implementado `stage6.js` e `stage6.css`: etapas editáveis/concluíveis dos objetivos, vínculo explícito de atividades aos objetivos, aproveitamento do vínculo existente dos ciclos, horários ocupados recorrentes e por data, disponibilidade efetiva descontando apenas interseções com faixas livres (sem descontar duas vezes horas declaradas livres), avisos de colisões, recomendações condicionadas a evidência real de desempenho, tempo desde revisão e modalidade, agendamento voluntário sem avançar ciclos, início da semana configurável em qualquer dia. Novos testes `tests/stage6.test.mjs` e atualização do cache PWA.
+
+**Escopo de verificação:** funcionalidades implementadas no código, teste automatizado no workflow do repositório. Não houve migração SQL nova nem edição de documentos do usuário. O usuário informou que SQL e login Google já funcionam; isso não foi homologado com acesso de duas contas. Permanecem testes manuais reais em PC/celular, PWA e sincronização simultânea.
+
+---
+
+
+
 ## Etapa 5 — Banco, conta, PWA e integração (2026-11-02)
 
 **Estado:** implementação de frontend, migração SQL e documentação no branch main. Integração real com um projeto Supabase ainda não executada, pois URL, publishable key e ativação do login dependem do proprietário. Não foram solicitados nem usados segredos de outro projeto.

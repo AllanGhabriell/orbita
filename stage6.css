@@ -1,0 +1,21 @@
+/* Complementos de planejamento — estilos discretos e responsivos. */
+.s6-goal-panel,.s6-busy,.s6-recommendations,.s6-day-busy{display:flex;flex-direction:column;gap:13px}
+.s6-goal{padding:15px;border:1px solid var(--border);background:var(--surface2);border-radius:14px}
+.s6-goal>.row-between{gap:16px;flex-wrap:wrap}
+.s6-goal>.row-between>div{display:flex;flex-direction:column;gap:5px}
+.s6-goal small,.s6-busy-row small{font-size:11px;color:var(--muted);display:block;margin-top:4px}
+.s6-step-list{margin-top:13px;display:flex;flex-direction:column;gap:6px}
+.s6-step{display:flex;align-items:center;gap:10px;padding:7px 5px;border-top:1px solid var(--border)}
+.s6-step span{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12px}
+.s6-done{text-decoration:line-through;color:var(--soft)}
+.s6-tick{border:1px solid var(--borderStrong);background:var(--surface);color:var(--text);border-radius:50%;width:27px;height:27px;flex:none}
+.s6-tick.done{color:var(--good)}
+.s6-busy-row,.s6-reco{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+.s6-busy-row>div:first-child,.s6-reco>div:first-child{min-width:0}
+.s6-busy-row strong,.s6-reco strong{font-size:12px;overflow-wrap:anywhere}
+.s6-reco p{font-size:12px;color:var(--muted);line-height:1.55;margin:6px 0 0}
+.s6-reco .btn{flex:none}
+.s6-busy-chipline{display:flex;gap:8px;flex-wrap:wrap}
+.s6-chip{border:1px solid var(--border);background:var(--surface2);border-radius:9px;padding:6px 9px;color:var(--muted);font-size:11px}
+.s6-warning{color:var(--warning);font-size:12px;line-height:1.5}
+@media(max-width:650px){.s6-busy-row,.s6-reco{align-items:flex-start}.s6-busy-row>.row{flex-wrap:wrap;justify-content:flex-end}.s6-goal-panel .card-head{align-items:start;flex-direction:column}.s6-step{gap:6px}.s6-step .btn{padding:6px 7px}}

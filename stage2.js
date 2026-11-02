@@ -37,7 +37,7 @@ function entryTitle(o){return o.displayTitle||o.title}
 function statusText(st){return ({done:"Concluída",progress:"Em andamento",notdone:"Não realizada",moved:"Remanejada",pending:"Pendente"})[st]||"Pendente"}
 function dtClock(isoString){return isoString?new Date(isoString).toLocaleString("pt-BR"):""}
 function recurLabel(r){if(!r||r.kind==="none")return "Única";if(r.kind==="weekdays")return "Semanal · "+r.weekdays.map(x=>SHORT[x]).join(", ");return "Mensal · dia "+r.monthDay}
-function baseEntry(b){return {id:ID(),type:b.type||"focus",title:b.title||"",date:b.date||s.date,createdAt:new Date().toISOString(),blockId:b.blockId||"",priority:b.priority||"medium",startTime:b.startTime||"",estimatedMin:b.estimatedMin||null,dueDate:b.dueDate||"",recurrence:b.recurrence||{kind:"none"},archivedAt:"",origin:b.origin||null};}
+function baseEntry(b){return {id:ID(),type:b.type||"focus",title:b.title||"",date:b.date||s.date,createdAt:new Date().toISOString(),blockId:b.blockId||"",priority:b.priority||"medium",goalId:b.goalId||"",startTime:b.startTime||"",estimatedMin:b.estimatedMin||null,dueDate:b.dueDate||"",recurrence:b.recurrence||{kind:"none"},archivedAt:"",origin:b.origin||null};}
 function occDate(entry,date){
  if(date<entry.date)return false;
  if(entry.archivedAt&&date>=entry.archivedAt)return false;
@@ -97,7 +97,7 @@ function itemRow(o,date,compact=false){
  const st=rec?.status||o.status||"pending";
  const color=block(o.blockId)?.color||"transparent";
  const taskAge=o.type==="task"&&dueAge(o,date)>=4?'<span class="age-chip" title="Dias desde a criação">'+dueAge(o,date)+'d</span>':"";
- const desc=[o.startTime?o.startTime:"",o.estimatedMin?C.hoursLabel(o.estimatedMin/60):"",o.type==="task"&&o.dueDate?"Prazo "+o.dueDate.split("-").reverse().join("/"):""].filter(Boolean).join(" · ");
+ const desc=[o.goalId?s.goals.find(g=>g.id===o.goalId)?.title||"": "",o.startTime?o.startTime:"",o.estimatedMin?C.hoursLabel(o.estimatedMin/60):"",o.type==="task"&&o.dueDate?"Prazo "+o.dueDate.split("-").reverse().join("/"):""].filter(Boolean).join(" · ");
  const controls=(locked(date)?"":'<button class="btn small ghost" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="'+(st==="done"?"pending":"done")+'" title="'+(st==="done"?"Desmarcar":"Concluir")+'">'+(st==="done"?"↶":"✓")+'</button><button class="btn small ghost" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="progress" title="Em andamento">◷</button>');
  return '<div class="task-row '+(st==="done"?"task-done":"")+'" style="--task-color:'+a(color)+'"><div class="task-mark">'+(st==="done"?"✓":st==="progress"?"◷":st==="notdone"?"×":st==="moved"?"↷":"·")+'</div><div class="task-main"><div class="task-title">'+e(entryTitle(o))+' '+taskAge+'</div><div class="task-meta">'+blockLabel(o.blockId)+(desc?'<span>'+e(desc)+'</span>':"")+'<span>'+e(statusText(st))+'</span></div></div><div class="task-actions">'+controls+'<button class="btn small ghost" data-s2="editEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Editar">✎</button><button class="btn small ghost" data-s2="moreEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Mais ações">⋯</button></div></div>';
 }
@@ -174,6 +174,7 @@ function entryModal(type,id,date){
  const editing=!!original;
  const form='<form id="s2-entry" class="section-stack"><input type="hidden" name="id" value="'+a(id||"")+'"><input type="hidden" name="editDate" value="'+a(date||x.date)+'"><input type="hidden" name="type" value="'+a(type||x.type)+'">'+
  formField("Nome da atividade","title",x.title,"text",'required maxlength="140"')+
+ '<div class="field"><label>Objetivo relacionado (opcional)</label><select name="goalId"><option value="">Sem objetivo</option>'+s.goals.filter(g=>!g.archived).map(g=>'<option value="'+a(g.id)+'" '+(x.goalId===g.id?"selected":"")+'>'+e(g.title)+'</option>').join("")+'</select></div>'+
  '<div class="form-grid">'+formField("Data inicial","date",x.date,"date",'required min="'+firstUse()+'"')+
  '<div class="field"><label>Bloco</label><select name="blockId">'+blockOptions(x.blockId)+'</select></div></div>'+
  (type==="task"?'<div class="form-grid"><div class="field"><label>Prioridade</label><select name="priority"><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="medium" '+(x.priority==="medium"?"selected":"")+'>Média</option><option value="low" '+(x.priority==="low"?"selected":"")+'>Baixa</option></select></div>'+formField("Prazo opcional","dueDate",x.dueDate,"date")+'</div>':"")+
@@ -209,7 +210,7 @@ function readForm(formData,old){
   if(repeat==="weekdays"){recurrence.weekdays=formData.getAll("weekday").map(Number).filter(x=>x>=0&&x<7);if(!recurrence.weekdays.length)throw Error("Selecione ao menos um dia da semana.");}
   if(repeat==="monthday"){recurrence.monthDay=Number(formData.get("monthDay"));if(!Number.isInteger(recurrence.monthDay)||recurrence.monthDay<1||recurrence.monthDay>31)throw Error("Escolha um dia do mês válido.");}
  }
- return {type,title,date,blockId:String(formData.get("blockId")||""),priority:String(formData.get("priority")||"medium"),startTime:String(formData.get("startTime")||""),estimatedMin:minutes,dueDate:ds(formData.get("dueDate")||""),recurrence};
+ return {type,title,date,blockId:String(formData.get("blockId")||""),goalId:String(formData.get("goalId")||""),priority:String(formData.get("priority")||"medium"),startTime:String(formData.get("startTime")||""),estimatedMin:minutes,dueDate:ds(formData.get("dueDate")||""),recurrence};
 }
 function preserveRecord(id,date){return !!p.records[uidKey(id,date)]||locked(date)}
 function updateEntry(data,original,editDate,scope){
@@ -218,7 +219,7 @@ function updateEntry(data,original,editDate,scope){
  if(!canChange(effective))return;
  if(original.recurrence?.kind!=="none"&&scope!=="future"){
   if(data.date!==original.date&&data.date!==effective){p.overrides[uidKey(original.id,effective)]={removed:true};p.entries.push(baseEntry({...data,recurrence:{kind:"none"},origin:{type:"occurrence_revision",fromId:original.id,fromDate:effective}}));return;}
-  p.overrides[uidKey(original.id,effective)]={fields:{title:data.title,blockId:data.blockId,startTime:data.startTime,estimatedMin:data.estimatedMin,priority:data.priority,dueDate:data.dueDate}};
+  p.overrides[uidKey(original.id,effective)]={fields:{title:data.title,blockId:data.blockId,goalId:data.goalId,startTime:data.startTime,estimatedMin:data.estimatedMin,priority:data.priority,dueDate:data.dueDate}};
   return;
  }
  if(original.recurrence?.kind!=="none"&&scope==="future"&&effective>original.date){
@@ -278,7 +279,7 @@ function copyPlanDraft(data){
    const key=o.type+"|"+o.title.toLowerCase()+"|"+targetDate;
    if(seen.has(key))continue;seen.add(key);
    const duplicates=allOn(targetDate).filter(x=>x.type===o.type&&x.title.toLowerCase()===o.title.toLowerCase());
-   changes.push({type:o.type,title:o.title,date:targetDate,blockId:o.blockId,priority:o.priority,startTime:o.startTime,estimatedMin:o.estimatedMin,dueDate:o.dueDate,recurrence:{kind:"none"},duplicateIds:duplicates.map(x=>x.id),sourceId:o.id});
+   changes.push({type:o.type,title:o.title,date:targetDate,blockId:o.blockId,goalId:o.goalId||"",priority:o.priority,startTime:o.startTime,estimatedMin:o.estimatedMin,dueDate:o.dueDate,recurrence:{kind:"none"},duplicateIds:duplicates.map(x=>x.id),sourceId:o.id});
   }
  }
  return {changes,kind,origin,target,conflict};

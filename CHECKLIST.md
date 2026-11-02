@@ -2,6 +2,16 @@
 
 Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validação completa são explicitamente indicados em PROGRESSO.md. Esta lista é auditada ao fim de toda etapa.
 
+## Complementos de conclusão — 02/11/2026
+- [x] Etapas dos objetivos, concluídas manualmente, e vínculo de atividades/ciclos ao objetivo
+- [x] Períodos ocupados semanais e pontuais com avisos de conflitos e desconto em faixas livres
+- [x] Preservar horas livres declaradas sem descontá-las duas vezes
+- [x] Recomendações contextuais de revisão, exercícios e reforço conforme evidências; agendamento opcional
+- [x] Escolha de qualquer dia da semana como primeiro no calendário
+- [x] Testes automatizados de integração dos complementos incluídos no workflow
+- [ ] Testes manuais em navegador e dispositivos reais, incluindo múltiplos aparelhos e acessibilidade
+- [ ] Teste integral de sincronização e RLS com contas reais; implantação do SQL e OAuth informada pelo usuário
+
 ## Etapa 1 — Base e UX
 - [x] Estrutura inicial do site estático no repositório
 - [x] Layout escuro e claro com preferência persistida
