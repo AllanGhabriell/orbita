@@ -1,5 +1,41 @@
 # PROGRESSO — Órbita
 
+## Etapa 3 — Sistema de estudos (2026-11-02)
+
+**Estado:** implementação funcional enviada ao GitHub e coberta por testes automatizados. A implantação final e a homologação visual em dispositivos reais devem ser confirmadas. Não iniciar Etapa 4 sem nova autorização.
+
+### Implementado
+- Tela própria **Meus estudos**, conectada aos painéis de Início, Organizar e Planejamento; primeiro acesso permanece vazio.
+- Criação, edição, duplicação, arquivamento e restauração de ciclos independentes com área, objetivo opcional e duração padrão personalizável.
+- Cadastro e ordenação de matérias, etapas com 1–12 sessões requeridas, seleção manual da próxima matéria, pausa opcional com motivo/data de referência, reativação, cópia e arquivamento.
+- Avanço condicionado às conclusões das sessões da etapa; não depende da mudança de data. Registros parciais e reforços não avançam.
+- Correção de conclusão da última etapa quando não há registros concluídos posteriores; preservação do histórico se correção retroativa se tornar ambígua.
+- Agendamento de sessões únicas ou múltiplas; modalidades `cycle`, `reinforcement`, `supplement`; duração e início previstos, tempo efetivo opcional e horários reais opcionais.
+- Classificação por área, disciplina, assunto, finalidade e modalidade. Estudos de Matemática para Eletrônica compõem Matemática global mas só contam para a área Eletrônica.
+- Modalidades/metodologias sem exemplos pré-cadastrados: criar, editar, duplicar, arquivar, restaurar e excluir.
+- Visão de carga diária: horas previstas nas sessões + atividades não vinculadas, disponibilidade, avisos de sobreposição/sobrecarga. Foco vinculado e sessão não duplicam tempo previsto.
+- Estatísticas por dia/mês, ciclo, área, disciplina, assunto e método; horas reais somente quando declaradas, sem equiparar não informado a zero.
+- Armazenamento provisório no estado local `studies`, com eventos de auditoria para a Etapa 4. SQL e Supabase não foram tocados.
+- UI responsiva em `stage3.css`; cadastro de ciclos condicionado à configuração da disponibilidade.
+
+### Testes e verificação
+- `tests/stage3.test.mjs` cobre inicialização vazia, pré-requisito de disponibilidade, criação de ciclos/matérias/métodos, duas sessões para avançar, sessão parcial, reabertura da última conclusão, pausas, reforço, edição que preserva tempo real, estatísticas independentes entre ENEM/Eletrônica, vínculo com focos sem contagem duplicada, cópia/arquivamento/reativação e proteção de datas fechadas.
+- `node --check` foi incluído no workflow para `stage3.js`; testes das etapas 1–3 executados no GitHub Actions.
+- A última execução do GitHub Actions pode ser conferida em https://github.com/AllanGhabriell/orbita/actions.
+
+### Pendências não omitidas
+- Revisão visual e de acessibilidade **em navegador real** no desktop e em celular; testes automatizados de lógica não substituem esse teste.
+- Testes exploratórios com grandes volumes de matérias/sessões, alterações simultâneas em várias abas, datas-limite de mês e correções complexas de ciclos já avançados.
+- O orientador com estratégias adaptativas, indicadores de domínio do conteúdo e relatórios de evolução permanece na Etapa 4.
+- A imutabilidade definitiva ao fechar o dia também será implementada na Etapa 4 (os registros atuais respeitam a lista de dias fechados existente no modelo).
+- Autenticação, sincronização multi-dispositivo, backup exportável e SQL são da Etapa 5.
+- A análise de carga permanece uma projeção informativa, sem replanejamento automático.
+
+### Próxima etapa — apenas com autorização
+**Etapa 4:** fechamento definitivo, revisão de dias pendentes, relatórios por período, métricas de consistência/qualidade/descanso e orientador exigente, objetivo e contextualizado.
+
+---
+
 ## Etapa 2 — Planejamento e organização pessoal (2026-11-02)
 
 **Estado:** módulos implementados e verificados por testes automatizados de lógica; QA visual manual ainda pendente. **Não iniciar Etapa 3 sem autorização do usuário.**
