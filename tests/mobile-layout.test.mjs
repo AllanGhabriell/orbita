@@ -39,5 +39,5 @@ assert.equal((markup.match(/class="day-meta"/g)||[]).length,7,"texto integral ma
 assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa para leitores de tela");
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
-assert.match(sw,/orbita-app-method-actions-20261102/,"cache PWA renovado");
+assert.match(sw,/orbita-app-study-home-batch-20261102/,"cache PWA renovado");
 console.log("Mobile: calendario compacto acessível, rota isolada, CSS sob media query e cache PWA atualizados.");
