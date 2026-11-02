@@ -535,6 +535,67 @@ function methodsView(){
  '<section class="card"><div class="card-head"><h2>Suas modalidades</h2>'+tag(methods.length+" cadastradas")+'</div>'+
  (methods.length?'<div class="task-list study-method-list">'+methods.map(x=>'<div class="task-row study-method-row"><div class="task-mark">◈</div><div class="task-main"><strong>'+E(x.title)+'</strong><div class="task-meta">'+E(x.description||"Sem descrição")+(x.archived?" · arquivada":"")+'</div></div><div class="task-actions study-method-actions"><button class="btn small ghost" data-s3="editMethod" data-id="'+A(x.id)+'">Editar</button><button class="btn small ghost" data-s3="copyMethod" data-id="'+A(x.id)+'">Copiar</button><button class="btn small ghost" data-s3="archiveMethod" data-id="'+A(x.id)+'">'+(x.archived?"Reativar":"Arquivar")+'</button><button class="btn small danger" data-s3="deleteMethod" data-id="'+A(x.id)+'">Excluir</button></div></div>').join("")+'</div>':'<p class="note">Nenhuma modalidade cadastrada. Exemplos opcionais: teoria, questões, revisão, flashcards, Feynman e laboratório.</p>')+'</section>';
 }
+// Plano da semana: só planejamento. Nenhuma execução é permitida nesta tela.
+let plannerWeek=s.date,plannerSelection=new Set();
+const plannerDow=["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
+function plannerLabel(x){
+ const c=cycle(x.cycleId),current=c&&!c.archived?cycleState(c):null;
+ if(x.rotationSlot)return (current?.title||"Próxima matéria")+" · previsão do ciclo";
+ return x.discipline||subject(x.subjectId)?.title||"Estudo complementar";
+}
+function plannerNavigation(){
+ return '<div class="row study-plan-nav"><button class="btn small ghost" data-s3="planPrevWeek" title="Semana anterior">←</button>'+
+ '<button class="btn small ghost" data-s3="planCurrentWeek">Esta semana</button>'+
+ '<button class="btn small ghost" data-s3="planNextWeek" title="Próxima semana">→</button>'+
+ '<label class="study-plan-date-pick">Ir para <input type="date" id="s3-plan-go-date" value="'+A(plannerWeek)+'" min="'+A(first())+'"></label></div>';
+}
+function plannerPreview(date){
+ const entries=planDayEntries(date),load=loadFor(date);
+ return '<section class="card study-plan-preview"><div class="card-head"><h2>Prévia do Início · '+E(fmt(date,false))+'</h2>'+tag(entries.length+" sessões")+'</div>'+
+ (entries.length?'<div class="study-plan-preview-items">'+entries.map(x=>'<div class="study-plan-preview-item"><strong>'+E(plannerLabel(x))+'</strong><span>'+E(cycle(x.cycleId)?.title||x.area)+' · '+E(minuteLabel(x.plannedMin))+'</span></div>').join("")+'</div>':'<p class="note">Esse dia ainda não tem estudos programados.</p>')+
+ '<p class="note">Carga prevista: '+E(minuteLabel(load.studyPlanned))+'. O Início mostra a matéria real quando você executar o ciclo. Esta é uma prévia, sem ações de conclusão.</p></section>';
+}
+function plannerView(){
+ const start=planWeekStart(plannerWeek),dates=planWeekDates(plannerWeek);
+ const count=dates.reduce((n,d)=>n+planDayEntries(d).length,0);
+ const minutes=dates.reduce((n,d)=>n+loadFor(d).studyPlanned,0);
+ const weekdayCards=dates.map((date,i)=>{
+  const items=planDayEntries(date),daily=loadFor(date),finished=blocked(date),
+   remaining=daily.available>0&&daily.totalPlanned>daily.available;
+  const plan=items.map((x,j)=>{
+   const c=cycle(x.cycleId),m=method(x.methodId),chosen=plannerSelection.has(x.id);
+   const editable=x.status==="pending"&&!finished;
+   const badgeLabel=x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":x.rotationSlot?"Seguir ciclo":x.kind==="reinforcement"?"Matéria específica":"Avulsa";
+   return '<div class="study-plan-item '+(chosen?"is-selected ":"")+(editable?"is-editable":"")+'" data-plan-id="'+A(x.id)+'" draggable="'+(editable?"true":"false")+'"><div class="study-plan-item-top"><span class="study-plan-grip" aria-hidden="true">⠿</span><div class="study-plan-item-body"><strong>'+E(plannerLabel(x))+'</strong><small>'+E(c?.title||x.area||"Sem ciclo")+' · '+E(minuteLabel(x.plannedMin))+(m?' · '+E(m.title):"")+(x.topic?' · '+E(x.topic):"")+'</small></div><span class="study-plan-status">'+E(badgeLabel)+'</span></div>'+
+ (editable?'<div class="study-plan-item-actions"><button class="btn small ghost" data-s3="planSelect" data-id="'+A(x.id)+'" aria-pressed="'+chosen+'">'+(chosen?"✓ Selecionado":"Selecionar")+'</button><button class="btn small ghost" data-s3="planEdit" data-id="'+A(x.id)+'">Editar</button><button class="btn small ghost" data-s3="planDuplicate" data-id="'+A(x.id)+'">Duplicar</button><button class="btn small ghost" data-s3="planMove" data-id="'+A(x.id)+'">Mover</button><button class="btn small danger" data-s3="planRemove" data-id="'+A(x.id)+'">Excluir</button></div>':'<small class="study-plan-locked">Para alterar uma sessão iniciada, corrija sua execução no Início.</small>')+'</div>';
+  }).join("");
+  return '<div class="study-plan-day '+(date===s.date?"is-today":"")+'" data-plan-date="'+A(date)+'"><div class="study-plan-day-head"><div><strong>'+plannerDow[i]+'</strong><small>'+E(spanDate(date))+'</small></div><span class="study-plan-day-total">'+items.length+' · '+E(minuteLabel(daily.studyPlanned))+'</span></div>'+
+  (remaining?'<p class="study-plan-overload">Carga acima da disponibilidade</p>':"")+
+  '<div class="study-plan-day-items">'+(plan||'<p class="study-plan-placeholder">Arraste uma sessão para cá ou adicione um estudo.</p>')+'</div>'+
+  (finished?'<small>Dia finalizado: histórico preservado</small>':'<div class="study-plan-day-footer"><button class="btn small primary" data-s3="planAdd" data-date="'+A(date)+'">+ Estudo</button><button class="btn small ghost" data-s3="planCopyDay" data-date="'+A(date)+'">Copiar dia</button></div>')+'</div>';
+ }).join("");
+ const hasSelection=plannerSelection.size;
+ return '<div class="hero-row"><div><div class="overline">EDIÇÃO DA SUA ROTINA</div><h1>Planejamento de estudos</h1><p class="kicker">Escolha ciclos e matérias já cadastrados. Configure o que aparecerá no Início; conclua os estudos somente lá.</p></div><div class="row"><button class="btn primary" data-s3="planAdd" data-date="'+A(s.date)+'">+ Estudo</button><button class="btn ghost" data-s3="openLibrary">Biblioteca</button><button class="btn ghost" data-s3="backStudies">Ciclos</button></div></div>'+
+ '<section class="card study-plan-toolbar"><div><h2>Semana de '+E(spanDate(start))+' a '+E(spanDate(dates[6]))+'</h2><p class="note">'+count+' sessão(ões) · '+E(minuteLabel(minutes))+' de estudos previstos</p></div>'+plannerNavigation()+
+ '<div class="study-plan-tools"><button class="btn small" data-s3="planCopyWeek">Copiar semana</button><button class="btn small ghost" data-s3="planSaveTemplate">Salvar modelo</button><button class="btn small ghost" data-s3="planUseTemplate">Aplicar modelo</button><button class="btn small ghost" data-s3="planBatch">Distribuir vários dias</button>'+
+ (hasSelection?'<button class="btn small primary" data-s3="planBulk">Editar '+hasSelection+' selecionada(s)</button><button class="btn small danger" data-s3="planRemoveSelected">Excluir selecionadas</button><button class="btn small ghost" data-s3="planUnselect">Cancelar seleção</button>':"")+
+ (plannerUndo?'<button class="btn small ghost" data-s3="planUndo">↶ Desfazer última edição</button>':"")+'</div></section>'+
+ '<div class="study-plan-week">'+weekdayCards+'</div>'+
+ plannerPreview(s.date)+
+ '<p class="note">Para reorganizar no computador, arraste uma sessão para outro dia. No celular, use Mover. Repetir uma matéria específica cria um estudo extra sem alterar a rotação; seguir o ciclo mantém a próxima matéria dinâmica.</p>';
+}
+function studyLibraryView(){
+ const cycles=db.cycles.filter(x=>!x.archived);
+ const activeMethods=db.methods.filter(x=>!x.archived);
+ return '<div class="hero-row"><div><div class="overline">CADASTRE UMA VEZ</div><h1>Biblioteca de estudos</h1><p class="kicker">Esses cadastros alimentam os seletores do planejamento. Você não precisará redigitar área, objetivo nem matéria.</p></div><div class="row"><button class="btn small ghost" data-s3="openPlanner">← Planejamento</button><button class="btn primary" data-s3="newCycle">+ Ciclo</button></div></div>'+
+ '<section class="card study-library-section"><div class="card-head"><h2>Ciclos, áreas e matérias</h2>'+tag(cycles.length+" ciclos")+'</div>'+
+ (cycles.length?cycles.map(c=>'<div class="study-library-cycle"><div class="study-library-cycle-head"><div><strong>'+E(c.title)+'</strong><small>'+E(c.area)+' · '+E(s.goals.find(g=>g.id===c.goalId)?.title||"Sem objetivo vinculado")+'</small></div><div class="row"><button class="btn small ghost" data-s3="editCycle" data-id="'+A(c.id)+'">Editar ciclo</button><button class="btn small" data-s3="addSubject" data-cycle="'+A(c.id)+'">+ Matéria</button><button class="btn small ghost" data-s3="selectCycle" data-id="'+A(c.id)+'">Sequência</button></div></div>'+
+ (studiedSubjects(c).length?studiedSubjects(c).map(sub=>'<div class="study-library-sub"><div class="study-library-sub-head"><div><strong>'+E(sub.title)+'</strong><small>'+(sub.paused?"Pausada · ":"")+sub.targetSessions+' conclusão(ões) por etapa</small></div><div class="row"><button class="btn small ghost" data-s3="editSubject" data-id="'+A(sub.id)+'">Editar</button><button class="btn small ghost" data-s3="newTopic" data-subject="'+A(sub.id)+'">+ Assunto</button></div></div>'+
+ (db.topics.filter(t=>t.subjectId===sub.id&&!t.archived).length?'<div class="study-library-topics">'+db.topics.filter(t=>t.subjectId===sub.id&&!t.archived).map(t=>'<span class="study-library-topic">'+E(t.title)+' <button class="study-library-topic-action" title="Editar assunto" data-s3="editTopic" data-id="'+A(t.id)+'">✎</button><button class="study-library-topic-action" title="Excluir assunto" data-s3="deleteTopic" data-id="'+A(t.id)+'">×</button></span>').join("")+'</div>':'<small class="study-library-empty">Sem assuntos cadastrados. O assunto é opcional no planejamento.</small>')+'</div>').join(""):'<p class="note">Cadastre matérias antes de planejar.</p>')+'</div>').join(""):'<p class="note">Crie seu primeiro ciclo para começar.</p>')+'</section>'+
+ '<section class="card study-library-section"><div class="card-head"><h2>Modalidades</h2><button class="btn small primary" data-s3="newMethod">+ Modalidade</button></div>'+
+ (activeMethods.length?'<div class="study-library-methods">'+activeMethods.map(m=>'<div class="study-library-method"><span>'+E(m.title)+'</span><button class="btn small ghost" data-s3="editMethod" data-id="'+A(m.id)+'">Editar</button></div>').join("")+'</div>':'<p class="note">Sem modalidades cadastradas. Você pode criá-las aqui e selecioná-las no planejamento.</p>')+
+ '<div class="row"><button class="btn small ghost" data-s3="openMethods">Gerenciar modalidades e arquivos</button></div></section>';
+}
 function statsView(){
  const v=summarize(),recent=summarize({from:add(day(),-29),to:day()});
  const sections=[["Áreas de estudo",v.groups.areas],["Matérias (todas as áreas)",v.groups.disciplines],["Assuntos",v.groups.topics],["Modalidades",v.groups.methods],["Ciclos",v.groups.cycles]];
