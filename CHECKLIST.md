@@ -2,6 +2,16 @@
 
 Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validação completa são explicitamente indicados em PROGRESSO.md. Esta lista é auditada ao fim de toda etapa.
 
+## Uso diário dos ciclos — 02/11/2026
+- [x] Início como painel de execução: sessões, progresso, Concluir / Desfazer / Registrar
+- [x] Avanço automático da matéria após número exigido de conclusões, com destaque visual discreto
+- [x] Configuração de matérias, sessões, modalidades e ciclos concentrada em Estudos
+- [x] Planejamento em lote de até 31 dias, por dia de semana ou dias com disponibilidade
+- [x] Cada sessão aumenta a carga prevista individualmente (3 × 1h30 = 4h30)
+- [x] Sessões futuras de rotação só assumem a matéria ao serem executadas
+- [x] Testes automatizados cobrindo planejamento e execução
+- [ ] Validação do fluxo de trabalho em dispositivos reais e sincronização multiaparelho
+
 ## Complementos de conclusão — 02/11/2026
 - [x] Etapas dos objetivos, concluídas manualmente, e vínculo de atividades/ciclos ao objetivo
 - [x] Períodos ocupados semanais e pontuais com avisos de conflitos e desconto em faixas livres
