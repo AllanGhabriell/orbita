@@ -5,7 +5,7 @@ const C=window.OrbitaCore, S2=window.OrbitaStage2?.inspect;
 if(!C||!S2)throw Error("Órbita: etapas anteriores não carregadas");
 const s=C.state;
 const db=s.studies||(s.studies={version:3,cycles:[],subjects:[],methods:[],sessions:[],events:[]});
-for(const key of ["cycles","subjects","methods","sessions","events"])if(!Array.isArray(db[key]))db[key]=[];
+for(const key of ["cycles","subjects","methods","sessions","events","topics","templates"])if(!Array.isArray(db[key]))db[key]=[];
 const $=id=>document.getElementById(id);
 const E=C.esc,A=C.attr, tag=C.tag, day=C.today, add=C.addDays,fmt=C.dateLabel;
 const unique=()=>((typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():"s"+Date.now().toString(36)+Math.random().toString(36).slice(2));
@@ -206,6 +206,161 @@ function addBatchSessions(data){
  }
  logs("sessions_batch_scheduled",{cycleId:c.id,dates,count,duration,ids:result.map(x=>x.id)});
  return result;
+}
+// Planejamento v4: somente a agenda é alterada. Conclusões e progresso ficam no Início.
+let plannerUndo=null;
+const planTopics=subjectId=>db.topics.filter(t=>!t.archived&&t.subjectId===subjectId);
+const planWeekStart=date=>add(date,-((C.parse(date).getDay()+6)%7));
+const planWeekDates=date=>Array.from({length:7},(_,i)=>add(planWeekStart(date),i));
+const planDayEntries=date=>db.sessions.filter(x=>x.date===date&&!x.archived)
+ .sort((a,b)=>Number(a.planOrder??0)-Number(b.planOrder??0)||(a.startTime||"99:99").localeCompare(b.startTime||"99:99")||String(a.createdAt||"").localeCompare(String(b.createdAt||"")));
+function planIsEditable(x){
+ if(!x||x.archived)throw Error("Sessão não encontrada.");
+ if(x.status!=="pending")throw Error("Esta sessão já foi iniciada ou concluída. Corrija a execução primeiro na tela Início.");
+ if(blocked(x.date))throw Error("Dia finalizado: preserve o histórico.");
+ if(x.kind==="cycle"&&!x.rotationSlot&&x.stepNo!==cycle(x.cycleId)?.stepNo)throw Error("Esta sessão pertence a uma etapa anterior do ciclo.");
+}
+function planJournal(){
+ const before=clone(db.sessions);
+ return ()=>{plannerUndo={before,after:JSON.stringify(db.sessions)};};
+}
+function planUndo(){
+ if(!plannerUndo)throw Error("Não há uma alteração recente para desfazer.");
+ if(JSON.stringify(db.sessions)!==plannerUndo.after)throw Error("A agenda mudou desde a última edição. Não é seguro desfazer automaticamente.");
+ for(const x of db.sessions)if(blocked(x.date)&&!plannerUndo.before.some(y=>y.id===x.id))throw Error("Um dia foi finalizado após a edição.");
+ db.sessions.splice(0,db.sessions.length,...plannerUndo.before);
+ plannerUndo=null;logs("planner_undo",{});save();render();notify("Última alteração no planejamento desfeita.");
+}
+function planNextOrder(date){
+ return planDayEntries(date).reduce((n,x)=>Math.max(n,Number(x.planOrder)||0),0)+1;
+}
+function planValidate(data){
+ const c=cycle(String(data.cycleId||""));
+ ensureCycleActive(c);
+ const date=String(data.date||"");
+ if(!datesOkay(date)||date<first()||blocked(date))throw Error("Escolha uma data aberta a partir do primeiro acesso.");
+ const mode=String(data.mode||"rotation");
+ if(!["rotation","specific"].includes(mode))throw Error("Escolha seguir o ciclo ou selecionar uma matéria específica.");
+ const sub=mode==="specific"?subject(String(data.subjectId||"")):null;
+ if(mode==="specific"&&(!sub||sub.cycleId!==c.id||sub.archived))throw Error("Escolha uma matéria cadastrada nesse ciclo.");
+ const plannedMin=positiveInt(data.plannedMin,c.defaultMin||90,1,720);
+ const methodId=String(data.methodId||"");
+ if(methodId&&(!method(methodId)||method(methodId).archived))throw Error("Modalidade indisponível na biblioteca.");
+ const topicId=String(data.topicId||"");
+ const topic=topicId?db.topics.find(t=>t.id===topicId&&!t.archived):null;
+ if(topicId&&(!topic||topic.subjectId!==sub?.id))throw Error("O assunto selecionado não pertence à matéria escolhida.");
+ return {date,cycleId:c.id,kind:mode==="rotation"?"cycle":"reinforcement",
+  subjectId:sub?.id||"",stepNo:0,rotationSlot:mode==="rotation",
+  area:c.area,discipline:sub?.title||"Próxima matéria do ciclo",plannedMin,methodId,
+  topicId:topic?.id||"",topic:topic?.title||"",startTime:"",focusId:""};
+}
+function planCreate(data){
+ const entry=planValidate(data),count=positiveInt(data.count,1,1,12);
+ const finish=planJournal(),created=[];
+ for(let i=0;i<count;i++){
+  const c=cycle(entry.cycleId),sub=subject(entry.subjectId);
+  const x={...defaultsForSession(c,sub,entry.kind,entry.date),...entry,
+   id:unique(),planOrder:planNextOrder(entry.date)+i,status:"pending",actualMin:null,completedAt:null};
+  db.sessions.push(x);created.push(x);
+ }
+ logs("planner_created",{ids:created.map(x=>x.id),date:entry.date});
+ finish();save();render();return created;
+}
+function planEdit(id,data){
+ const x=session(id);planIsEditable(x);
+ const changed=planValidate(data);
+ const finish=planJournal();
+ Object.assign(x,changed,{actualMin:null,completedAt:null,planOrder:changed.date===x.date?x.planOrder:planNextOrder(changed.date)});
+ // Manter id e createdAt para referências de registros externos.
+ logs("planner_edited",{sessionId:id,date:x.date});
+ finish();save();render();return x;
+}
+function planDelete(ids){
+ const chosen=[...new Set(ids.map(String))];
+ if(!chosen.length)throw Error("Selecione pelo menos uma sessão.");
+ chosen.forEach(id=>planIsEditable(session(id)));
+ const finish=planJournal();
+ const set=new Set(chosen);
+ db.sessions.splice(0,db.sessions.length,...db.sessions.filter(x=>!set.has(x.id)));
+ logs("planner_removed",{ids:chosen});finish();save();render();return chosen.length;
+}
+function planCopyDraft(source,date){
+ const c=cycle(source.cycleId),sub=subject(source.subjectId);
+ if(source.kind==="cycle"&&c&&!c.archived&&activeSubjects(c).length)
+  return {...defaultsForSession(c,null,"cycle",date),rotationSlot:true,discipline:"Próxima matéria do ciclo",
+   plannedMin:source.plannedMin,methodId:source.methodId||"",topic:"",topicId:""};
+ return {...defaultsForSession(c,sub,source.kind,date),kind:source.kind,cycleId:source.cycleId||"",
+  subjectId:source.subjectId||"",discipline:source.discipline,area:source.area,
+  rotationSlot:false,plannedMin:source.plannedMin,methodId:source.methodId||"",
+  topic:source.topic||"",topicId:source.topicId||"",startTime:source.startTime||""};
+}
+function planCopyRange(sourceStart,targetStart,days=1,replace=false){
+ if(![1,7].includes(days))throw Error("Período de cópia inválido.");
+ if(!datesOkay(sourceStart)||!datesOkay(targetStart)||targetStart<first())throw Error("Selecione datas válidas para copiar.");
+ if(days===7&&(sourceStart!==planWeekStart(sourceStart)||targetStart!==planWeekStart(targetStart)))throw Error("Para copiar a semana, escolha a segunda-feira inicial.");
+ const sourceDates=Array.from({length:days},(_,i)=>add(sourceStart,i));
+ const destDates=Array.from({length:days},(_,i)=>add(targetStart,i));
+ if(sourceDates.some(x=>destDates.includes(x)))throw Error("Escolha um período de destino diferente da origem.");
+ if(destDates.some(blocked))throw Error("A cópia inclui um dia finalizado. Escolha outro período.");
+ const copies=sourceDates.flatMap((d,i)=>planDayEntries(d).map(x=>planCopyDraft(x,destDates[i])));
+ if(!copies.length)throw Error("Nenhuma sessão encontrada no período de origem.");
+ if(copies.length>180)throw Error("Copie no máximo 180 sessões de uma vez.");
+ const finish=planJournal();
+ if(replace){const dst=new Set(destDates);db.sessions.splice(0,db.sessions.length,...db.sessions.filter(x=>!dst.has(x.date)||x.status!=="pending"));}
+ for(const x of copies){x.id=unique();x.createdAt=now();x.planOrder=planNextOrder(x.date);db.sessions.push(x);}
+ logs("planner_copied",{sourceStart,targetStart,days,replace,count:copies.length});
+ finish();save();render();return copies;
+}
+function planMove(id,date,order=0){
+ const x=session(id);planIsEditable(x);
+ if(!datesOkay(date)||date<first()||blocked(date))throw Error("Escolha um dia disponível para mover a sessão.");
+ const finish=planJournal();
+ if(x.date===date){const target=Number(order)||1;const peers=planDayEntries(date).filter(q=>q.id!==id);
+  peers.splice(Math.min(Math.max(target-1,0),peers.length),0,x);
+  peers.forEach((q,i)=>q.planOrder=i+1);
+ }else{x.date=date;x.planOrder=planNextOrder(date);}
+ logs("planner_moved",{id,date});finish();save();render();
+}
+function planBulk(ids,data){
+ const list=[...new Set(ids)].map(session);
+ if(!list.length)throw Error("Selecione as sessões que deseja editar.");
+ list.forEach(planIsEditable);
+ const dest=String(data.date||"");
+ if(dest&&(!datesOkay(dest)||dest<first()||blocked(dest)))throw Error("Data de destino inválida ou finalizada.");
+ const duration=String(data.plannedMin??"").trim()?positiveInt(data.plannedMin,90,1,720):null;
+ const finish=planJournal();
+ for(const x of list){
+  if(dest&&dest!==x.date){x.date=dest;x.planOrder=planNextOrder(dest);}
+  if(duration!==null)x.plannedMin=duration;
+ }
+ logs("planner_bulk_edit",{ids:list.map(x=>x.id),date:dest,duration});finish();save();render();
+ return list;
+}
+function planSaveTemplate(name,date){
+ const title=validName(name,60),start=planWeekStart(date);
+ const items=planWeekDates(start).flatMap((d,i)=>planDayEntries(d).map(x=>{
+  const p=planCopyDraft(x,d);
+  return {offset:i,...p};
+ }));
+ if(!items.length)throw Error("Monte pelo menos uma sessão antes de salvar um modelo.");
+ const template={id:unique(),title,items,createdAt:now()};
+ db.templates.push(template);logs("planner_template_saved",{id:template.id});save();render();return template;
+}
+function planApplyTemplate(id,weekStart,replace=false){
+ const t=db.templates.find(x=>x.id===id);
+ if(!t)throw Error("Modelo de semana não encontrado.");
+ if(!datesOkay(weekStart)||weekStart!==planWeekStart(weekStart)||weekStart<first())throw Error("Escolha a segunda-feira da semana de destino.");
+ const dates=planWeekDates(weekStart);
+ if(dates.some(blocked))throw Error("Uma data da semana já foi finalizada.");
+ if(t.items.length>180)throw Error("Modelo ultrapassa o limite de 180 sessões.");
+ const finish=planJournal();
+ if(replace){const d=new Set(dates);db.sessions.splice(0,db.sessions.length,...db.sessions.filter(x=>!d.has(x.date)||x.status!=="pending"));}
+ for(const item of t.items){
+  const date=dates[item.offset],fresh=planCopyDraft(item,date);
+  fresh.id=unique();fresh.planOrder=planNextOrder(date);
+  db.sessions.push(fresh);
+ }
+ logs("planner_template_applied",{id,weekStart,replace});finish();save();render();return t.items.length;
 }
 function updateSession(id,data){
  const x=session(id);if(!x||x.archived)throw Error("Sessão indisponível.");
