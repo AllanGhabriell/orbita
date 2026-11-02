@@ -172,11 +172,12 @@ case "moduleHelp":moduleModal(button.dataset.module);break;
 }}
 document.addEventListener("click",(event)=>{const nav=event.target.closest("[data-nav]");if(nav){go(nav.dataset.nav);return;}const act=event.target.closest("[data-action]");if(act)handleAction(act.dataset.action,act);});
 document.addEventListener("submit",(event)=>{
-// Formulários dos módulos 2–6 possuem seus próprios controladores de envio.
-// Evita interceptar e validar indevidamente um formulário que não pertence à base.
-if(!["goal-form","date-form","exception-date-form","availability-form"].includes(event.target?.id))return;
-event.preventDefault();const form=event.target;const data=new FormData(form);
-if(form.id==="goal-form"){
+const form=event.target;
+const formId=form?.getAttribute?.("id")||form?.id;
+// Evita acessar form.id diretamente: um campo name="id" pode sobrescrevê-lo.
+if(!["goal-form","date-form","exception-date-form","availability-form"].includes(formId))return;
+event.preventDefault();const data=new FormData(form);
+if(formId==="goal-form"){
 const title=String(data.get("title")||"").trim();if(!title)return notify("Informe o nome do objetivo.");
 const id=String(data.get("id")||"")||uid();let g=state.goals.find(x=>x.id===id);
 if(!g){g={id,archived:false};state.goals.push(g);}
@@ -184,9 +185,9 @@ g.title=title;g.area=String(data.get("area")||"").trim();g.description=String(da
 if(data.has("primary")){g.archived=false;state.primaryGoalId=id;}else if(state.primaryGoalId===id)state.primaryGoalId=null;
 save();closeModal();render();notify("Objetivo salvo.");return;
 }
-if(form.id==="date-form"){const date=String(data.get("date")||"");closeModal();updateDate(date);return;}
-if(form.id==="exception-date-form"){const date=String(data.get("date")||"");if(date<state.firstAccess)return notify("Data anterior ao primeiro acesso.");closeModal();availabilityModal(null,date);return;}
-if(form.id==="availability-form"){
+if(formId==="date-form"){const date=String(data.get("date")||"");closeModal();updateDate(date);return;}
+if(formId==="exception-date-form"){const date=String(data.get("date")||"");if(date<state.firstAccess)return notify("Data anterior ao primeiro acesso.");closeModal();availabilityModal(null,date);return;}
+if(formId==="availability-form"){
 const mode=String(data.get("mode")||"hours");let entry={mode};
 if(mode==="hours"||mode==="broad"){
 const hours=Number(data.get("hours"));if(!Number.isFinite(hours)||hours<=0||hours>=24)return notify("Informe horas válidas, entre 0,25 e 23,75.");entry.hours=hours;
