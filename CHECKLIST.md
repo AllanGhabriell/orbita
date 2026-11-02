@@ -3,18 +3,24 @@
 Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validação completa são explicitamente indicados em PROGRESSO.md. Esta lista é auditada ao fim de toda etapa.
 
 ## Etapa 1 — Base e UX
-- [ ] Estrutura inicial do site estático no repositório
-- [ ] Layout escuro e claro com preferência persistida
-- [ ] Fundo animado com luz do cursor e preferência de movimento reduzido
-- [ ] Desktop/móvel, navegação acessível e menus avançados discretos
-- [ ] Tela Início vazia, sem qualquer meta/tarefa demonstrativa
-- [ ] Disponibilidade semanal por horas e múltiplos intervalos
-- [ ] Descanso semanal e exceções por data
-- [ ] Orientação inicial contextual e desbloqueio dependente de disponibilidade
-- [ ] Objetivos: criar, editar, definir principal, arquivar e excluir
-- [ ] Calendário semanal, navegação entre dias, saltar data e Hoje
-- [ ] Documentos ESCOPO/CHECKLIST/PROGRESSO/README
-- [ ] Testes e revisão de uso em telas pequenas
+- [x] Estrutura inicial do site estático no repositório
+- [x] Layout escuro e claro com preferência persistida
+- [x] Fundo animado com luz do cursor e preferência de movimento reduzido
+- [x] Desktop/móvel, navegação acessível e menus avançados discretos
+- [x] Tela Início vazia, sem qualquer meta/tarefa demonstrativa
+- [x] Disponibilidade semanal por horas e múltiplos intervalos
+- [x] Descanso semanal e exceções por data
+- [x] Orientação inicial contextual e desbloqueio dependente de disponibilidade
+- [x] Objetivos: criar, editar, definir principal, arquivar e excluir
+- [x] Calendário semanal, navegação entre dias, saltar data e Hoje
+- [x] Documentos ESCOPO/CHECKLIST/PROGRESSO/README
+- [ ] Testes visuais e de interação em navegador real, especialmente em telas pequenas (pendência de QA; ver PROGRESSO.md)
+
+### Verificação técnica da Etapa 1
+- [x] Teste automatizado de inicialização vazia e armazenamento local
+- [x] Teste de criação de disponibilidade e objetivo principal
+- [x] Checagem sintática de JavaScript pelo workflow
+- [ ] Verificação visual final no domínio publicado (depende do Pages e revisão em dispositivos)
 
 ## Etapa 2 — Organização
 - [ ] Focos obrigatórios com estados e remanejamento auditável
