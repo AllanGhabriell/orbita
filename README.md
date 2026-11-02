@@ -90,7 +90,7 @@ Durante as etapas 1–4, os registros são provisórios e locais (`localStorage`
 
 ## Etapa 5 — banco, contas, offline e aplicativo instalável
 
-O Órbita está pronto para receber a **configuração do seu projeto Supabase** pelo próprio site. O SQL foi entregue, mas **ainda não foi executado**: não há banco nem autenticação real associados até você configurá-los.
+O projeto Supabase está **pré-configurado no código público** do Órbita em `config.js`; não existe mais formulário para informar URL ou chave pública. O SQL foi entregue, mas a execução no banco e a habilitação do login Google ainda precisam ser confirmadas.
 
 **[Guia de conexão: CONFIGURAR_SUPABASE.md](./CONFIGURAR_SUPABASE.md)**  
 **[SQL completo: supabase/migrations/20261102_000001_orbita.sql](./supabase/migrations/20261102_000001_orbita.sql)**
@@ -101,7 +101,7 @@ Implementado no código:
 - IndexedDB como espelho durável dos dados, com acesso local offline e recuperação do estado; não depende de conexão para abrir a agenda já carregada.
 - Backup JSON por exportação e importação com validação e alerta de substituição.
 - PWA com manifesto, ícones PNG 192/512 e service worker para arquivos estáticos, instalável em navegadores compatíveis.
-- Sem chave secreta no GitHub. A configuração local só aceita URL Supabase e chave pública.
+- Sem chave secreta no GitHub. A URL e a chave pública do Supabase são carregadas automaticamente pelo `config.js` em todos os dispositivos.
 
 **Limitação de validação:** o Google, a aplicação SQL e a sincronização entre aparelhos requerem um projeto Supabase conectado. Não foram testados com dados reais nesta etapa. O funcionamento offline e a instalação também precisam de teste em dispositivos reais.
 
