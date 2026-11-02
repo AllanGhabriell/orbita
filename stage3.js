@@ -395,7 +395,10 @@ function recordModal(id){
  const x=session(id);if(!x)return;
  modal("Registrar estudo",'<form id="s3-record" class="section-stack"><input name="id" value="'+A(id)+'" type="hidden"><p class="note">'+E(x.discipline)+' · '+E(fmt(x.date,false))+'</p><div class="field"><label>Situação</label><select name="status"><option value="pending" '+(x.status==="pending"?"selected":"")+'>Pendente</option><option value="progress" '+(x.status==="progress"?"selected":"")+'>Em andamento / parcial</option><option value="done" '+(x.status==="done"?"selected":"")+'>Concluída</option></select></div>'+
  '<div class="form-grid">'+field("Tempo efetivo (minutos, opcional)","actualMin",x.actualMin??"","number",'min="1" max="1440" placeholder="Não inferir do previsto"')+
- field("Hora real de início (opcional)","actualTime",x.actualTime||"","time")+'</div><p class="note">Sessões parciais registram esforço sem avançar o ciclo. A conclusão exige confirmação; o tempo real pode permanecer não informado.</p>'+
+ field("Hora real de início (opcional)","actualTime",x.actualTime||"","time")+'</div>'+
+ '<div class="form-grid">'+field("Questões respondidas (opcional)","questions",x.evidence?.questions??"","number",'min="0" max="10000"')+field("Questões corretas (opcional)","correct",x.evidence?.correct??"","number",'min="0" max="10000"')+'</div>'+
+ '<div class="field"><label>Qualidade percebida do estudo (autoavaliação)</label><select name="quality"><option value="">Não informar</option>'+[1,2,3,4,5].map(n=>'<option value="'+n+'" '+(x.evidence?.quality===n?"selected":"")+'>'+n+' de 5</option>').join("")+'</select><small class="help">É uma percepção pessoal, não comprovação de aprendizagem.</small></div>'+
+ '<p class="note">Sessões parciais registram esforço sem avançar o ciclo. Tempo real e resultados são opcionais; nenhum valor será inferido automaticamente.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar registro</button></div></form>');
 }
 function ask(title,description,action,extra=""){
@@ -466,7 +469,16 @@ function submission(id,data){
   if(id)updateSession(id,payload);else addSessions(payload,data.get("count"));
   save();close();render();notify("Sessão salva.");return;
  }
- if(id==="s3-record"){const x=setSessionStatus(String(data.get("id")),String(data.get("status")),data.get("actualMin"),String(data.get("actualTime")||""));save();close();render();notify(x.status==="done"?"Sessão concluída.":"Registro atualizado.");return;}
+ if(id==="s3-record"){
+ const questionsRaw=String(data.get("questions")??"").trim(),correctRaw=String(data.get("correct")??"").trim(),qualityRaw=String(data.get("quality")??"").trim();
+ const questions=questionsRaw===""?null:Number(questionsRaw),correct=correctRaw===""?null:Number(correctRaw),quality=qualityRaw===""?null:Number(qualityRaw);
+ if(questions!==null&&(!Number.isInteger(questions)||questions<0||questions>10000))throw Error("Quantidade de questões inválida.");
+ if(correct!==null&&(!Number.isInteger(correct)||correct<0||correct>10000))throw Error("Quantidade de acertos inválida.");
+ if(correct!==null&&(questions===null||correct>questions))throw Error("Informe primeiro o total de questões; acertos não podem exceder o total.");
+ if(quality!==null&&(!Number.isInteger(quality)||quality<1||quality>5))throw Error("Qualidade percebida inválida.");
+ const x=setSessionStatus(String(data.get("id")),String(data.get("status")),data.get("actualMin"),String(data.get("actualTime")||""));
+ x.evidence={questions,correct,quality};logs("learning_evidence",{sessionId:x.id,questions,correct,quality});save();close();render();notify(x.status==="done"?"Sessão concluída.":"Registro atualizado.");return;
+ }
 }
 document.addEventListener("click",event=>{
  const t=event.target.closest("[data-s3]");if(!t)return;
