@@ -77,6 +77,7 @@ function canUndoCompletedStep(sess){
 }
 function ensureCycleActive(c){if(!c||c.archived)throw Error("Ciclo indisponível.");if(!cycleState(c))throw Error("Ative pelo menos uma matéria neste ciclo.");}
 function saveCycle(data,id){
+ if(!id&&!C.availabilityReady())throw Error("Configure sua disponibilidade antes de criar ciclos de estudo.");
  const title=validName(data.title),area=validName(data.area,80);
  const duration=positiveInt(data.defaultMin,90,1,720),goalId=data.goalId||"";
  if(goalId&&!s.goals.some(g=>g.id===goalId&&!g.archived))throw Error("Objetivo não encontrado.");
@@ -273,6 +274,7 @@ function loadPanel(date){
  '<p class="note">As horas vêm das sessões cadastradas. Atividades vinculadas a um foco são contadas uma única vez.</p></section>';
 }
 function studyView(){
+ if(!C.availabilityReady())return '<div class="hero-row"><div><div class="overline">SEQUÊNCIA E APRENDIZAGEM</div><h1>Meus estudos</h1></div></div><section class="card empty-state"><div class="empty-symbol">◷</div><h2>Configure sua disponibilidade</h2><p>Para planejar ciclos e sessões, informe quando você tem tempo livre.</p><button class="btn primary" data-action="openAvailability">Definir disponibilidade</button></section>';
  const cycles=db.cycles.filter(x=>!x.archived),archived=db.cycles.filter(x=>x.archived);
  const tot=summarize(),forDay=summarize({from:s.date,to:s.date});
  const inMonth=summarize({from:s.date.slice(0,7)+"-01",to:s.date.slice(0,7)+"-31"});
@@ -407,7 +409,7 @@ const actions={
  openStudies(){screen="cycles";detailCycle="";C.go("estudos")},
  backStudies(){screen="cycles";detailCycle="";render()},
  selectCycle(el){screen="cycle";detailCycle=el.dataset.id;C.go("estudos")},
- newCycle(){cycleModal()},editCycle(el){cycleModal(el.dataset.id)},
+ newCycle(){if(!C.availabilityReady())return notify("Configure sua disponibilidade antes de criar ciclos.");cycleModal()},editCycle(el){cycleModal(el.dataset.id)},
  addSubject(el){subjectModal(null,el.dataset.cycle||detailCycle)},editSubject(el){subjectModal(el.dataset.id)},
  pauseSubject(el){pauseModal(el.dataset.id)},
  resumeSubject(el){pauseSubject(el.dataset.id,false);save();render();notify("Matéria reativada.");},
