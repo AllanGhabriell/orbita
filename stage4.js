@@ -249,11 +249,26 @@ function chartDays(x){
  const max=Math.max(60,...x.days.map(q=>q.studyMin));
  return '<div class="evo-chart">'+x.days.slice(-14).map(row=>'<div class="evo-bar-col" title="'+E(row.date)+': '+minutes(row.studyMin)+'"><div class="evo-bar">'+(row.studyMin?'<i style="height:'+Math.max(4,Math.round(row.studyMin/max*100))+'%"></i>':'<span class="evo-zero">·</span>')+'</div><small>'+E(String(Number(row.date.slice(-2))))+'</small></div>').join("")+'</div>';
 }
+function previousComparison(x){
+ if(x.kind!=="week"&&x.kind!=="month"&&x.kind!=="year")return "";
+ const old=x.kind==="week"?add(x.from,-7):x.kind==="month"?iso(new Date(parse(x.from).getFullYear(),parse(x.from).getMonth()-1,1,12)):(Number(x.from.slice(0,4))-1)+"-01-01";
+ if(old<first())return "";
+ const prior=periodData(x.kind,old);
+ const a=x.count,b=prior.count;
+ if(a.closed<5||b.closed<5||a.focus<5||b.focus<5)return "";
+ const currentRate=Math.round(a.doneFocus/a.focus*100),previousRate=Math.round(b.doneFocus/b.focus*100);
+ const message=currentRate===previousRate?"O cumprimento percentual permaneceu igual.":currentRate>previousRate?"O cumprimento percentual cresceu "+(currentRate-previousRate)+" ponto(s).":"O cumprimento percentual caiu "+(previousRate-currentRate)+" ponto(s).";
+ return '<section class="card"><div class="card-head"><h2>Comparação com o período anterior</h2></div><div class="metrics-grid">'+
+ metric("Anterior",previousRate+"%",b.doneFocus+"/"+b.focus+" focos")+
+ metric("Atual",currentRate+"%",a.doneFocus+"/"+a.focus+" focos")+
+ '</div><p class="note" style="margin-top:12px">'+E(message)+' Compare também a quantidade e a dificuldade dos compromissos; porcentagens isoladas não demonstram qualidade do estudo.</p></section>';
+}
 function overviewPeriod(x){
  const n=x.count,rate=focusRate(n),source=x.final?"Relatório definitivo":"Análise provisória";
  let html='<div class="row-between"><div><div class="overline">EVOLUÇÃO · '+E(source.toUpperCase())+'</div><h2 style="margin:7px 0">'+E(fmt(x.from,false))+' — '+E(fmt(x.to,false))+'</h2></div><div class="row">'+C.tag(x.final?"Consolidado":"Provisório",x.final?"good":"warn")+'</div></div>';
  if(!x.final)html+='<p class="note">Parte do período ainda não foi finalizada ou não possui registros. As análises são descritivas; dias sem atividade registrada não são tratados como fracasso.</p>';
  html+='<div class="metrics-grid">'+metric("Compromissos",rate==null?"—":rate+"",n.doneFocus+" de "+n.focus+" focos concluídos")+metric("Horas reais de estudo",minutes(n.studyActualMin),n.missingStudyTimes+" sessões sem tempo")+metric("Horas planejadas",minutes(n.plannedMin),"Tarefas e estudos sem dupla contagem")+metric("Descansos",n.rest+" planejado(s)",n.unplannedPauses+" pausa(s) extraordinária(s)")+'</div>';
+ html+=previousComparison(x);
  html+='<section class="card evo-period-chart"><div class="card-head"><h2>Distribuição diária do estudo</h2><span class="note">Minutos realmente informados</span></div>'+chartDays(x)+'</section>';
  html+='<section class="card"><div class="card-head"><h2>Orientador</h2>'+C.tag(sampleLevel(x)==="limited"?"Poucos registros":sampleLevel(x)==="initial"?"Tendências iniciais":"Histórico suficiente")+'</div><div class="evo-insights">'+guidance(x).map(y=>'<div class="evo-insight '+A(y.tone)+'"><strong>'+E(y.title)+'</strong><p>'+E(y.body)+'</p><small>Próximo passo: '+E(y.action)+'</small></div>').join("")+'</div></section>';
  if(ev.milestones.length)html+='<section class="card"><div class="card-head"><h2>Conquistas reais</h2></div><div class="evo-achievements">'+ev.milestones.slice(-5).reverse().map(m=>'<div class="evo-achievement"><span aria-hidden="true">✦</span><div><strong>'+E(m.title)+'</strong><small>Concedida uma única vez, com base em fechamentos completos de focos.</small></div></div>').join("")+'</div></section>';
@@ -280,7 +295,7 @@ function viewEvolution(){
  return '<div class="hero-row"><div><div class="overline">SEU HISTÓRICO</div><h1>Minha evolução</h1><p class="kicker">Os resultados vêm de registros reais. Constância conta tanto quanto aumentar a quantidade.</p></div><div class="row"><button class="btn small ghost" data-s4="backProfile">← Perfil</button><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Fechar dia</button></div></div>'+
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
  overviewPeriod(current)+
- ' <section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
+ '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
 }
 function yesterday(){return add(today(),-1);}
 function lastStudyDayOfWeek(d){
@@ -305,6 +320,7 @@ function reminderEligible(){
 function homeDecor(base){
  if(!C.availabilityReady())return base;
  const date=state.date,closed=ev.closed[date],pending=pendingDates();
+ if(date<=today()&&!ev.visitedDays[date]){ev.visitedDays[date]=true;C.save();}
  let upper="";
  if(pending.length&&date===today())upper+='<div class="evo-alert evo-warning"><strong>Fechamento pendente</strong><span> Há '+pending.length+' dia(s) anteriores sem conclusão. Revise primeiro '+E(fmt(pending[0],false))+'.</span><button class="btn small" data-s4="reviewDate" data-date="'+A(pending[0])+'">Revisar</button></div>';
  if(closed){
@@ -351,8 +367,7 @@ function goView(){period="week";referenceDate=state.date;markViewed();C.go("evol
 function confirmSubmit(data){
  if(!data.has("reviewed")||String(data.get("phrase")||"").trim()!=="FINALIZAR")throw Error("Marque a revisão e digite FINALIZAR exatamente.");
  const date=String(data.get("date")||"");finalize(date);
- const snap=ev.closed[date],n=dailyCounts(snap);
- const year=periodData("week",date);
+ const snap=ev.closed[date];
  C.closeModal();C.go("fechamento");
  C.notify("Dia finalizado definitivamente.");
  if(lastStudyDayOfWeek(date))C.notify("Fechamento concluído. A prévia semanal está disponível em Evolução.");
