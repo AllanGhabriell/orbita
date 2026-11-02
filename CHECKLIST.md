@@ -34,7 +34,7 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [x] Auditoria contra ESCOPO.md
 - [x] Testes automatizados dos módulos de planejamento passaram no GitHub Actions
 - [ ] Testes visuais e ações completas em navegador real no PC e no celular
-- [ ] Validação da pontualidade como métrica nos relatórios (etapa 4; o horário real já pode ser registrado)
+- [x] Pontualidade de hábitos registrada e representada nos relatórios da etapa 4
 - [ ] Revisar casos extremos de repetição e cópia em mudanças de mês após teste real
 
 ## Etapa 3 — Estudos
@@ -52,7 +52,7 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [ ] Testes manuais com mouse/toque, calendário em meses diferentes e aparelhos reais
 - [ ] Validação de acessibilidade/teclado do fluxo completo de cadastro e sessões
 - [ ] Recomendações adaptativas de método e revisão contextual (motor orientador da Etapa 4)
-- [ ] Sincronização e persistência entre dispositivos (Etapa 5)
+- [x] Código de sincronização entre dispositivos preparado; [ ] integração real entre dispositivos com login
 
 ## Etapa 4 — Evolução
 - [x] Fechamento com revisão obrigatória, confirmação por texto e bloqueio no aplicativo
@@ -72,16 +72,30 @@ Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validaç
 - [x] Testes automatizados de fechamento imutável no aplicativo, precedência entre dias e relatórios congelados
 - [ ] Verificação visual e de teclado em navegador real (desktop e celular)
 - [ ] Análise exploratória de calendários antigos/extensos, recorrências e múltiplas abas
-- [ ] Bloqueio de escrita **no servidor** para dias finalizados: somente na Etapa 5 com RLS/funções SQL
+- [x] Função SQL com snapshots protegidos preparada; [ ] aplicar e validar no Supabase real
 - [ ] IA generativa opcional não foi integrada: o orientador atual usa regras verificáveis sem serviço externo
 - [ ] Testar um mês inteiro de fechamento diário com registros reais, inclusive semanas iniciadas em diferentes dias
 
 ## Etapa 5 — Integração
-- [ ] Migrações SQL completas e políticas RLS
-- [ ] Login Google + Supabase funcional
-- [ ] Offline-first, fila de sincronização e conflitos
-- [ ] Exportação/importação/backups
-- [ ] PWA instalável e funcionamento offline
-- [ ] GitHub Pages ativo e testado em domínio real (workflow de implantação aprovado; navegador real ainda não verificado)
-- [ ] Testes e ajustes finais com dados reais
-- [ ] Revisão completa de 100% dos requisitos com evidências
+- [x] Migração SQL pronta em `supabase/migrations/20261102_000001_orbita.sql`, com tabelas, RLS e função transacional de sincronização
+- [x] Chaves secretas proibidas no frontend; configuração de URL e chave pública pelo próprio site
+- [x] Implementação do login Google com Supabase Auth OAuth/PKCE
+- [x] Armazenamento offline IndexedDB, ponte de compatibilidade localStorage e recuperação de dados locais
+- [x] Controle otimista de versão da nuvem, prevenção de sobrescrita silenciosa e escolha manual em conflitos
+- [x] Preservação de dias encerrados em ambas as cópias, com rejeição de fechamentos divergentes
+- [x] Exportação/importação de backup JSON com validação e confirmação
+- [x] Manifesto PWA, service worker e ícones reais PNG 192×192/512×512
+- [x] Workflow atualizado para validar scripts das cinco etapas; testes automatizados de configuração, conflitos e PWA
+- [x] Guia de ativação SQL, Google Cloud, Supabase e testes em `CONFIGURAR_SUPABASE.md`
+- [ ] Executar SQL no projeto Supabase real — depende do proprietário
+- [ ] Configurar e validar o provedor Google no Supabase/Google Cloud — depende do proprietário
+- [ ] Testar autenticação e sincronização ponta a ponta com contas reais
+- [ ] Confirmar instalação e funcionamento PWA/offline em dispositivos reais
+- [ ] Validar isolamento de duas contas, RLS e bloqueio de dias fechados no banco real
+- [ ] Testar resolução de conflitos com dois dispositivos em simultâneo
+- [ ] QA visual e acessibilidade PC/celular, inclusive casos extremos dos ciclos e repetições
+- [ ] Verificar edição/fechamento de um mês de dados reais e concluir homologação final
+
+### Estado da entrega
+**Código e SQL preparados.** A ativação e o teste final da nuvem ainda dependem da conexão de um projeto real. SQL *não foi executado*, credenciais privadas *não foram armazenadas* e banco real *não foi alterado*.
+
