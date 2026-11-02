@@ -86,7 +86,7 @@ function kindOn(date,type){return allOn(date).filter(x=>x.type===type).sort((x,y
   if(type==="task"){const rank={high:0,medium:1,low:2};const diff=(rank[x.priority]??1)-(rank[y.priority]??1);if(diff)return diff;}
   return (x.startTime||"99:99").localeCompare(y.startTime||"99:99")||x.title.localeCompare(y.title);
  });}
-function hoursFor(date){const rows=allOn(date);const seen=new Set();return rows.reduce((total,x)=>{const k=x.id; if(seen.has(k))return total;seen.add(k);return total+Number(x.estimatedMin||0)},0)}
+function hoursFor(date){const rows=allOn(date);const seen=new Set();return rows.reduce((total,x)=>{const k=x.id; if(seen.has(k))return total;seen.add(k);if(x.type==="task"&&x.date!==date)return total;return total+Number(x.estimatedMin||0)},0)}
 function availabilityStatus(date){const val=C.resolveAvailability(date);return val?(val.mode==="rest"?"Descanso":C.hoursLabel(C.availabilityMinutes(val)/60)+" livres"):"Sem disponibilidade definida"}
 function restInfo(date){const x=p.dayPauses[date];if(x)return x;const av=C.resolveAvailability(date);return av?.mode==="rest"?{kind:"planejado",reason:"Disponibilidade definida como descanso"}:null}
 function dueAge(entry,date){const start=entry.createdAt?.slice(0,10)||entry.date;const diff=Math.round((C.parse(date)-C.parse(start))/86400000);return Math.max(0,diff)}
@@ -212,6 +212,7 @@ function updateEntry(data,original,editDate,scope){
  const effective=editDate||original.date;
  if(!canChange(effective))return;
  if(original.recurrence?.kind!=="none"&&scope!=="future"){
+  if(data.date!==original.date&&data.date!==effective){p.overrides[uidKey(original.id,effective)]={removed:true};p.entries.push(baseEntry({...data,recurrence:{kind:"none"},origin:{type:"occurrence_revision",fromId:original.id,fromDate:effective}}));return;}
   p.overrides[uidKey(original.id,effective)]={fields:{title:data.title,blockId:data.blockId,startTime:data.startTime,estimatedMin:data.estimatedMin,priority:data.priority,dueDate:data.dueDate}};
   return;
  }
@@ -320,6 +321,7 @@ function quickRecord(id,date,status){
  if(!canChange(date))return;
  const x=find(id);if(!x)return;
  const rec=p.records[uidKey(id,date)]||{};
+ if(rec.status==="moved"&&status!=="moved")return notify("Este foco foi remanejado. Consulte o destino ou edite o planejamento.");
  if(status==="pending"){delete p.records[uidKey(id,date)];}
  else p.records[uidKey(id,date)]={...rec,status,markedAt:new Date().toISOString()};
  save();render();notify(status==="done"?"Concluída. Você pode informar a duração real nos detalhes.":"Situação atualizada.");
@@ -371,6 +373,7 @@ function submission(id,data){
   const status=String(data.get("status")),min=String(data.get("actualMin")||""),actualMin=min?Number(min):null;
   if(actualMin!==null&&(!Number.isInteger(actualMin)||actualMin<1||actualMin>1440))throw Error("Duração real inválida.");
   const actualTime=String(data.get("actualTime")||"");if(!["pending","progress","done","notdone"].includes(status))throw Error("Estado inválido.");
+  if(p.records[uidKey(item,date)]?.status==="moved")throw Error("Este foco foi remanejado; o registro da origem deve ser preservado.");
   if(status==="pending"&&!actualMin&&!actualTime)delete p.records[uidKey(item,date)];
   else p.records[uidKey(item,date)]={status,actualMin,actualTime,markedAt:new Date().toISOString()};
   save();C.closeModal();render();notify("Registro atualizado.");return;
