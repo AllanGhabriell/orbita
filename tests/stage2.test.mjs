@@ -70,10 +70,14 @@ assert.equal(S.occurrence(habit,C.addDays(today,7)).displayTitle,"Correr 2");
 
 submit("s2-pause",{date:today,kind:"imprevisto",reason:"Compromisso familiar"});
 assert.equal(S.model.dayPauses[today].kind,"imprevisto");
+assert.ok(S.model.events.some(x=>x.kind==="pause_change"),"registra auditoria da pausa");
 assert.ok(S.model.dayPauses[today].originalPlannedMinutes>0);
 
+assert.throws(()=>submit("s2-move",{id:focus.id,date:today,target:C.addDays(today,3),reason:"Imprevisto"}),/já foi concluído/,"não remanejar foco já concluído");
+S.quickRecord(focus.id,today,"pending");
 submit("s2-move",{id:focus.id,date:today,target:C.addDays(today,3),reason:"Imprevisto"});
 assert.equal(S.model.records[focus.id+"@"+today].status,"moved");
+assert.ok(S.model.events.some(x=>x.kind==="focus_rescheduled"),"preserva histórico do remanejamento");
 assert.equal(S.model.entries.filter(x=>x.type==="focus").length,2);
 assert.equal(S.model.entries.find(x=>x.origin?.type==="rescheduled").origin.fromId,focus.id);
 
