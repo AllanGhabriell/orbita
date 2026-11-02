@@ -19,3 +19,17 @@
 .s6-chip{border:1px solid var(--border);background:var(--surface2);border-radius:9px;padding:6px 9px;color:var(--muted);font-size:11px}
 .s6-warning{color:var(--warning);font-size:12px;line-height:1.5}
 @media(max-width:650px){.s6-busy-row,.s6-reco{align-items:flex-start}.s6-busy-row>.row{flex-wrap:wrap;justify-content:flex-end}.s6-goal-panel .card-head{align-items:start;flex-direction:column}.s6-step{gap:6px}.s6-step .btn{padding:6px 7px}}
+
+/* Compromissos recorrentes: múltiplos dias, acessíveis por mouse, toque e teclado. */
+.s6-weekdays{border:1px solid var(--border);border-radius:12px;padding:12px;margin:0;min-width:0}
+.s6-weekdays legend{font-size:12px;font-weight:700;color:var(--text);padding:0 6px}
+.s6-weekday-actions{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 11px}
+.s6-weekday-actions .btn{font-size:11px;white-space:normal}
+.s6-weekday-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.s6-weekday-choice{display:flex;align-items:center;gap:9px;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;font-size:12px;line-height:1.3}
+.s6-weekday-choice:has(input:checked){border-color:var(--accent);background:rgba(139,112,234,.13)}
+.s6-weekday-choice input{width:17px;height:17px;accent-color:var(--accent);flex:none}
+.s6-weekday-choice span{min-width:0;overflow-wrap:anywhere}
+.s6-weekdays small{display:block;margin-top:9px;font-size:11px;color:var(--muted)}
+#s6-day-field[hidden],#s6-date-field[hidden]{display:none!important}
+@media(max-width:400px){.s6-weekday-grid{grid-template-columns:1fr}.s6-weekday-actions .btn{flex:1}}
