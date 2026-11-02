@@ -1,5 +1,44 @@
 # PROGRESSO — Órbita
 
+## Etapa 4 — Inteligência, fechamento e evolução (2026-11-02)
+
+**Estado:** código da etapa 4 enviado ao branch `main`, incluindo lógica de fechamento e relatórios com testes automatizados. Verificar o último workflow em `Actions` e concluir inspeção visual em navegadores reais. **Não iniciar etapa 5 sem autorização.**
+
+### Implementado
+- Integração de `stage4.js`/`stage4.css`, com telas de fechamento, evolução e acesso a partir de Início e Perfil.
+- Confirmação de fechamento por checklist e digitação explícita de `FINALIZAR`; o mesmo dia não pode ser reaberto na interface.
+- Fotografia imutável no fluxo de utilização do navegador dos focos, tarefas, hábitos, sessões, tempos informados, pausas, disponibilidade e objetivo principal; preservação independente de alterações futuras nos modelos.
+- Passado pendente notificado sem bloquear atividades atuais; ordem de fechamento respeitada. Datas sem compromisso e descansos podem ser encerrados.
+- Relatórios diários e agregados de semana/mês/ano; prévias quando período ainda incompleto, indicação de qualidade da amostra, dias sem observação ≠ fracasso.
+- Comparação de períodos apenas quando ambos oferecem ao menos cinco dias encerrados e número mínimo de compromissos.
+- Horas planejadas e reais distintas, sem duplicar foco vinculado a estudo; estatísticas do sistema de estudos leem snapshots dos dias fechados.
+- Questionários opcionais em sessões: número de questões, acertos e qualidade percebida 1–5. Análise não interpreta autoavaliação como prova objetiva de domínio.
+- Feedback determinístico de exigência configurável, sem alegações de IA externa; identifica bom cumprimento, compromissos pouco executados, pausas extraordinárias, ausência de tempo real e importância do descanso.
+- Lembretes de estatísticas não invasivos, com intervalo mínimo, adiamento e desligamento.
+- Reconhecimento por marcos de 5/10/20/50 dias com todos os focos concluídos; sem recompensas por cliques.
+- Proteções integradas nas etapas 1–3 para bloquear edições de disponibilidade específica, atividades e sessões de dias já fechados; visualização dos snapshots em Início e Calendário.
+
+### Testes
+- Testes `tests/stage4.test.mjs`: ausência de dados artificiais; backlog; impedir fechamento antes de dias pendentes; impedir dupla finalização; preservar foco e tempo em snapshot; proteção de novas sessões; consolidação do relatório; ausência de conclusões inventadas; resultados de questões e autoavaliações registrados.
+- Job `Testar e publicar Órbita`: `node --check` para os quatro scripts e execução de `node --test tests/*.test.mjs`. Acompanhar o último resultado no GitHub Actions.
+- Etapas 1–3 continuam com testes próprios. Não inferir que testes automatizados validam animações, layout mobile ou sincronização.
+
+### Pendências honestas
+- QA visual manual e acessibilidade real (PC e celular), integração entre múltiplas abas, histórico longo e casos extremos de recorrência/cópia.
+- A imutabilidade é **lógica e de interface nesta fase**; como dados ainda estão em `localStorage`, alterações externas ao aplicativo podem modificar o conteúdo. Políticas definitivas no Supabase serão aplicadas na etapa 5.
+- Não há autenticação Google, sincronização, backups ou banco SQL ainda.
+- O motor atual é baseado em regras auditáveis e registros; não usa IA generativa ou fontes externas para inferir personalidade ou capacidade real.
+- A qualidade do estudo é analisada apenas quando há evidências registradas; acertos autoanotados podem não refletir provas de dificuldade equivalente.
+- Validar meses completos de descanso, datas faltantes e relatórios de semana personalizada em cenários reais.
+- O volume de `localStorage` ainda é limitado; a migração para armazenamento robusto integra a etapa 5.
+
+### Próxima fase: Etapa 5, apenas por solicitação
+- Supabase: migrações SQL, esquema de dados, Row Level Security e mecanismos de bloqueio de dias finalizados no backend.
+- Login Google, persistência online, sincronização offline-first, resolução de conflitos, exportação/importação e instalação PWA.
+- Homologação funcional e visual do produto completo após integração real.
+
+---
+
 ## Etapa 3 — Sistema de estudos (2026-11-02)
 
 **Estado:** implementação funcional enviada ao GitHub e coberta por testes automatizados. A implantação final e a homologação visual em dispositivos reais devem ser confirmadas. Não iniciar Etapa 4 sem nova autorização.
