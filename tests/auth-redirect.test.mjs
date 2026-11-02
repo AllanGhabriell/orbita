@@ -3,12 +3,12 @@ import fs from "node:fs";
 import vm from "node:vm";
 const read=name=>fs.readFileSync(new URL("../"+name,import.meta.url),"utf8");
 
-async function scenario(query,{fetchError=false,existingSession=false}={}){
+async function scenario(query,{fetchError=false,existingSession=false,remoteDocument=false}={}){
  const store=new Map(),elements=new Map(),handlers={};
- let seq=0,exchangeCalls=0,authEvent=null;
+ let seq=0,exchangeCalls=0,authEvent=null,reloadCalls=0,importCalls=0;
  let session=existingSession?{user:{id:"test-user",email:"estudante@example.com",user_metadata:{name:"Pessoa de teste"}}}:null;
  const origin="https://allanghabriell.github.io",pathname="/orbita/";
- const location={origin,pathname,search:query,hash:"#configuracoes",href:origin+pathname+query+"#configuracoes",protocol:"https:"};
+ const location={origin,pathname,search:query,hash:"#configuracoes",href:origin+pathname+query+"#configuracoes",protocol:"https:",reload(){reloadCalls++}};
  const document={
   body:{dataset:{},classList:{toggle(){}}},
   getElementById(id){
@@ -38,12 +38,12 @@ async function scenario(query,{fetchError=false,existingSession=false}={}){
    async signOut(){session=null;authEvent?.("SIGNED_OUT",null);return{error:null}}
   },
   from(){return{select(){return{eq(){return{async maybeSingle(){
-   return fetchError?{data:null,error:{message:"Network blocked"}}:{data:null,error:null};
+   return fetchError?{data:null,error:{message:"Network blocked"}}:remoteDocument?{data:{version:4,content:remoteDocument},error:null}:{data:null,error:null};
   }}}}}}},
   async rpc(){return {data:{status:"ok",version:1},error:null}}
  };
  window.__mockSupabase={createClient(){return client}};
- const storage={supportsIndexedDB:true,onSave(){},async replaceDocument(){},async clearDocument(){},async markSynced(){},async persistNow(){}};
+ const storage={supportsIndexedDB:true,onSave(){},async replaceDocument(doc){importCalls++;store.set("orbita:stage1:v1",JSON.stringify(doc))},async clearDocument(){},async markSynced(){},async persistNow(){}};
  window.OrbitaStorage=storage;
  const context={document,window,location,history,
   localStorage:{getItem:key=>store.get(key)??null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
@@ -53,13 +53,21 @@ async function scenario(query,{fetchError=false,existingSession=false}={}){
  vm.createContext(context);
  for(const file of ["app.js","stage2.js","stage3.js","stage4.js"])
   vm.runInContext(read(file),context,{filename:file});
+ const plannerRef=window.OrbitaStage2.inspect.model,studiesRef=window.OrbitaStage3.inspect.model,evolutionRef=window.OrbitaStage4.inspect.model;
+ if(remoteDocument===true){
+  remoteDocument=JSON.parse(JSON.stringify(window.OrbitaCore.state));
+  remoteDocument.goals=[{id:"remote-goal",title:"Objetivo recuperado da nuvem",archived:false}];
+  remoteDocument.primaryGoalId="remote-goal";
+  remoteDocument.planner.entries=[{id:"remote-entry",type:"focus",title:"Atividade recuperada",date:remoteDocument.date,recurrence:{kind:"none"},createdAt:"2026-01-01T00:00:00Z"}];
+  remoteDocument.studies.cycles=[{id:"remote-cycle",title:"Ciclo recuperado",area:"Estudos",currentSubjectId:null,archived:false,history:[],stepNo:1}];
+ }
  let stage5=read("stage5.js");
  assert.match(stage5,/detectSessionInUrl:false/,"o SDK não disputa o código com outra troca");
  stage5=stage5.replace('await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.87.3/+esm")','window.__mockSupabase');
  vm.runInContext(stage5,context,{filename:"stage5.js"});
  for(let i=0;i<12;i++)await new Promise(resolve=>setImmediate(resolve));
  const app=window.OrbitaStage5.inspect;
- return {app,window,document,location,exchangeCalls,code:read("stage5.js")};
+ return {app,window,document,location,exchangeCalls,get reloadCalls(){return reloadCalls},get importCalls(){return importCalls},plannerRef,studiesRef,evolutionRef,code:read("stage5.js")};
 }
 {
  const s=await scenario("?code=auth-code");
@@ -93,5 +101,25 @@ async function scenario(query,{fetchError=false,existingSession=false}={}){
  const s=await scenario("",{existingSession:true});
  assert.equal(s.app.user?.id,"test-user","sessão existente carregada sem repetir OAuth");
  assert.equal(s.exchangeCalls,0);
+}
+{
+ const s=await scenario("?code=auth-code",{remoteDocument:true});
+ assert.equal(s.app.user?.id,"test-user","login permanece ativo após importar dados");
+ assert.equal(s.reloadCalls,0,"receber dados da nuvem NÃO recarrega a aba");
+ assert.equal(s.importCalls,1,"documento sincronizado importado somente uma vez");
+ assert.equal(s.window.OrbitaCore.state.goals[0].title,"Objetivo recuperado da nuvem");
+ assert.equal(s.window.OrbitaStage2.inspect.model,s.plannerRef,"planejamento mantém sua referência original");
+ assert.equal(s.window.OrbitaStage3.inspect.model,s.studiesRef,"estudos mantêm sua referência original");
+ assert.equal(s.window.OrbitaStage4.inspect.model,s.evolutionRef,"evolução mantém sua referência original");
+ assert.equal(s.plannerRef.entries[0].title,"Atividade recuperada");
+ assert.equal(s.studiesRef.cycles[0].title,"Ciclo recuperado");
+ s.window.OrbitaCore.go("perfil");
+ assert.match(s.document.getElementById("view").innerHTML,/Objetivo recuperado da nuvem/);
+}
+{
+ const s=await scenario("",{existingSession:true,remoteDocument:true});
+ assert.equal(s.reloadCalls,0,"abrir sessão com dados existentes não gera loop de reload");
+ assert.equal(s.app.mode,"ready");
+ assert.equal(s.window.OrbitaCore.state.goals[0].id,"remote-goal");
 }
 console.log("OAuth: troca PKCE explícita, sessão persistida, erro de callback visível, erro de banco não desconecta e retorno limpo.");
