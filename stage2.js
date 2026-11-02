@@ -66,6 +66,7 @@ function occurrence(entry,date){
  return o;
 }
 function allOn(date){
+ const frozen=s.evolution?.closed?.[date];if(frozen)return frozen.activities.map(x=>({...x,date,displayTitle:x.title,occurrenceDate:date,record:{status:x.status,actualMin:x.actualMin,actualTime:x.actualTime}}));
  const rows=p.entries.map(x=>occurrence(x,date)).filter(Boolean);
  // Tarefas flexíveis seguem acessíveis até a conclusão, inclusive se criadas em outro dia.
  for(const entry of p.entries.filter(x=>x.type==="task"&&x.recurrence?.kind==="none"&&x.date<date)){
@@ -166,6 +167,7 @@ function decorateOrganize(){
 function blockOptions(selected){return '<option value="">Sem bloco</option>'+p.blocks.filter(b=>!b.archived||b.id===selected).map(b=>'<option value="'+a(b.id)+'" '+(selected===b.id?"selected":"")+'>'+e(b.title)+(b.archived?" (arquivado)":"")+'</option>').join("");}
 function formField(label,name,value,type="text",attrs=""){return '<div class="field"><label>'+e(label)+'</label><input type="'+type+'" name="'+name+'" value="'+a(value??"")+'" '+attrs+'></div>';}
 function entryModal(type,id,date){
+ if(locked(date||s.date))return notify("Dia finalizado: apenas consulta ao registro original.");
  let original=id?find(id):null;
  if(!original&&!C.availabilityReady())return notify("Configure sua disponibilidade antes de planejar.");
  const x=id?(occurrence(original,date||original.date)||original):baseEntry({type,date:date||s.date});
@@ -234,7 +236,7 @@ function updateEntry(data,original,editDate,scope){
  Object.assign(original,data);
 }
 function blockModal(id){const b=block(id)||{};C.openModal(id?"Editar bloco":"Novo bloco",'<form id="s2-block" class="section-stack"><input type="hidden" name="id" value="'+a(id||"")+'">'+formField("Nome do bloco","title",b.title||"","text",'required maxlength="80"')+'<div class="field"><label>Cor</label><input type="color" name="color" value="'+a(b.color||COLORS[0])+'" style="width:80px;height:43px"></div><div class="modal-footer"><button type="button" data-action="closeModal" class="btn ghost">Cancelar</button><button class="btn primary">Salvar</button></div></form>',"");}
-function statusModal(id,date){const x=find(id),r=p.records[uidKey(id,date)]||{};
+function statusModal(id,date){if(locked(date))return notify("Dia finalizado: registro em modo de consulta.");const x=find(id),r=p.records[uidKey(id,date)]||{};
  if(!x)return;
  C.openModal("Registrar execução",'<form id="s2-record" class="section-stack"><input type="hidden" name="id" value="'+a(id)+'"><input type="hidden" name="date" value="'+a(date)+'"><div class="field"><label>Situação</label><select name="status">'+[["pending","Pendente"],["progress","Em andamento"],["done","Concluída"],["notdone","Não realizada"]].map(([key,label])=>'<option value="'+key+'" '+(r.status===key?"selected":"")+'>'+label+'</option>').join("")+'</select></div>'+formField("Duração real (minutos, opcional)","actualMin",r.actualMin||"","number",'min="1" max="1440"')+(x.type==="habit"?formField("Horário real (opcional)","actualTime",r.actualTime||"","time"):"")+'<p class="note">A duração real não será preenchida automaticamente com a previsão.</p><div class="modal-footer"><button type="button" data-action="closeModal" class="btn ghost">Cancelar</button><button type="submit" class="btn primary">Salvar registro</button></div></form>',"");}
 function moreModal(id,date){
@@ -311,10 +313,10 @@ function confirmDeleteEntry(id,date){
 }
 function deleteEntry(id,date,scope){
  const x=find(id);if(!x)return;
- if(scope==="one"&&x.recurrence?.kind!=="none"){p.overrides[uidKey(id,date)]={removed:true};return;}
- if(scope==="future"&&x.recurrence?.kind!=="none"){x.recurrence.end=D(date,-1);return;}
+ if(scope==="one"&&x.recurrence?.kind!=="none"){if(locked(date))return notify("Dia finalizado: ocorrência protegida.");p.overrides[uidKey(id,date)]={removed:true};return;}
+ if(scope==="future"&&x.recurrence?.kind!=="none"){if(locked(date))return notify("Dia finalizado: o modelo passado deve ser preservado.");x.recurrence.end=D(date,-1);return;}
  // Não permite apagar registros em dias já fechados, inclusive na série.
- const hasLocked=Object.keys(p.records).some(k=>k.startsWith(id+"@")&&locked(k.split("@")[1]));
+ const hasLocked=Object.keys(p.records).some(k=>k.startsWith(id+"@")&&locked(k.split("@")[1]))||Object.values(s.evolution?.closed||{}).some(snapshot=>snapshot.activities.some(x=>x.id===id));
  if(hasLocked){notify("Esta atividade tem registros em dias finalizados; arquive-a em vez de excluir.");return;}
  p.entries=p.entries.filter(e=>e.id!==id);
  Object.keys(p.records).filter(k=>k.startsWith(id+"@")).forEach(k=>delete p.records[k]);
