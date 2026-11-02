@@ -421,8 +421,9 @@ document.addEventListener("click",(ev)=>{
  ev.preventDefault();const fn=actions[el.dataset.s2];if(fn){try{fn(el)}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}}
 });
 document.addEventListener("submit",(ev)=>{
- if(!ev.target.id?.startsWith("s2-"))return;
- ev.preventDefault();try{submission(ev.target.id,new FormData(ev.target));}catch(err){notify(err.message||"Revise o formulário.");}
+ const id=ev.target?.getAttribute?.("id")||ev.target?.id;
+ if(!String(id||"").startsWith("s2-"))return;
+ ev.preventDefault();try{submission(id,new FormData(ev.target));}catch(err){notify(err.message||"Revise o formulário.");}
 });
 document.addEventListener("change",(ev)=>{
  if(ev.target?.name!=="repeat"||!$("s2-repeat-fields"))return;
