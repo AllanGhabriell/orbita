@@ -94,4 +94,15 @@ C.go("organizar");
 assert.ok(html().includes("Organizar"));
 C.go("planejamento");
 assert.ok(html().includes("SEU CALENDÁRIO"));
+// O calendário considera sessões de estudo mesmo sem foco ou hábito.
+C.state.studies={sessions:[
+ {id:"session-calendar-1",date:today,plannedMin:90,archived:false},
+ {id:"session-calendar-2",date:today,plannedMin:90,archived:false},
+ {id:"session-calendar-hidden",date:today,plannedMin:90,archived:true}
+]};
+C.state.date=today;
+C.go("planejamento");
+assert.match(html(),/2 sessão\\(ões\\) de estudo/,"indicador semanal inclui sessões de estudo não arquivadas");
+assert.match(html(),/2 ses\\./,"rótulo compacto apresenta sessões");
+
 console.log("Etapa 2: verificações de tarefas, focos, conclusão, blocos, recorrência, continuidade, pausa, remanejamento, tempo real e cópias passaram.");
