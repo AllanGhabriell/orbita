@@ -175,3 +175,82 @@
  .study-daily-step{min-width:85px}
 }
 @media(prefers-reduced-motion:reduce){.study-home-advanced{animation:none}}
+
+/* Reformulação da organização de estudos: calendário semanal, ações acessíveis e Biblioteca. */
+.study-plan-toolbar{display:flex;flex-direction:column;gap:12px}
+.study-plan-toolbar h2{font-size:18px;margin:0}
+.study-plan-toolbar .note{margin:4px 0 0}
+.study-plan-nav{justify-content:flex-start;align-items:center;gap:7px}
+.study-plan-date-pick{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:9px;margin-left:auto}
+.study-plan-date-pick input{width:146px;min-width:0;padding:7px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text)}
+.study-plan-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.study-plan-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:stretch;gap:9px}
+.study-plan-day{display:flex;flex-direction:column;gap:11px;min-width:0;padding:11px;border:1px solid var(--border);background:var(--surface);border-radius:14px;transition:border-color .15s,background .15s}
+.study-plan-day.is-today{border-color:var(--borderStrong)}
+.study-plan-day.is-drop-target{border-color:var(--accent);background:rgba(139,112,234,.11)}
+.study-plan-day-head{display:flex;align-items:flex-start;justify-content:space-between;gap:7px;flex-wrap:wrap}
+.study-plan-day-title{border:0;background:transparent;color:var(--text);padding:0;display:flex;flex-direction:column;gap:4px;text-align:left;cursor:pointer}
+.study-plan-day-title:hover strong{color:var(--accent)}
+.study-plan-day-title strong{font-size:12px;font-weight:740}
+.study-plan-day-title small{font-size:10px;color:var(--muted)}
+.study-plan-day-total{font-size:10px;white-space:nowrap;color:var(--soft);background:var(--surface2);padding:5px 6px;border-radius:6px}
+.study-plan-day-items{display:flex;flex-direction:column;gap:8px;flex:1;min-height:56px}
+.study-plan-item{min-width:0;border:1px solid var(--border);background:var(--surface2);border-radius:10px;padding:9px 8px;display:flex;flex-direction:column;gap:8px;transition:border-color .16s,transform .16s}
+.study-plan-item.is-editable{cursor:grab}
+.study-plan-item.is-dragging{opacity:.45;transform:scale(.97)}
+.study-plan-item.is-selected{border-color:var(--accent)}
+.study-plan-item-top{display:flex;align-items:flex-start;gap:6px;min-width:0;flex-wrap:wrap}
+.study-plan-grip{font-size:13px;line-height:1;color:var(--muted);flex:none}
+.study-plan-item-body{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 75px}
+.study-plan-item-body strong{font-size:11px;line-height:1.38;overflow-wrap:anywhere}
+.study-plan-item-body small{font-size:10px;line-height:1.4;color:var(--soft);overflow-wrap:anywhere}
+.study-plan-status{display:inline-flex;border:1px solid var(--border);border-radius:6px;padding:3px 5px;background:var(--surface3);font-size:9.5px;line-height:1.3;color:var(--muted);max-width:100%;overflow-wrap:anywhere}
+.study-plan-item-actions{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.study-plan-item-actions .btn{width:auto;min-width:0;flex:1 1 auto;font-size:10px;line-height:1.3;padding:6px 8px;white-space:normal}
+.study-plan-locked{color:var(--muted);font-size:9.5px;line-height:1.4}
+.study-plan-placeholder{font-size:10px;line-height:1.5;color:var(--muted);margin:0}
+.study-plan-day-footer{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto}
+.study-plan-day-footer .btn{flex:1 1 100%;padding:7px 6px;font-size:10px;white-space:normal;min-width:0}
+.study-plan-overload{color:var(--warning);font-size:10px;line-height:1.4;margin:0}
+.study-plan-preview-items{display:flex;gap:8px;flex-wrap:wrap}
+.study-plan-preview-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:5px;padding:10px;min-width:140px;max-width:240px;flex:1}
+.study-plan-preview-item strong{font-size:12px;overflow-wrap:anywhere}
+.study-plan-preview-item span{color:var(--soft);font-size:10px;line-height:1.4}
+.study-plan-preview .note{margin:8px 0 0}
+.study-quick-cycle-meta{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px;color:var(--soft);font-size:11px;line-height:1.45}
+#s3-quick-subject-field[hidden],#s3-quick-topic-field[hidden],#s3-bulk-target[hidden],#s3-bulk-subject-wrap[hidden]{display:none!important}
+.study-library-section{display:flex;flex-direction:column;gap:12px}
+.study-library-section .card-head{margin-bottom:0}
+.study-library-cycle{border:1px solid var(--border);background:var(--surface2);padding:13px;border-radius:12px;display:flex;flex-direction:column;gap:11px}
+.study-library-cycle-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.study-library-cycle-head>div:first-child{display:flex;flex-direction:column;gap:4px}
+.study-library-cycle-head strong{font-size:14px}
+.study-library-cycle-head small{font-size:11px;color:var(--muted)}
+.study-library-sub{padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+.study-library-sub-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.study-library-sub-head>div:first-child{display:flex;flex-direction:column;gap:4px}
+.study-library-sub-head strong{font-size:12px}
+.study-library-sub-head small,.study-library-empty{font-size:10.5px;color:var(--muted)}
+.study-library-topics{display:flex;gap:6px;flex-wrap:wrap}
+.study-library-topic{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--border);border-radius:8px;padding:5px 7px;font-size:10.5px;background:var(--surface2);color:var(--text)}
+.study-library-topic-action{border:0;background:transparent;cursor:pointer;color:var(--soft);padding:3px;font-size:12px}
+.study-library-topic-action:hover{color:var(--accent)}
+.study-library-methods{display:flex;flex-direction:column;gap:7px}
+.study-library-method{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);font-size:12px}
+.study-library-method span{overflow-wrap:anywhere}
+@media(max-width:1380px){.study-plan-week{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:940px){.study-plan-week{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){
+ .study-plan-week{grid-template-columns:1fr}
+ .study-plan-day{padding:12px}
+ .study-plan-day-items{min-height:20px}
+ .study-plan-day-footer .btn{flex:0 1 auto;padding:8px 11px}
+ .study-plan-item-actions .btn{flex:0 1 auto}
+ .study-plan-nav{flex-wrap:wrap}
+ .study-plan-date-pick{margin-left:0;flex:1 1 100%}
+ .study-plan-date-pick input{width:100%;max-width:220px}
+ .study-plan-preview-item{max-width:none}
+ .study-library-cycle-head{align-items:flex-start}
+}
+@media(max-width:380px){.study-plan-item-actions .btn{flex:1 1 30%}.study-plan-day-footer .btn{flex:1 1 45%}}
+@media(prefers-reduced-motion:reduce){.study-plan-day,.study-plan-item{transition:none}}
