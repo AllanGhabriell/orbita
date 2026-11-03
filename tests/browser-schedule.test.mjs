@@ -125,6 +125,8 @@ try{
   T.saveSubject({cycleId:cycle.id,title:"Física",targetSessions:1});
   C.save();T.actions.backStudies();C.go("estudos");return cycle.id;
  });
+ await page.waitForSelector('[data-s3="openPlanner"]');
+ await page.click('[data-s3="openPlanner"]');
  await page.waitForSelector('[data-s3="planBatch"]');
  await page.click('[data-s3="planBatch"]');
  await page.waitForSelector("#s3-batch");
