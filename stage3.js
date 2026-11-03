@@ -401,7 +401,13 @@ function setSessionStatus(id,status,actualMin,actualTime){
   const c=cycle(x.cycleId);ensureCycleActive(c);
   const sub=cycleState(c);
   x.subjectId=sub.id;x.stepNo=c.stepNo;x.discipline=sub.title;
-  x.rotationSlot=false;x.resolvedAt=now();
+  x.rotationSlot=false;x.wasRotationSlot=true;x.resolvedAt=now();
+ }
+ // Ao desfazer uma sessão que seguia o ciclo, ela volta a ser uma vaga
+ // dinâmica. Isso evita fixar uma matéria por engano depois da correção.
+ if(status==="pending"&&old!=="pending"&&x.kind==="cycle"&&(x.wasRotationSlot||x.resolvedAt)){
+  x.rotationSlot=true;x.wasRotationSlot=true;x.subjectId="";x.stepNo=0;
+  x.discipline="Próxima matéria do ciclo";x.resolvedAt=null;
  }
  x.status=status;x.actualMin=minutes;x.actualTime=actualTime||"";
  if(status==="done")x.completedAt=x.completedAt||now();
