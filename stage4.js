@@ -39,7 +39,7 @@ function rowsToday(date){
  return S2.allOn(date).filter(x=>!(x.type==="task"&&x.sourceDate&&x.sourceDate!==date&&x.status!=="done"));
 }
 function capture(date){
- const linkedStudy=studies.sessions.filter(x=>x.date===date&&!x.archived);
+ const linkedStudy=studies.sessions.filter(x=>x.date===date&&!x.archived).sort((a,b)=>Number(a.planOrder??0)-Number(b.planOrder??0)||(a.startTime||"99:99").localeCompare(b.startTime||"99:99")||String(a.createdAt||"").localeCompare(String(b.createdAt||"")));
  const taskRows=rowsToday(date).map(x=>{
   const r=p.records[x.id+"@"+date]||x.record||{};
   return {
@@ -237,13 +237,25 @@ function dayReview(date){
  content+='<section class="card"><div class="card-head"><h2>Revisão dos compromissos</h2>'+C.tag(n.unmarked+" sem conclusão")+'</div>'+(
  snap.activities.length?'<div class="review-lines">'+snap.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")+'</div>':'<p class="note">Nenhuma atividade cadastrada para este dia.</p>')+'</section>';
  content+='<section class="card"><div class="card-head"><h2>Revisão dos estudos</h2>'+C.tag(n.missingStudyTimes+" tempos não informados")+'</div>'+(
- snap.studies.length?'<div class="review-lines">'+snap.studies.map(x=>reviewLine(x.discipline+(x.topic?" · "+x.topic:""),x.status,x.plannedMin,x.actualMin)).join("")+'</div>':'<p class="note">Nenhuma sessão de estudo cadastrada.</p>')+'</section>';
+ snap.studies.length?'<div class="review-lines">'+snap.studies.map((x,i)=>reviewStudyLine(x,i)).join("")+'</div>':'<p class="note">Nenhuma sessão de estudo cadastrada.</p>')+'</section>';
  if(!closed&&!unavailable){
  content+='<section class="card evo-confirm"><h2>Finalizar definitivamente</h2><p class="note">Atividades pendentes permanecerão pendentes ou sem registro; não serão inventadas conclusões. A tarefa secundária poderá continuar em dias futuros, mas esta fotografia do dia não poderá ser editada.</p><p class="note">Depois de finalizar, não será possível acrescentar, apagar, remanejar ou corrigir os registros desta data pela interface.</p><form id="s4-finalize"><input type="hidden" name="date" value="'+A(date)+'"><label class="checkline"><input type="checkbox" name="reviewed" required> Revisei atividades, horários, estudos e registros ausentes.</label><div class="field"><label>Digite FINALIZAR para confirmar</label><input name="phrase" type="text" autocomplete="off" required placeholder="FINALIZAR"></div><button class="btn danger" type="submit" '+(remaining.length?"disabled":"")+'>Finalizar dia sem possibilidade de reabertura</button></form></section>';
  }
  return content;
 }
-function reviewLine(title,status,planned,actual){const st={done:"Concluído",progress:"Em andamento",pending:"Sem registro de conclusão",moved:"Remanejado",notdone:"Não realizado"};return '<div class="review-line"><div><strong>'+E(title)+'</strong><small>'+E(st[status]||status)+' · previsto '+(planned!=null?minutes(planned):"não informado")+' · real '+(actual!=null?minutes(actual):"não informado")+'</small></div><span class="dot-state '+(status==="done"?"done":status==="pending"?"muted":"")+'">'+(status==="done"?"✓":"·")+'</span></div>';}
+// Sessões permanecem identificáveis mesmo quando várias matérias se repetem.
+function reviewStudyLine(x,i){
+ const context=[x.discipline||"Matéria não informada",x.topic,x.cycle||x.area,x.method].filter(Boolean).join(" · ");
+ return reviewLine("Sessão "+(i+1),x.status,x.plannedMin,x.actualMin,context);
+}
+function reviewLine(title,status,planned,actual,details=""){
+ const st={done:"Concluído",progress:"Em andamento",pending:"Sem registro de conclusão",moved:"Remanejado",notdone:"Não realizado"};
+ return '<div class="review-line"><div><strong>'+E(title)+'</strong>'+
+ (details?'<span class="study-review-context">'+E(details)+'</span>':"")+
+ '<small>'+E(st[status]||status)+' · previsto '+(planned!=null?minutes(planned):"não informado")+
+ ' · real '+(actual!=null?minutes(actual):"não informado")+'</small></div>'+
+ '<span class="dot-state '+(status==="done"?"done":status==="pending"?"muted":"")+'">'+(status==="done"?"✓":"·")+'</span></div>';
+}
 function chartDays(x){
  if(!x.days.length)return '<p class="note">Ainda não há registros para representar.</p>';
  const max=Math.max(60,...x.days.map(q=>q.studyMin));
@@ -329,7 +341,7 @@ function homeDecor(base){
   '<div class="evo-alert evo-good">✓ Dia finalizado. Os resultados mostrados pertencem ao registro preservado no fechamento.</div>'+
   '<div class="metrics-grid">'+metric("Focos",ct.doneFocus+"/"+ct.foci)+metric("Sessões",ct.studiesDone+"/"+ct.plannedStudy)+metric("Estudo real",minutes(closed.result.actualStudyMin))+metric("Carga prevista",minutes(closed.plan.totalMin))+'</div>'+
   '<section class="card"><h2 class="section-title">Atividades registradas</h2><div class="review-lines">'+(closed.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")||'<p class="note">Sem atividades.</p>')+'</div></section>'+
-  '<section class="card"><h2 class="section-title">Estudos registrados</h2><div class="review-lines">'+(closed.studies.map(x=>reviewLine(x.discipline,x.status,x.plannedMin,x.actualMin)).join("")||'<p class="note">Sem sessões.</p>')+'</div></section>';
+  '<section class="card"><h2 class="section-title">Estudos registrados</h2><div class="review-lines">'+(closed.studies.map((x,i)=>reviewStudyLine(x,i)).join("")||'<p class="note">Sem sessões.</p>')+'</div></section>';
  }
  if(date>today())return base;
  const closeLink='<div class="evo-footer"><button class="btn primary" data-s4="reviewDate" data-date="'+A(date)+'">Revisar e finalizar o dia</button><button class="btn small ghost" data-s4="viewStats">Ver evolução</button></div>';
