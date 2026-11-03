@@ -163,6 +163,74 @@ try{
  },testCycle),"Matemática","desfazer última conclusão reabre etapa anterior");
  console.log("Chromium: planejamento 3x90min, três conclusões no Início, avanço e desfazer passaram.");
 
+ // Nova agenda real: cadastro de assunto, planejamento por seleção e cópia de semana.
+ await page.evaluate(()=>window.OrbitaStage3.inspect.actions.openPlanner());
+ await page.waitForSelector(".study-plan-week");
+ assert.equal(await page.evaluate(()=>document.querySelectorAll('.study-plan-day').length),7);
+ assert.equal(await page.evaluate(()=>document.querySelectorAll('[data-s3="quickDone"],[data-s3="recordSession"]').length),0,
+  "as telas de planejamento não podem executar sessões");
+ await page.click('[data-s3="openLibrary"]');
+ await page.waitForSelector(".study-library-section");
+ const physicsId=await page.evaluate(id=>{
+  const T=window.OrbitaStage3.inspect;
+  return T.model.subjects.find(x=>x.cycleId===id&&x.title==="Física").id;
+ },testCycle);
+ await page.click('[data-s3="newTopic"][data-subject="'+physicsId+'"]');
+ await page.waitForSelector("#s3-topic");
+ await page.$eval('#s3-topic [name="title"]',el=>{el.value="Cinemática"});
+ await page.click('#s3-topic [type="submit"]');
+ await page.waitForFunction(()=>!document.querySelector("#s3-topic"));
+ assert.equal(await page.evaluate(()=>window.OrbitaStage3.inspect.model.topics.some(x=>x.title==="Cinemática")),true);
+ await page.click('[data-s3="openPlanner"]');
+ await page.waitForSelector(".study-plan-week");
+ await page.click('.study-plan-day.is-today [data-s3="planAdd"]');
+ await page.waitForSelector("#s3-quick");
+ await page.$eval('#s3-quick [name="cycleId"]',(el,id)=>{el.value=id;el.dispatchEvent(new Event("change",{bubbles:true}));},testCycle);
+ await page.$eval('#s3-quick [name="mode"]',el=>{el.value="specific";el.dispatchEvent(new Event("change",{bubbles:true}));});
+ await page.$eval('#s3-quick [name="subjectId"]',(el,id)=>{el.value=id;el.dispatchEvent(new Event("change",{bubbles:true}));},physicsId);
+ const topicId=await page.evaluate(()=>window.OrbitaStage3.inspect.model.topics.find(x=>x.title==="Cinemática").id);
+ await page.$eval('#s3-quick [name="topicId"]',(el,id)=>{el.value=id},topicId);
+ await page.$eval('#s3-quick [name="plannedMin"]',el=>{el.value="45"});
+ const quickData=await page.$eval("#s3-quick",el=>Object.fromEntries(new FormData(el).entries()));
+ assert.equal(quickData.mode,"specific");
+ assert.equal(quickData.subjectId,physicsId);
+ assert.equal(quickData.topicId,topicId);
+ await page.click('#s3-quick [type="submit"]');
+ await page.waitForFunction(()=>!document.querySelector("#s3-quick"),{timeout:5000});
+ const planned=await page.evaluate(id=>{
+  const C=window.OrbitaCore,T=window.OrbitaStage3.inspect;
+  const entries=T.model.sessions.filter(x=>x.cycleId===id&&x.date===C.state.date);
+  return {count:entries.length,minutes:T.loadFor(C.state.date).studyPlanned,
+   specific:entries.find(x=>x.subjectId===T.model.subjects.find(y=>y.title==="Física"&&y.cycleId===id)?.id&&x.kind==="reinforcement")?.id,
+   next:T.cycleState(T.cycle(id)).title};
+ },testCycle);
+ assert.equal(planned.count,4,"nova sessão específica entra na agenda");
+ assert.equal(planned.minutes,315,"três sessões de 90min mais 45min");
+ assert.ok(planned.specific,"seleção por matéria salvou o vínculo");
+ assert.equal(planned.next,"Matemática","exceção específica não avança o ciclo");
+ assert.equal(await page.evaluate(()=>document.querySelectorAll(".study-plan-item").length>=4),true);
+ await page.click('[data-plan-id="'+planned.specific+'"] [data-s3="planDuplicate"]');
+ assert.equal(await page.evaluate(id=>window.OrbitaStage3.inspect.model.sessions.filter(x=>x.cycleId===id&&x.status==="pending").length>=3,testCycle),true);
+ await page.click('[data-s3="planUndo"]');
+ assert.equal(await page.evaluate(id=>{
+  const C=window.OrbitaCore,T=window.OrbitaStage3.inspect;
+  return T.model.sessions.filter(x=>x.cycleId===id&&x.date===C.state.date).length;
+ },testCycle),4,"desfazer duplicação reverte mudança");
+ await page.click('[data-s3="planCopyWeek"]');
+ await page.waitForSelector("#s3-plan-copy");
+ await page.click('#s3-plan-copy [type="submit"]');
+ await page.waitForFunction(()=>!document.querySelector("#s3-plan-copy"),{timeout:5000});
+ assert.ok(await page.evaluate(id=>{
+  const C=window.OrbitaCore,T=window.OrbitaStage3.inspect;
+  const future=C.addDays(C.state.date,7);
+  return T.model.sessions.some(x=>x.cycleId===id&&x.date===future&&x.status==="pending"&&x.actualMin===null);
+ },testCycle),"cópia semanal não herda conclusão nem tempo estudado");
+ await page.setViewport({width:390,height:860,deviceScaleFactor:1});
+ assert.equal(await page.$eval(".study-plan-week",el=>getComputedStyle(el).gridTemplateColumns.split(" ").length),1,"no celular exibir um dia por coluna");
+ assert.equal(await page.evaluate(()=>document.querySelectorAll('[data-s3="quickDone"],[data-s3="recordSession"]').length),0);
+ console.log("Chromium: Biblioteca, cadastro de assunto, sessão por seleção, duplicação/desfazer e cópia semanal passaram.");
+
+
  assert.equal(errors.length,0,"nenhum erro JavaScript em fluxo de salvar e reabrir: "+errors.join("; "));
  console.log("Chromium: clique de salvar, cinco dias, persistência após recarga e edição passaram.");
 }finally{
