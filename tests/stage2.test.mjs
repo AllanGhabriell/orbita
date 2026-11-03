@@ -102,7 +102,7 @@ C.state.studies={sessions:[
 ]};
 C.state.date=today;
 C.go("planejamento");
-assert.match(html(),/2 sessão\\(ões\\) de estudo/,"indicador semanal inclui sessões de estudo não arquivadas");
-assert.match(html(),/2 ses\\./,"rótulo compacto apresenta sessões");
+assert.ok(html().includes("2 sessão(ões) de estudo"),"indicador semanal inclui sessões de estudo não arquivadas");
+assert.ok(html().includes("2 ses."),"rótulo compacto apresenta sessões");
 
 console.log("Etapa 2: verificações de tarefas, focos, conclusão, blocos, recorrência, continuidade, pausa, remanejamento, tempo real e cópias passaram.");
