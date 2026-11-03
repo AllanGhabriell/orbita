@@ -461,23 +461,35 @@ function cycleCard(c,compact=false){
  return '<section class="card study-cycle-card"><div class="card-head"><div><div class="overline">'+E(c.area)+'</div><h2>'+E(c.title)+'</h2></div>'+tag(c.archived?"Arquivado":"Ciclo","")+'</div><div class="study-current"><div><span>PRÓXIMA MATÉRIA</span><strong>'+E(cur?.title||"Nenhuma matéria ativa")+'</strong><small>'+(cur?count+" de "+required+" sessão(ões) concluída(s) na etapa":"Adicione ou reative uma matéria")+'</small></div><div class="study-progress"><div style="width:'+(required?Math.round(count/required*100):0)+'%"></div></div></div><div class="row study-actions"><button class="btn small" data-s3="selectCycle" data-id="'+A(c.id)+'">Gerenciar</button>'+(cur&&!c.archived?'<button class="btn small primary" data-s3="planForCycle" data-cycle="'+A(c.id)+'">Planejar sessões</button>':"")+'</div></section>';
 }
 function tinySessions(date){
- const list=db.sessions.filter(x=>x.date===date&&!x.archived).sort((a,b)=>(a.startTime||"99:99").localeCompare(b.startTime||"99:99"));
+ const list=planDayEntries(date);
  if(!list.length)return '<p class="note">Nenhuma sessão de estudo planejada para esta data.</p>';
  return '<div class="study-session-list">'+list.map(x=>sessionRow(x,true)).join("")+'</div>';
 }
+// A identidade visual acompanha a SESSÃO, não o nome da matéria.
+// A numeração é calculada por data e não altera documentos antigos.
+function sessionOrdinal(x){
+ const index=planDayEntries(x.date).findIndex(item=>item.id===x.id);
+ return index<0?1:index+1;
+}
+function sessionModeLabel(x){
+ if(x.rotationSlot)return "Segue o ciclo · matéria prevista";
+ if(x.kind==="cycle")return "Etapa do ciclo";
+ if(x.cycleId)return "Matéria específica do ciclo";
+ return "Estudo independente";
+}
 function sessionRow(x,compact=false){
- const c=cycle(x.cycleId),m=method(x.methodId),label=plannerLabel(x);
- const details=[c?.title||x.area||"Estudo complementar",x.topic,x.plannedMin!=null?minuteLabel(x.plannedMin)+" previstas":"",m?.title].filter(Boolean).join(" · ");
+ const c=cycle(x.cycleId),m=method(x.methodId),label=plannerLabel(x),number=sessionOrdinal(x);
+ const details=[c?.title||x.area||"Estudo independente",x.topic,x.plannedMin!=null?minuteLabel(x.plannedMin)+" previstas":"",m?.title,sessionModeLabel(x)].filter(Boolean).join(" · ");
  const modifiable=x.status==="pending"&&!blocked(x.date);
- return '<div class="study-session-row '+(x.status==="done"?"done":"")+'"><span class="study-session-mark">'+(x.status==="done"?"✓":"◉")+'</span><div class="study-session-body"><strong>'+E(label)+'</strong><small>'+E(details)+'</small></div>'+
+ return '<div class="study-session-row '+(x.status==="done"?"done":"")+'"><span class="study-session-mark">'+number+'</span>'+
+ '<div class="study-session-body"><strong>Sessão '+number+'</strong><span class="study-session-subject">'+E(label)+'</span><small>'+E(details)+'</small></div>'+
  '<div class="study-session-controls">'+(modifiable?
  '<button class="btn small ghost" data-s3="planEdit" data-id="'+A(x.id)+'">Editar</button><button class="btn small ghost" data-s3="planDuplicate" data-id="'+A(x.id)+'">Duplicar</button><button class="btn small danger" data-s3="planRemove" data-id="'+A(x.id)+'">Excluir</button>':
  '<span class="status">'+(x.status==="done"?"Concluída no Início":x.status==="progress"?"Em andamento":"Dia fechado")+'</span>')+'</div></div>';
 }
 function homePanel(){
  const date=s.date,load=loadFor(date),activeCycles=db.cycles.filter(x=>!x.archived);
- const daily=db.sessions.filter(x=>x.date===date&&!x.archived).sort((a,b)=>(a.startTime||"99:99").localeCompare(b.startTime||"99:99")||a.createdAt.localeCompare(b.createdAt));
- const done=daily.filter(x=>x.status==="done").length;
+ const daily=planDayEntries(date),done=daily.filter(x=>x.status==="done").length;
  const groups=[];
  for(const x of daily){
   const c=cycle(x.cycleId),key=c?.id||"extra";
@@ -485,21 +497,29 @@ function homePanel(){
   if(!group){group={key,cycle:c,items:[]};groups.push(group);}
   group.items.push(x);
  }
- // O painel inicial é exclusivamente de EXECUÇÃO. O planejamento fica em Estudos.
+ // O Início executa sessões. Ciclo/matéria são contexto, nunca a ação principal.
  let body=groups.map(group=>{
   const c=group.cycle,p=c&&!c.archived?cycleProgress(c):null;
   const n=group.items.filter(x=>x.status==="done").length;
   const flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
-  const labels=group.items.map((x,i)=>{
-   const sub=x.rotationSlot?p?.cur?.title||"Próxima matéria":x.discipline;
-   return '<div class="study-daily-step '+(x.status==="done"?"is-done":x.status==="progress"?"is-active":"")+'"><span class="study-daily-marker">'+(x.status==="done"?"✓":i+1)+'</span><strong>'+E(sub)+'</strong><small>'+E(x.plannedMin!=null?minuteLabel(x.plannedMin):"Sem previsão")+'</small></div>';
-  }).join('<div class="study-daily-link" aria-hidden="true"></div>');
-  const entries=group.items.map((x,i)=>{
-   const label=x.rotationSlot?p?.cur?.title||"Próxima matéria":x.discipline;
-   const desc=[x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista",x.startTime||"",x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":"Pendente"].filter(Boolean).join(" · ");
-   return '<div class="study-daily-entry '+(x.status==="done"?"is-done":"")+'"><span class="study-daily-number">'+(i+1)+'</span><div class="study-daily-label"><strong>'+E(label)+'</strong><small>'+E(desc)+'</small></div><div class="study-daily-controls">'+(!blocked(date)?'<button class="btn small '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button><button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>':'<span class="status">Dia fechado</span>')+'</div></div>';
+  const entries=group.items.map(x=>{
+   const number=sessionOrdinal(x),label=plannerLabel(x);
+   const desc=[x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista",x.startTime||"",
+    x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":"Pendente"].filter(Boolean).join(" · ");
+   return '<div class="study-daily-entry '+(x.status==="done"?"is-done":"")+'"><span class="study-daily-number">'+number+'</span>'+
+    '<div class="study-daily-label"><strong>Sessão '+number+'</strong><span class="study-daily-subject">'+E(label)+'</span>'+
+    '<small>'+E(desc)+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
+    '<button class="btn small '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button>'+
+    '<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>':
+    '<span class="status">Dia fechado</span>')+'</div></div>';
   }).join("");
-  return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><div><strong>'+E(c?.title||"Estudos complementares")+'</strong><small>'+n+' de '+group.items.length+' concluída(s)'+(p?.cur?' · próxima matéria: '+E(p.cur.title):"")+'</small></div></div><div class="study-daily-track" aria-label="Sequência das sessões do dia">'+labels+'</div><div class="study-daily-list">'+entries+'</div></div>';
+  const progress=group.items.length?Math.round(100*n/group.items.length):0;
+  return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><div><strong>'+E(c?.title||"Estudos independentes")+
+    '</strong><small>'+n+' de '+group.items.length+' sessões concluídas'+(p?.cur?' · próxima matéria do ciclo: '+E(p.cur.title):"")+
+    '</small></div></div>'+
+    '<div class="study-session-progress" role="progressbar" aria-label="Sessões concluídas em '+A(c?.title||"Estudos independentes")+
+    '" aria-valuemin="0" aria-valuemax="'+group.items.length+'" aria-valuenow="'+n+'"><div class="study-session-progress-fill" style="width:'+progress+'%"></div></div>'+
+    '<div class="study-daily-list">'+entries+'</div></div>';
  }).join("");
  if(!groups.length)body='<div class="study-daily-empty"><p class="note">Nenhuma sessão planejada para esta data.</p><p class="note">Organize a quantidade de sessões e os dias da semana na área de Estudos. Depois, acompanhe e conclua tudo aqui.</p></div>';
  const real=summarize({from:date,to:date});
