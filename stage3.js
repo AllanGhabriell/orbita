@@ -570,10 +570,34 @@ function methodsView(){
 // Plano da semana: só planejamento. Nenhuma execução é permitida nesta tela.
 let plannerWeek=s.date,plannerSelectedDate=s.date,plannerSelection=new Set();
 const plannerDow=["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
+// A previsão da agenda simula conclusões futuras, mas não move o ciclo real.
+// Caso o usuário não conclua sessões previstas, a projeção se recalcula.
+function rotationPreview(x){
+ const c=cycle(x.cycleId);
+ if(!c||c.archived)return null;
+ const subjects=activeSubjects(c);
+ if(!subjects.length)return null;
+ const current=cycleState(c),initial=subjects.findIndex(sub=>sub.id===current.id);
+ if(initial<0)return null;
+ if(x.status!=="pending"||!x.rotationSlot||x.date<day())return current;
+ const pending=db.sessions.filter(item=>item.cycleId===c.id&&!item.archived&&item.rotationSlot&&item.status==="pending"&&item.date>=day())
+ .sort((a,b)=>a.date.localeCompare(b.date)||Number(a.planOrder??0)-Number(b.planOrder??0)||(a.startTime||"99:99").localeCompare(b.startTime||"99:99")||String(a.createdAt||"").localeCompare(String(b.createdAt||"")));
+ let position=initial,completed=stepSessions(c).filter(item=>item.status==="done").length,needed=requiredSessions(c);
+ for(const item of pending){
+  const predicted=subjects[position];
+  if(item.id===x.id)return predicted;
+  completed++;
+  if(completed>=needed){
+   position=(position+1)%subjects.length;
+   completed=0;
+   needed=Math.max(1,Number(subjects[position].targetSessions)||1);
+  }
+ }
+ return current;
+}
 function plannerLabel(x){
- const c=cycle(x.cycleId),current=c&&!c.archived?cycleState(c):null;
- if(x.rotationSlot)return (current?.title||"Próxima matéria")+" · previsão do ciclo";
- return x.discipline||subject(x.subjectId)?.title||"Estudo complementar";
+ if(x.rotationSlot)return rotationPreview(x)?.title||"Matéria definida pelo ciclo";
+ return x.discipline||subject(x.subjectId)?.title||"Conteúdo não especificado";
 }
 function plannerNavigation(){
  return '<div class="row study-plan-nav"><button class="btn small ghost" data-s3="planPrevWeek" title="Semana anterior">←</button>'+
@@ -584,8 +608,8 @@ function plannerNavigation(){
 function plannerPreview(date){
  const entries=planDayEntries(date),load=loadFor(date);
  return '<section class="card study-plan-preview"><div class="card-head"><h2>Prévia do Início · '+E(fmt(date,false))+'</h2>'+tag(entries.length+" sessões")+'</div>'+
- (entries.length?'<div class="study-plan-preview-items">'+entries.map(x=>'<div class="study-plan-preview-item"><strong>'+E(plannerLabel(x))+'</strong><span>'+E(cycle(x.cycleId)?.title||x.area)+' · '+E(minuteLabel(x.plannedMin))+'</span></div>').join("")+'</div>':'<p class="note">Esse dia ainda não tem estudos programados.</p>')+
- '<p class="note">Carga prevista: '+E(minuteLabel(load.studyPlanned))+'. O Início mostra a matéria real quando você executar o ciclo. Esta é uma prévia, sem ações de conclusão.</p></section>';
+ (entries.length?'<div class="study-plan-preview-items">'+entries.map(x=>'<div class="study-plan-preview-item"><strong>Sessão '+sessionOrdinal(x)+'</strong><span class="study-plan-preview-subject">'+E(plannerLabel(x))+'</span><span>'+E(cycle(x.cycleId)?.title||x.area||"Estudo independente")+' · '+E(minuteLabel(x.plannedMin))+(x.rotationSlot?" · previsão sujeita ao progresso":"")+'</span></div>').join("")+'</div>':'<p class="note">Esse dia ainda não tem estudos programados.</p>')+
+ '<p class="note">Carga prevista: '+E(minuteLabel(load.studyPlanned))+'. As matérias de sessões que seguem o ciclo são projeções condicionadas à conclusão das anteriores; o Início atualiza o conteúdo real ao estudar. Aqui não há ações de conclusão.</p></section>';
 }
 function plannerView(){
  const start=planWeekStart(plannerWeek),dates=planWeekDates(plannerWeek);
@@ -597,8 +621,8 @@ function plannerView(){
   const plan=items.map((x,j)=>{
    const c=cycle(x.cycleId),m=method(x.methodId),chosen=plannerSelection.has(x.id);
    const editable=x.status==="pending"&&!finished;
-   const badgeLabel=x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":x.rotationSlot?"Seguir ciclo":x.kind==="reinforcement"?"Matéria específica":"Avulsa";
-   return '<div class="study-plan-item '+(chosen?"is-selected ":"")+(editable?"is-editable":"")+'" data-plan-id="'+A(x.id)+'" draggable="'+(editable?"true":"false")+'"><div class="study-plan-item-top"><span class="study-plan-grip" aria-hidden="true">⠿</span><div class="study-plan-item-body"><strong>'+E(plannerLabel(x))+'</strong><small>'+E(c?.title||x.area||"Sem ciclo")+' · '+E(minuteLabel(x.plannedMin))+(m?' · '+E(m.title):"")+(x.topic?' · '+E(x.topic):"")+'</small></div><span class="study-plan-status">'+E(badgeLabel)+'</span></div>'+
+   const badgeLabel=x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":x.rotationSlot?"Previsão do ciclo":sessionModeLabel(x);
+   return '<div class="study-plan-item '+(chosen?"is-selected ":"")+(editable?"is-editable":"")+'" data-plan-id="'+A(x.id)+'" draggable="'+(editable?"true":"false")+'"><div class="study-plan-item-top"><span class="study-plan-grip" aria-hidden="true">⠿</span><div class="study-plan-item-body"><strong>Sessão '+(j+1)+'</strong><span class="study-plan-item-subject">'+E(plannerLabel(x))+'</span><small>'+E(c?.title||x.area||"Estudo independente")+' · '+E(minuteLabel(x.plannedMin))+(m?' · '+E(m.title):"")+(x.topic?' · '+E(x.topic):"")+'</small></div><span class="study-plan-status">'+E(badgeLabel)+'</span></div>'+
  (editable?'<div class="study-plan-item-actions"><button class="btn small ghost" data-s3="planSelect" data-id="'+A(x.id)+'" aria-pressed="'+chosen+'">'+(chosen?"✓ Selecionado":"Selecionar")+'</button><button class="btn small ghost" data-s3="planEdit" data-id="'+A(x.id)+'">Editar</button><details class="study-plan-more"><summary>Mais ações</summary><div class="study-plan-more-content"><button class="btn small ghost" data-s3="planDuplicate" data-id="'+A(x.id)+'">Duplicar</button><button class="btn small ghost" data-s3="planMove" data-id="'+A(x.id)+'">Mover</button><button class="btn small danger" data-s3="planRemove" data-id="'+A(x.id)+'">Excluir</button></div></details></div>':'<small class="study-plan-locked">Para alterar uma sessão iniciada, corrija sua execução no Início.</small>')+'</div>';
   }).join("");
   return '<div class="study-plan-day '+(date===s.date?"is-today":"")+'" data-plan-date="'+A(date)+'"><div class="study-plan-day-head"><button class="study-plan-day-title" data-s3="planPreviewDay" data-date="'+A(date)+'"><strong>'+plannerDow[i]+'</strong><small>'+E(spanDate(date))+'</small></button><span class="study-plan-day-total">'+items.length+' · '+E(minuteLabel(daily.studyPlanned))+'</span></div>'+
@@ -614,7 +638,7 @@ function plannerView(){
  (plannerUndo?'<button class="btn small ghost" data-s3="planUndo">↶ Desfazer última edição</button>':"")+'</div></section>'+
  '<div class="study-plan-week">'+weekdayCards+'</div>'+
  plannerPreview(plannerSelectedDate)+
- '<p class="note">Para reorganizar no computador, arraste uma sessão para outro dia. No celular, use Mover. Repetir uma matéria específica cria um estudo extra sem alterar a rotação; seguir o ciclo mantém a próxima matéria dinâmica.</p>';
+ '<p class="note">Cada cartão corresponde a uma sessão. No computador, arraste para outro dia; no celular, use Mover. Matérias futuras que seguem o ciclo são previsões, não compromissos fixos: podem mudar conforme as conclusões reais.</p>';
 }
 function studyLibraryView(){
  const cycles=db.cycles.filter(x=>!x.archived);
