@@ -59,6 +59,12 @@ assert.equal(T.summarize({from:previous,to:previous}).actualMin,65,"estatística
 assert.equal(V.model.closed[previous].availableMin,360,"disponibilidade anterior preservada");
 C.state.date=previous;C.go("inicio");
 assert.ok(el("view").innerHTML.includes("Estudar Matemática"),"dia bloqueado exibe snapshot original");
+assert.match(el("view").innerHTML,/Sessão 1/,"dia finalizado distingue a sessão da matéria");
+assert.match(el("view").innerHTML,/study-review-context/,"matéria e modalidade aparecem como contexto do histórico");
+C.go("fechamento");
+assert.match(el("view").innerHTML,/Revisão dos estudos/);
+assert.match(el("view").innerHTML,/Sessão 1/,"a revisão do dia mantém identidade de cada sessão");
+C.go("inicio");
 assert.ok(!el("view").innerHTML.includes("Título alterado fora do histórico"),"não exibe título mutável no dia fechado");
 C.go("planejamento");
 assert.ok(el("view").innerHTML.includes("Dia finalizado · somente leitura"));
