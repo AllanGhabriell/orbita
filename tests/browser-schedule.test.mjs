@@ -185,6 +185,32 @@ try{
  assert.equal(await page.evaluate(()=>window.OrbitaStage3.inspect.model.topics.some(x=>x.title==="Cinemática")),true);
  await page.click('[data-s3="openPlanner"]');
  await page.waitForSelector(".study-plan-week");
+ // Layout regressivo: impedir nova página sem os estilos correspondentes.
+ for(const [width,columns] of [[1796,3],[1180,2],[390,1]]){
+  await page.setViewport({width,height:850,deviceScaleFactor:1});
+  const visual=await page.evaluate(()=>{
+   const grid=document.querySelector(".study-plan-week");
+   const day=document.querySelector(".study-plan-day");
+   const nav=document.querySelector(".study-plan-toolbar");
+   const title=document.querySelector(".study-plan-day-title");
+   const rect=grid.getBoundingClientRect();
+   const dayStyle=getComputedStyle(day),gridStyle=getComputedStyle(grid);
+   const firstTwo=[...grid.children].slice(0,2).map(x=>x.getBoundingClientRect());
+   return {columns:gridStyle.gridTemplateColumns.split(" ").filter(Boolean).length,
+    display:gridStyle.display,cardDisplay:dayStyle.display,cardRadius:dayStyle.borderRadius,
+    cardBackground:dayStyle.backgroundColor,titleColor:getComputedStyle(title).color,
+    toolbarDisplay:getComputedStyle(nav).display,width:rect.width,scrollWidth:grid.scrollWidth,
+    cardWidth:firstTwo[0]?.width||0};
+  });
+  assert.equal(visual.display,"grid","estilo da grade semanal carregado com "+width+"px");
+  assert.equal(visual.columns,columns,"colunas adaptativas em "+width+"px: "+JSON.stringify(visual));
+  assert.equal(visual.cardDisplay,"flex","dias renderizados como cartões");
+  assert.ok(parseFloat(visual.cardRadius)>=12,"cartões com bordas");
+  assert.equal(visual.toolbarDisplay,"flex","barra de ações organizada");
+  assert.ok(visual.cardWidth>180,"cartões legíveis e sem compressão");
+  assert.ok(visual.scrollWidth<=visual.width+2,"grade sem transbordamento horizontal");
+ }
+ await page.setViewport({width:1180,height:850,deviceScaleFactor:1});
  await page.click('.study-plan-day.is-today [data-s3="planAdd"]');
  await page.waitForSelector("#s3-quick");
  await page.$eval('#s3-quick [name="cycleId"]',(el,id)=>{el.value=id;el.dispatchEvent(new Event("change",{bubbles:true}));},testCycle);
@@ -211,6 +237,7 @@ try{
  assert.ok(planned.specific,"seleção por matéria salvou o vínculo");
  assert.equal(planned.next,"Matemática","exceção específica não avança o ciclo");
  assert.equal(await page.evaluate(()=>document.querySelectorAll(".study-plan-item").length>=4),true);
+ await page.click('[data-plan-id="'+planned.specific+'"] .study-plan-more > summary');
  await page.click('[data-plan-id="'+planned.specific+'"] [data-s3="planDuplicate"]');
  assert.equal(await page.evaluate(id=>window.OrbitaStage3.inspect.model.sessions.filter(x=>x.cycleId===id&&x.status==="pending").length>=3,testCycle),true);
  await page.click('[data-s3="planUndo"]');
@@ -230,6 +257,7 @@ try{
  await page.setViewport({width:390,height:860,deviceScaleFactor:1});
  assert.equal(await page.$eval(".study-plan-week",el=>getComputedStyle(el).gridTemplateColumns.split(" ").length),1,"no celular exibir um dia por coluna");
  assert.equal(await page.evaluate(()=>document.querySelectorAll('[data-s3="quickDone"],[data-s3="recordSession"]').length),0);
+ console.log("Chromium: layout adaptativo 3/2/1 colunas, cards estilizados e botões agrupados passaram.");
  console.log("Chromium: Biblioteca, cadastro de assunto, sessão por seleção, duplicação/desfazer e cópia semanal passaram.");
 
 
