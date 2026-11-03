@@ -226,11 +226,11 @@ assert.ok(T.model.sessions.filter(x=>x.date>=monday&&x.date<=C.addDays(monday,6)
 T.planUndo();
 assert.equal(T.model.sessions.filter(x=>x.date>=monday&&x.date<=C.addDays(monday,6)).length,0,"desfazer remove aplicação de modelo");
 T.planBulk([planPair[0].id,planPair[1].id],{date:following,plannedMin:60,mode:"specific",cycleId:planCycle.id,subjectId:circuits.id});
-assert.equal(planPair[0].discipline,"Circuitos");
-assert.equal(planPair[1].date,following);
+assert.equal(T.session(planPair[0].id).discipline,"Circuitos");
+assert.equal(T.session(planPair[1].id).date,following);
 assert.equal(T.cycleState(planCycle).id,electrical.id,"alterar planejamento não avança o ciclo");
 T.planUndo();
-assert.equal(planPair[0].discipline,"Próxima matéria do ciclo","edição em lote desfeita preserva estado anterior");
+assert.equal(T.session(planPair[0].id).discipline,"Próxima matéria do ciclo","edição em lote desfeita preserva estado anterior");
 // As referências de objetos anteriores ao desfazer devem ser reobtidas do modelo atual.
 assert.ok(T.planDayEntries(date).some(x=>x.id===planPair[0].id&&x.rotationSlot));
 assert.throws(()=>T.planCopyRange(date,date,1,false),/diferente da origem/);
