@@ -148,6 +148,18 @@ try{
  await page.evaluate(()=>window.OrbitaCore.go("inicio"));
  await page.waitForSelector(".study-daily-entry");
  assert.equal(await page.evaluate(()=>document.querySelectorAll(".study-daily-entry").length),3);
+
+ const sessionView=await page.evaluate(()=>({
+  titles:[...document.querySelectorAll(".study-daily-entry .study-daily-label > strong")].map(e=>e.textContent.trim()),
+  subjects:[...document.querySelectorAll(".study-daily-entry .study-daily-subject")].map(e=>e.textContent.trim()),
+  progressBars:document.querySelectorAll(".study-session-progress").length,
+  oldRails:document.querySelectorAll(".study-daily-track").length
+ }));
+ assert.deepEqual(sessionView.titles,["Sessão 1","Sessão 2","Sessão 3"],"o cartão destaca a sessão e sua ordem");
+ assert.ok(sessionView.subjects.every(x=>x.includes("Matemática")),"matéria mantida como contexto");
+ assert.equal(sessionView.progressBars,1,"progresso compacto por ciclo");
+ assert.equal(sessionView.oldRails,0,"não duplicar matérias em trilha enorme");
+
  for(let i=0;i<3;i++){
   await page.click('.study-daily-entry:nth-child('+(i+1)+') [data-s3="quickDone"]');
   await page.waitForFunction((n)=>[...document.querySelectorAll('.study-daily-entry.is-done')].length===n,{timeout:5000},i+1);
@@ -163,6 +175,15 @@ try{
  assert.equal(await page.evaluate(id=>{
   const T=window.OrbitaStage3.inspect;return T.cycleState(T.cycle(id)).title;
  },testCycle),"Matemática","desfazer última conclusão reabre etapa anterior");
+
+ await page.evaluate(()=>window.OrbitaCore.go("planejamento"));
+ await page.waitForSelector(".day-tile.selected .day-meta");
+ assert.match(await page.$eval(".day-tile.selected .day-meta",el=>el.textContent),/3 sessão\(ões\) de estudo/,"calendário semanal conta sessões");
+ await page.click('[data-s2="switchCalendar"][data-mode="month"]');
+ await page.waitForSelector(".month-day.selected");
+ assert.match(await page.$eval(".month-day.selected span",el=>el.textContent),/3 ses\./,"calendário mensal conta sessões");
+ await page.evaluate(()=>window.OrbitaCore.go("inicio"));
+
  console.log("Chromium: planejamento 3x90min, três conclusões no Início, avanço e desfazer passaram.");
 
  // Nova agenda real: cadastro de assunto, planejamento por seleção e cópia de semana.
@@ -237,6 +258,13 @@ try{
  assert.ok(planned.specific,"seleção por matéria salvou o vínculo");
  assert.equal(planned.next,"Matemática","exceção específica não avança o ciclo");
  assert.equal(await page.evaluate(()=>document.querySelectorAll(".study-plan-item").length>=4),true);
+
+ assert.ok(await page.evaluate(()=>[...document.querySelectorAll(".study-plan-item-body > strong")].every(x=>/^Sessão \d+$/.test(x.textContent.trim()))),"planejamento destaca sessão, não matéria");
+ const previewText=await page.$eval(".study-plan-preview",el=>el.textContent);
+ assert.match(previewText,/Sessão 1/,"prévia também enumera sessões");
+ assert.match(previewText,/Matemática|Física/,"conteúdo de cada sessão permanece visível");
+ assert.equal(await page.evaluate(()=>[...document.querySelectorAll(".study-plan-status")].some(x=>x.textContent.trim()==="Avulsa")),false,"sessões do ciclo não são rotuladas como avulsas");
+
  await page.click('[data-plan-id="'+planned.specific+'"] .study-plan-more > summary');
  await page.click('[data-plan-id="'+planned.specific+'"] [data-s3="planDuplicate"]');
  assert.equal(await page.evaluate(id=>window.OrbitaStage3.inspect.model.sessions.filter(x=>x.cycleId===id&&x.status==="pending").length>=3,testCycle),true);
