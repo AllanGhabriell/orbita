@@ -1,5 +1,16 @@
 # PROGRESSO — Órbita
 
+## Organizador semanal de estudos e Biblioteca (2026-11-03)
+
+- A área **Estudos → Planejar semana** agora dispõe de calendário visual de sete dias, prévia do Início, edição rápida por seleção, organização por arrastar no computador ou ação Mover no celular, duplicação, exclusão, seleção e edição de várias sessões, desfazer última alteração, copiar dia e semana, salvar/aplicar modelos reutilizáveis.
+- A **Biblioteca de estudos** reúne acesso ao cadastro de ciclos, matérias e modalidades, e novo catálogo de assuntos por matéria. O organizador herda a área e o objetivo do ciclo, evitando redigitação.
+- Sessões podem seguir a rotação dinâmica do ciclo ou fixar uma matéria específica como reforço, sem avançar a rotação indevidamente. Cópias são sempre pendentes e não transportam conclusões nem tempos realizados; dias finalizados são preservados.
+- Concluir/Desfazer/Registrar foram retirados dos cartões de planejamento, permanecendo apenas na tela Início. O analisador continua somando a carga de cada sessão individual.
+- Testes unitários e testes no Chromium verificam seleção de matéria/assunto, cópia semanal, duplicação/desfazer e conclusão exclusivamente no Início.
+
+---
+
+
 ## Estudos — Início para execução, ciclos para planejamento (2026-11-02)
 
 - Tela Início exibe todas as sessões planejadas do dia com trilha visual por ciclo, progresso individual, ações Concluir, Desfazer e Registrar, sem controles de configuração. Uma animação discreta indica passagem da etapa à próxima matéria.
