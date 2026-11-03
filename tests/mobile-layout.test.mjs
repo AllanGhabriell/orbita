@@ -41,9 +41,9 @@ assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo cu
 const sw=read("sw.js");
 assert.match(sw,/orbita-app-planner-layout-20261103-planner-layout-fix/,"cache PWA renovado");
 const html=read("index.html");
-assert.match(html,/stage3\\.css\\?v=20261103-planner-layout-fix/,"stylesheet recebe versão para superar cache antigo");
-assert.match(sw,/const isAppCode=\/,"CSS, JS e HTML tratados como recursos atualizáveis");
-assert.match(sw,/\?online:\(cached\|\|online\)/,"prioriza rede para estilo atualizado e preserva fallback offline");
+assert.ok(html.includes("stage3.css?v=20261103-planner-layout-fix"),"stylesheet recebe versão para superar cache antigo");
+assert.ok(sw.includes("const isAppCode="),"CSS, JS e HTML tratados como recursos atualizáveis");
+assert.ok(sw.includes("return isAppCode?online:(cached||online)"),"prioriza rede para estilo atualizado e preserva fallback offline");
 const stage3Styles=read("stage3.css");
 assert.match(stage3Styles,/Layout do planejador semanal: cartões legíveis/,"regras visuais do planejador existem");
 assert.match(stage3Styles,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"grade de três colunas");
