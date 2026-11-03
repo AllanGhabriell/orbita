@@ -122,13 +122,18 @@ function decorateHome(){
  html+='<div class="row-between"><p class="note">Duração planejada nesta data: <strong>'+C.hoursLabel(estimated/60)+'</strong>. Horas efetivas só serão computadas quando informadas.</p><button class="btn small" data-s2="newEntry" data-type="focus">Novo foco</button></div>';
  return html;
 }
+function studyCountOn(date){
+ const frozen=s.evolution?.closed?.[date];
+ if(frozen)return (frozen.studies||[]).length;
+ return (s.studies?.sessions||[]).filter(x=>x.date===date&&!x.archived).length;
+}
 function startWeek(date){return C.firstDayOfWeek(date)}
 function monthCalendar(){
  const m=startMonth(monthAnchor),start=startWeek(m);
  let out='<div class="month-grid">';
  for(let i=0;i<42;i++){
-  const d=D(start,i);const current=d.slice(0,7)===monthAnchor.slice(0,7),count=allOn(d).filter(x=>x.type==="focus"||x.type==="habit").length;
-  out+='<button class="month-day '+(!current?"outside ":"")+(s.date===d?"selected ":"")+'" data-s2="chooseDate" data-date="'+d+'" '+(d<firstUse()?"disabled":"")+'><strong>'+Number(d.slice(-2))+'</strong><span>'+ (restInfo(d)?"☾ ":count?count+" atividade"+(count>1?"s":""):"")+'</span></button>';
+  const d=D(start,i);const current=d.slice(0,7)===monthAnchor.slice(0,7),count=allOn(d).filter(x=>x.type==="focus"||x.type==="habit").length,studyCount=studyCountOn(d);
+  out+='<button class="month-day '+(!current?"outside ":"")+(s.date===d?"selected ":"")+'" data-s2="chooseDate" data-date="'+d+'" '+(d<firstUse()?"disabled":"")+'><strong>'+Number(d.slice(-2))+'</strong><span>'+ ([restInfo(d)?"☾":"",count?count+" ativ.":"",studyCount?studyCount+" ses.":""].filter(Boolean).join(" · "))+'</span></button>';
  }
  return out+"</div>";
 }
@@ -139,17 +144,17 @@ function decoratePlan(){
  if(calendarView==="week"){
   out+='<div class="week-grid">';
   for(let i=0;i<7;i++){
-   const d=D(start,i),count=allOn(d).filter(x=>x.type==="focus"||x.type==="habit").length;
-   const fullStatus=restInfo(d)?"☾ Descanso":count?count+" previsto(s)":availabilityStatus(d);
+   const d=D(start,i),count=allOn(d).filter(x=>x.type==="focus"||x.type==="habit").length,studyCount=studyCountOn(d);
+   const fullStatus=[restInfo(d)?"☾ Descanso":count?count+" atividade(s)":availabilityStatus(d),studyCount?studyCount+" sessão(ões) de estudo":""].filter(Boolean).join(" · ");
    const available=C.resolveAvailability(d),freeMin=available?C.availabilityMinutes(available):null;
-   const compactStatus=restInfo(d)?"☾":count?count+" ativ.":freeMin===null?"—":freeMin===0?"0h":freeMin%60===0?(freeMin/60)+"h":"✓";
+   const compactStatus=studyCount?(count?count+" at. · "+studyCount+" ses.":studyCount+" ses."):(restInfo(d)?"☾":count?count+" ativ.":freeMin===null?"—":freeMin===0?"0h":freeMin%60===0?(freeMin/60)+"h":"✓");
    out+='<button class="day-tile '+(s.date===d?"selected ":"")+(d===day()?"today ":"")+'" data-s2="chooseDate" data-date="'+d+'" aria-label="'+a(fmt(d,true)+" — "+fullStatus)+'" '+(d<firstUse()?"disabled":"")+'><span class="dow">'+SHORT[C.parse(d).getDay()]+'</span><span class="day-number">'+C.parse(d).getDate()+'</span><span class="day-meta">'+e(fullStatus)+'</span><span class="day-meta-compact" aria-hidden="true">'+e(compactStatus)+'</span></button>';
   }
   out+='</div>';
  } else out+=monthCalendar();
  const all=allOn(s.date);
  if(overlapsFor(s.date).length)out+='<div class="action-strip warning-strip"><span class="icon">◷</span><p>'+overlapsFor(s.date).length+' conflito(s) de horários previstos. Nenhuma atividade foi bloqueada.</p></div>';
- out+='<section class="card board"><div class="card-head"><div><h2>'+e(fmt(s.date,true))+'</h2><small>'+e(availabilityStatus(s.date))+' · '+C.hoursLabel(hoursFor(s.date)/60)+' de carga estimada</small></div><div class="row"><button class="btn small" data-s2="newEntry" data-type="focus">+ Foco</button><button class="btn small" data-s2="newEntry" data-type="task">+ Tarefa</button><button class="btn small" data-s2="newEntry" data-type="habit">+ Rotina</button></div></div>';
+ out+='<section class="card board"><div class="card-head"><div><h2>'+e(fmt(s.date,true))+'</h2><small>'+e(availabilityStatus(s.date))+' · '+C.hoursLabel(hoursFor(s.date)/60)+' em outras atividades'+(studyCountOn(s.date)?' · '+studyCountOn(s.date)+' sessão(ões) de estudo':'')</small></div><div class="row"><button class="btn small" data-s2="newEntry" data-type="focus">+ Foco</button><button class="btn small" data-s2="newEntry" data-type="task">+ Tarefa</button><button class="btn small" data-s2="newEntry" data-type="habit">+ Rotina</button></div></div>';
  out+=all.length?'<div class="task-list">'+[...kindOn(s.date,"focus"),...kindOn(s.date,"habit"),...kindOn(s.date,"task")].map(x=>itemRow(x,s.date)).join("")+'</div>':emptyList("Nenhuma atividade planejada para esta data.");
  out+='</section>';
  return out;
