@@ -154,7 +154,7 @@ function decoratePlan(){
  } else out+=monthCalendar();
  const all=allOn(s.date);
  if(overlapsFor(s.date).length)out+='<div class="action-strip warning-strip"><span class="icon">◷</span><p>'+overlapsFor(s.date).length+' conflito(s) de horários previstos. Nenhuma atividade foi bloqueada.</p></div>';
- out+='<section class="card board"><div class="card-head"><div><h2>'+e(fmt(s.date,true))+'</h2><small>'+e(availabilityStatus(s.date))+' · '+C.hoursLabel(hoursFor(s.date)/60)+' em outras atividades'+(studyCountOn(s.date)?' · '+studyCountOn(s.date)+' sessão(ões) de estudo':'')</small></div><div class="row"><button class="btn small" data-s2="newEntry" data-type="focus">+ Foco</button><button class="btn small" data-s2="newEntry" data-type="task">+ Tarefa</button><button class="btn small" data-s2="newEntry" data-type="habit">+ Rotina</button></div></div>';
+ out+='<section class="card board"><div class="card-head"><div><h2>'+e(fmt(s.date,true))+'</h2><small>'+e(availabilityStatus(s.date))+' · '+C.hoursLabel(hoursFor(s.date)/60)+' em outras atividades'+(studyCountOn(s.date)?' · '+studyCountOn(s.date)+' sessão(ões) de estudo':'')+'</small></div><div class="row"><button class="btn small" data-s2="newEntry" data-type="focus">+ Foco</button><button class="btn small" data-s2="newEntry" data-type="task">+ Tarefa</button><button class="btn small" data-s2="newEntry" data-type="habit">+ Rotina</button></div></div>';
  out+=all.length?'<div class="task-list">'+[...kindOn(s.date,"focus"),...kindOn(s.date,"habit"),...kindOn(s.date,"task")].map(x=>itemRow(x,s.date)).join("")+'</div>':emptyList("Nenhuma atividade planejada para esta data.");
  out+='</section>';
  return out;
