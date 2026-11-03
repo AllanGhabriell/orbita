@@ -1127,6 +1127,6 @@ document.addEventListener("drop",event=>{
 document.addEventListener("dragend",()=>{
  for(const n of document.querySelectorAll(".study-plan-day.is-drop-target,.study-plan-item.is-dragging"))n.classList.remove("is-drop-target","is-dragging");
 });
-window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
+window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,sessionOrdinal,sessionModeLabel,rotationPreview,plannerLabel,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
 render();
 })();
