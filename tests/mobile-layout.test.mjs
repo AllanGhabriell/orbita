@@ -40,4 +40,12 @@ assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa pa
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
 assert.match(sw,/orbita-app-planner-layout-20261103-planner-layout-fix/,"cache PWA renovado");
+const html=read("index.html");
+assert.match(html,/stage3\\.css\\?v=20261103-planner-layout-fix/,"stylesheet recebe versão para superar cache antigo");
+assert.match(sw,/const isAppCode=\/,"CSS, JS e HTML tratados como recursos atualizáveis");
+assert.match(sw,/\?online:\(cached\|\|online\)/,"prioriza rede para estilo atualizado e preserva fallback offline");
+const stage3Styles=read("stage3.css");
+assert.match(stage3Styles,/Layout do planejador semanal: cartões legíveis/,"regras visuais do planejador existem");
+assert.match(stage3Styles,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"grade de três colunas");
+assert.match(stage3Styles,/@media\(max-width:760px\)/,"layout de uma coluna para mobile");
 console.log("Mobile: calendario compacto acessível, rota isolada, CSS sob media query e cache PWA atualizados.");
