@@ -184,4 +184,56 @@ if(nextOpen){
  assert.equal(T.cycleState(batchCycle).id,batchMath.id,"próxima vaga segue a rotação real");
 }
 
+
+// Reforma de planejamento: sessões selecionadas, duplicação, cópia, modelo e desfazer.
+const planCycle=T.saveCycle({title:"Rotação IFPB",area:"Eletrônica",defaultMin:90});
+const electrical=T.saveSubject({cycleId:planCycle.id,title:"Eletricidade Básica",targetSessions:1});
+const circuits=T.saveSubject({cycleId:planCycle.id,title:"Circuitos",targetSessions:1});
+T.model.topics.push({id:"topic-1",title:"Leis de Kirchhoff",subjectId:circuits.id,archived:false});
+const beforePlan=T.loadFor(date).studyPlanned;
+const planPair=T.planCreate({cycleId:planCycle.id,date,mode:"rotation",plannedMin:"90",count:2});
+assert.equal(planPair.length,2);
+assert.equal(T.loadFor(date).studyPlanned,beforePlan+180,"duas sessões de 90min adicionam três horas");
+assert.ok(planPair.every(x=>x.rotationSlot&&x.status==="pending"&&x.subjectId===""));
+C.go("estudos");
+T.actions.openPlanner();
+assert.match(element("view").innerHTML,/Planejamento de estudos/);
+assert.match(element("view").innerHTML,/Copiar semana/);
+assert.doesNotMatch(element("view").innerHTML,/data-s3="quickDone"|data-s3="recordSession"/,"planejamento não executa sessões");
+const specific=T.planCreate({cycleId:planCycle.id,date,mode:"specific",subjectId:circuits.id,topicId:"topic-1",plannedMin:"45",count:1});
+assert.equal(specific[0].kind,"reinforcement");
+assert.equal(specific[0].discipline,"Circuitos");
+assert.equal(specific[0].topic,"Leis de Kirchhoff");
+assert.equal(T.cycleState(planCycle).id,electrical.id,"exceção não altera matéria atual");
+assert.throws(()=>T.planDelete([sessions[0].id]),/iniciada|concluída/,"conclusão fica protegida");
+T.planEdit(specific[0].id,{cycleId:planCycle.id,date:following,mode:"specific",subjectId:electrical.id,plannedMin:"60"});
+assert.equal(specific[0].date,following);
+assert.equal(specific[0].discipline,"Eletricidade Básica");
+T.planMove(specific[0].id,date);
+assert.equal(specific[0].date,date);
+const copied=T.planCopyRange(date,C.addDays(date,7),1,false);
+assert.ok(copied.length>=3);
+assert.ok(copied.every(x=>x.status==="pending"&&x.actualMin===null),"cópia não herda conclusão nem tempo");
+const lenAfterCopy=T.model.sessions.length;
+T.planUndo();
+assert.equal(T.model.sessions.length,lenAfterCopy-copied.length,"desfazer reverte a cópia recente");
+const template=T.planSaveTemplate("Semana foco",date);
+assert.ok(template.items.length>=3);
+const monday=T.planWeekStart(C.addDays(date,14));
+const result=T.planApplyTemplate(template.id,monday,false);
+assert.equal(result,template.items.length);
+assert.ok(T.model.sessions.filter(x=>x.date>=monday&&x.date<=C.addDays(monday,6)).every(x=>x.status==="pending"));
+T.planUndo();
+assert.equal(T.model.sessions.filter(x=>x.date>=monday&&x.date<=C.addDays(monday,6)).length,0,"desfazer remove aplicação de modelo");
+T.planBulk([planPair[0].id,planPair[1].id],{date:following,plannedMin:60,mode:"specific",cycleId:planCycle.id,subjectId:circuits.id});
+assert.equal(planPair[0].discipline,"Circuitos");
+assert.equal(planPair[1].date,following);
+assert.equal(T.cycleState(planCycle).id,electrical.id,"alterar planejamento não avança o ciclo");
+T.planUndo();
+assert.equal(planPair[0].discipline,"Próxima matéria do ciclo","edição em lote desfeita preserva estado anterior");
+// As referências de objetos anteriores ao desfazer devem ser reobtidas do modelo atual.
+assert.ok(T.planDayEntries(date).some(x=>x.id===planPair[0].id&&x.rotationSlot));
+assert.throws(()=>T.planCopyRange(date,date,1,false),/diferente da origem/);
+assert.throws(()=>T.planCreate({cycleId:planCycle.id,date,mode:"specific",subjectId:"missing",plannedMin:90}),/matéria cadastrada/);
+
 console.log("Etapa 3: ciclos, etapa multi-sessão, correção, pausa, reforço, vínculo com foco, estatísticas por dimensão e editor preservado.");
