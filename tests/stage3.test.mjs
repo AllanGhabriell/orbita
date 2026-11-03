@@ -236,4 +236,39 @@ assert.ok(T.planDayEntries(date).some(x=>x.id===planPair[0].id&&x.rotationSlot))
 assert.throws(()=>T.planCopyRange(date,date,1,false),/diferente da origem/);
 assert.throws(()=>T.planCreate({cycleId:planCycle.id,date,mode:"specific",subjectId:"missing",plannedMin:90}),/matéria cadastrada/);
 
+
+// A sessão é a unidade principal; o rótulo da matéria é informação subordinada.
+// A previsão de uma matéria futura simula conclusões, sem alterar o ciclo real.
+const visualCycle=T.saveCycle({title:"Ciclo de teste visual",area:"ENEM",defaultMin:45});
+const visualMath=T.saveSubject({cycleId:visualCycle.id,title:"Álgebra",targetSessions:2});
+const visualPhysics=T.saveSubject({cycleId:visualCycle.id,title:"Física II",targetSessions:1});
+const visualDay=T.planCreate({cycleId:visualCycle.id,date,mode:"rotation",plannedMin:45,count:2});
+const visualFuture=T.planCreate({cycleId:visualCycle.id,date:following,mode:"rotation",plannedMin:45,count:1});
+assert.equal(T.plannerLabel(visualDay[0]),"Álgebra");
+assert.equal(T.plannerLabel(visualDay[1]),"Álgebra");
+assert.equal(T.plannerLabel(visualFuture[0]),"Física II","a previsão considera a conclusão hipotética das duas sessões anteriores");
+assert.equal(T.cycleState(visualCycle).id,visualMath.id,"prévia de matéria não avança o ciclo real");
+const visualExtra=T.planCreate({cycleId:visualCycle.id,date,mode:"specific",subjectId:visualPhysics.id,plannedMin:30});
+assert.equal(T.sessionModeLabel(visualExtra[0]),"Matéria específica do ciclo","exceção do ciclo não é classificada como avulsa");
+assert.ok(T.sessionOrdinal(visualExtra[0])>=1);
+C.go("inicio");
+const homeVisual=element("view").innerHTML;
+assert.match(homeVisual,/study-session-progress/,"Início usa uma barra discreta de progresso");
+assert.doesNotMatch(homeVisual,/study-daily-track/,"não duplica a matéria em uma longa reta");
+assert.match(homeVisual,/<strong>Sessão \d+<\/strong>/,"sessão em primeiro plano");
+assert.match(homeVisual,/study-daily-subject/,"matéria como contexto da sessão");
+C.go("estudos");
+T.actions.openPlanner();
+const plannerVisual=element("view").innerHTML;
+assert.match(plannerVisual,/study-plan-item-subject/);
+assert.match(plannerVisual,/Previsão do ciclo/,"projeção é identificada como não definitiva");
+assert.doesNotMatch(plannerVisual,/>Avulsa</,"sessão vinculada a ciclo não aparece como avulsa");
+T.setSessionStatus(visualDay[0].id,"done",null,"");
+T.setSessionStatus(visualDay[1].id,"done",null,"");
+assert.equal(T.cycleState(visualCycle).id,visualPhysics.id);
+assert.equal(T.plannerLabel(visualFuture[0]),"Física II","previsão é consistente com o avanço real");
+T.setSessionStatus(visualDay[1].id,"pending",null,"");
+assert.equal(T.cycleState(visualCycle).id,visualMath.id,"desfazer reabre a etapa");
+assert.equal(T.plannerLabel(visualFuture[0]),"Física II","projeção continua condicional à sessão pendente");
+
 console.log("Etapa 3: ciclos, etapa multi-sessão, correção, pausa, reforço, vínculo com foco, estatísticas por dimensão e editor preservado.");
