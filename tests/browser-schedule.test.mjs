@@ -330,6 +330,111 @@ try{
  assert.ok(badgesOnMobile.every(x=>x.fits&&x.visible),"indicadores de prioridade legíveis no celular");
  console.log("Chromium: prioridade baixa/média/alta com cores distintas, conclusão e desfazer preservados no mobile.");
 
+
+ // Regressão transversal: Organizar NÃO pode usar os 30px dos botões de ícone.
+ await page.evaluate(()=>{
+  const C=window.OrbitaCore,S=window.OrbitaStage2.inspect;
+  const today=C.state.date;
+  for(let i=0;i<5;i++)S.model.entries.push({
+   id:"layout-focus-"+i,type:"focus",title:"FAZER O TRABALHO DE SISTEMAS ELÉTRICOS - IFPB "+i,
+   date:today,createdAt:new Date().toISOString(),blockId:"",priority:"medium",
+   goalId:"",startTime:"",estimatedMin:60,dueDate:"",recurrence:{kind:"none"},archivedAt:"",origin:null
+  });
+  S.model.entries.push({
+   id:"layout-habit",type:"habit",title:"TREINAR OLIMPÍADAS",
+   date:today,createdAt:new Date().toISOString(),blockId:"",priority:"medium",
+   goalId:"",startTime:"",estimatedMin:30,dueDate:"",
+   recurrence:{kind:"none"},archivedAt:"",origin:null
+  });
+  S.model.blocks.push({id:"layout-block",title:"IFPB / ELETRÔNICA",color:"#7d6ee3",archived:false});
+  C.save();C.go("organizar");
+ });
+ await page.waitForSelector(".organize-row");
+ const widths=[1366,1024,768,600,390,360,320];
+ for(const theme of ["dark","light"]){
+  await page.evaluate(value=>{
+   const C=window.OrbitaCore;C.state.settings.theme=value;C.render();
+  },theme);
+  for(const type of ["focus","task","habit","block"]){
+   await page.click('[data-s2="organizeTab"][data-type="'+type+'"]');
+   await page.waitForSelector(".organize-row");
+   for(const width of widths){
+    await page.setViewport({width,height:850,deviceScaleFactor:1});
+    const result=await page.evaluate(()=>{
+     const items=[...document.querySelectorAll(".organize-row")];
+     const view=document.getElementById("view");
+     const details=items.map(row=>{
+      const bounds=row.getBoundingClientRect();
+      const actions=row.querySelector(".organize-actions");
+      const buttons=[...actions.querySelectorAll("button")];
+      const buttonsRects=buttons.map(button=>button.getBoundingClientRect());
+      const intersects=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>1
+        &&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1;
+      return {
+       width:bounds.width,actionsDisplay:getComputedStyle(actions).display,
+       labels:buttons.map(button=>button.textContent.trim()),
+       overlap:buttonsRects.some((a,i)=>buttonsRects.slice(i+1).some(b=>intersects(a,b))),
+       clipped:buttonsRects.some(r=>r.left<bounds.left-2||r.right>bounds.right+2||r.top<bounds.top-2||r.bottom>bounds.bottom+2),
+       truncated:buttons.some(button=>button.scrollWidth>button.clientWidth+1),
+       textVisible:buttons.every(button=>getComputedStyle(button).fontSize!=="0px")
+      };
+     });
+     const bodyStyle=getComputedStyle(document.body);
+     const cardStyle=getComputedStyle(document.querySelector(".organize-row"));
+     return {rows:details,viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+      viewScroll:view.scrollWidth,viewClient:view.clientWidth,
+      bodyColor:bodyStyle.color,theme:document.body.dataset.theme,
+      cardBg:cardStyle.backgroundColor,scheme:bodyStyle.colorScheme};
+    });
+    assert.ok(result.rows.length,"Organizar deve exibir itens na aba "+type);
+    for(const row of result.rows){
+     assert.deepEqual(row.labels.map((x,i)=>i===2?"Ação de arquivar":x),["Editar","Copiar","Ação de arquivar","Excluir"],
+      "quatro botões com texto na aba "+type);
+     assert.ok(!row.overlap,"sem colisão "+theme+" "+type+" "+width+": "+JSON.stringify(row));
+     assert.ok(!row.clipped,"sem recorte "+theme+" "+type+" "+width+": "+JSON.stringify(row));
+     assert.ok(!row.truncated,"texto de botão completo "+theme+" "+type+" "+width+": "+JSON.stringify(row));
+     assert.equal(row.actionsDisplay,"flex");
+    }
+    assert.ok(result.scrollWidth<=result.viewport+2,"sem rolagem horizontal global "+theme+" "+type+" "+width);
+    assert.ok(result.viewScroll<=result.viewClient+2,"sem conteúdo cortado no Organizar "+theme+" "+type+" "+width);
+    if(theme==="light"){
+     assert.equal(result.scheme,"light","campos nativos respeitam o tema claro");
+     assert.equal(result.bodyColor,"rgb(36, 41, 65)","texto principal escuro no tema claro");
+    }
+   }
+  }
+ }
+ // O modo claro precisa manter a legibilidade em várias telas, inclusive modal.
+ await page.setViewport({width:390,height:850,deviceScaleFactor:1});
+ for(const route of ["inicio","planejamento","organizar","estudos","disponibilidade","perfil"]){
+  await page.evaluate(r=>window.OrbitaCore.go(r),route);
+  const result=await page.evaluate(()=>{
+   const header=document.querySelector(".top-title strong");
+   const main=document.querySelector(".main-shell");
+   return {body:document.body.dataset.theme,text:getComputedStyle(header).color,
+    bg:getComputedStyle(main).backgroundColor,
+    viewW:document.getElementById("view").scrollWidth,
+    viewClient:document.getElementById("view").clientWidth};
+  });
+  assert.equal(result.body,"light");
+  assert.ok(result.viewW<=result.viewClient+2,"conteúdo adaptado no mobile: "+route);
+  assert.equal(result.text,"rgb(36, 41, 65)","título contrastante no modo claro: "+route);
+ }
+ await page.evaluate(()=>window.OrbitaCore.go("organizar"));
+ await page.click('[data-s2="organizeTab"][data-type="focus"]');
+ await page.click(".hero-row [data-s2='newEntry']");
+ await page.waitForSelector("#s2-entry");
+ const formLight=await page.evaluate(()=>{
+  const modal=document.querySelector(".modal-card"),input=document.querySelector("#s2-entry input[name='title']");
+  return {bg:getComputedStyle(modal).backgroundColor,inputColor:getComputedStyle(input).color,
+   inputBg:getComputedStyle(input).backgroundColor};
+ });
+ assert.equal(formLight.bg,"rgb(255, 255, 255)","modal legível no tema claro");
+ assert.equal(formLight.inputBg,"rgb(255, 255, 255)","campo claro no tema claro");
+ assert.equal(formLight.inputColor,"rgb(36, 41, 65)","entrada com texto escuro");
+ await page.evaluate(()=>window.OrbitaCore.closeModal());
+ console.log("Chromium: Organizar sem sobreposição, 4 abas, 7 tamanhos e 2 temas; telas mobile e modal no claro passaram.");
+
  assert.equal(errors.length,0,"nenhum erro JavaScript em fluxo de salvar e reabrir: "+errors.join("; "));
  console.log("Chromium: clique de salvar, cinco dias, persistência após recarga e edição passaram.");
 }finally{
