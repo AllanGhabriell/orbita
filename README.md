@@ -1,5 +1,14 @@
 # Órbita
 
+## Cronômetro inteligente — 04/11/2026
+
+O Órbita agora disponibiliza o botão **Cronometrar** em cada sessão de estudo na tela Início, um indicador global de **ESTUDO EM ANDAMENTO / ESTUDO PAUSADO / NENHUM ESTUDO ATIVO**, contagem circular de progresso, pausas com motivo (descanso, preparação de flashcards, interrupção, pausa programada), correção auditada de horários e salvamento automático local e sincronizável.
+
+Nas Preferências, há modos contínuo, Pomodoro e personalizado, sons distintos de conclusão e pausa prolongada, volume, repetição, áudios próprios pequenos, brilho e notificações mediante permissão. A meta atingida não conclui o ciclo automaticamente; concluir é decisão explícita. O relatório prioriza tempo pausado e contexto, não a quantidade bruta de pausas.
+
+**SQL:** nenhuma migração adicional. Os dados ficam no documento JSON `orbita_documents.content`, usando a sincronização existente `orbita_commit`. A operação com navegador fechado e alertas em segundo plano exige testes reais; o dispositivo pode restringir a emissão de som.
+
+
 **Organização. Disciplina. Evolução.**
 
 Planejador pessoal e de estudos, independente da Academia CFOP. O objetivo é organizar compromissos, disponibilidade, ciclos, hábitos e evolução com liberdade para editar tudo que não pertence a um dia já encerrado.
