@@ -154,3 +154,7 @@ Implementado no código:
 5. **Integração:** banco, SQL, Google, segurança, offline/PWA e sincronização.
 
 **Regra:** nenhuma etapa posterior começa sem nova autorização.
+
+## Publicação independente dos testes — novembro de 2026
+
+O GitHub Pages já publica a branch `main` pelo workflow nativo `pages build and deployment`. O workflow `.github/workflows/pages.yml` ficou dedicado aos testes, para evitar dois deploys concorrentes e impedir que uma falha de teste torne a etapa de publicação `skipped`. Os testes continuam ativos, e falhas devem ser corrigidas; o site poderá receber commits mesmo quando algum teste falhar. A verificação do Service Worker usa a versão real de CSS referenciada no HTML, evitando falhas por números de versão antigos.

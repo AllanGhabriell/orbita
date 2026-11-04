@@ -17,9 +17,10 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
    if(path==="/stage5.js"){res.writeHead(200,{"Content-Type":"text/javascript"});return res.end("");}
    const location=resolve(root,"."+path.replace(/\/$/,"/index.html"));
    if(!location.startsWith(root+sep))throw Error("Fora do diretório");
+   const content=await readFile(location);
    res.writeHead(200,{"Content-Type":types[extname(location)]||"application/octet-stream"});
-   res.end(await readFile(location));
-  }catch(err){res.writeHead(404);res.end(String(err));}
+   res.end(content);
+  }catch(err){if(!res.headersSent)res.writeHead(404);res.end(String(err));}
  });
  await new Promise(r=>server.listen(0,"127.0.0.1",r));
  let browser;

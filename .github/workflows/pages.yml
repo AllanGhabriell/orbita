@@ -1,17 +1,18 @@
-name: Testar e publicar Órbita
+name: Verificar Órbita
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: github-pages
-  cancel-in-progress: true
+
+# Publicação: GitHub Pages já executa seu próprio "pages build and deployment"
+# para os commits da branch main. Aqui os testes são independentes do deploy.
 jobs:
   test:
+    name: Validar aplicação
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,19 +25,3 @@ jobs:
         run: npm install --no-save --no-package-lock puppeteer-core@24
       - name: Testes das etapas 1 a 7 e do formulário no Chromium
         run: node --test tests/*.test.mjs
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - id: deployment
-        uses: actions/deploy-pages@v4

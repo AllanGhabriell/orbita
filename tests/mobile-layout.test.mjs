@@ -40,9 +40,11 @@ assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa pa
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
 assert.match(sw,/orbita-app-20261104-settings-layout-v3/,"cache PWA renovado para alarmes persistentes");
- assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v=20261104-alarm-loop-v1"),"assets atuais presentes no cache");
+ const html=read("index.html");
+ const cssVersion=html.match(/stage7\.css\?v=([a-zA-Z0-9-]+)/)?.[1];
+ assert.ok(cssVersion,"CSS do cronômetro tem versão explícita no HTML");
+ assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v="+cssVersion),"o Service Worker contém a versão de CSS realmente usada no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
-const html=read("index.html");
 assert.ok(html.includes("styles.css?v=20261104-organize-light-mobile"),"tema claro recebe CSS atualizado");
 assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"Organizar recebe CSS atualizado");
 assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"CSS das prioridades de tarefas com versão atualizada");
