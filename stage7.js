@@ -233,8 +233,8 @@ function resetTimer(id){
  if(!window.confirm("Zerar todos os tempos e pausas desta cronometragem? A sessão planejada e a sua conclusão serão preservadas. Você poderá desfazer em até 60 segundos."))return;
  snapshotUndo([id]);
  if(trackTimeMatches(x,r))x.actualMin=null;
- const keptMode=r.mode,keptGoal=r.goalMin;
- timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,lastBlockAlert:0,goalNotified:false,finishedAt:null,resetAt:new Date().toISOString()};
+ const keptMode=r.mode,keptGoal=r.goalMin,originalStatus=r.originalStatus;
+ timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,originalStatus,lastBlockAlert:0,goalNotified:false,finishedAt:null,resetAt:new Date().toISOString()};
  if(timing.active?.sessionId===id)timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
  persist();C.closeModal();C.render();tick();C.notify("Cronômetro zerado. Use ⋯ para desfazer.");
 }
