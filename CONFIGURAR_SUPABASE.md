@@ -1,5 +1,12 @@
 # CONFIGURAÇÃO FINAL DO SUPABASE — ÓRBITA
 
+## Novidade: cronômetro inteligente
+
+**Não precisa executar nenhum SQL novo.** O cronômetro, as pausas, correções e sons personalizados são salvos em `timing` dentro do campo JSONB já existente `public.orbita_documents.content`, pela função `public.orbita_commit`. O snapshot de dia fechado permanece protegido pela mesma estrutura.
+
+O documento completo tem limite de 5 MB na migração original. Cada áudio pessoal é limitado pela interface a 120 KB, e pode ser reduzido/substituído nas Preferências. Não apague nem recrie tabelas para instalar o cronômetro.
+
+
 O site e o código estão no GitHub. Esta página descreve **somente** o que depende das suas contas. A aplicação continua utilizável sem login, com registros locais.
 
 ## 1. Criar o projeto no Supabase
