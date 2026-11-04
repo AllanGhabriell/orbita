@@ -50,6 +50,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.waitForSelector(".s7-timer.s7-paused");
   await page.click('.s7-timer [data-s7="resume"]');
   await page.waitForSelector(".s7-timer.s7-running");
+  await new Promise(resolve=>setTimeout(resolve,1250)); // garante tempo produtivo não nulo antes do encerramento
   page.once("dialog",dialog=>dialog.accept());
   await page.click('.s7-timer [data-s7="partial"]');
   await page.waitForFunction(()=>window.OrbitaCore.state.timing.active===null);
