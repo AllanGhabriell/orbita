@@ -143,7 +143,7 @@ function finish(done){
  T.setSessionStatus(x.id,done?"done":"progress",studied?Math.max(1,Math.round(studied/60000)):null,x.actualTime||"");
  r.studyMs=studied;r.pauseMs=paused;
  if(a.phase==="paused"&&r.pauses.at(-1)?.endedAt===null)r.pauses.at(-1).endedAt=at;
- r.finishedAt=new Date(at).toISOString();r.status=done?"done":"partial";
+ r.finishedAt=new Date(at).toISOString();r.status=done?"done":"partial";r.recordedActualMin=x.actualMin;
  timing.active=null;
  persist();C.render();tick();C.notify(done?"Sessão concluída e tempo registrado.":"Tempo parcial salvo; a etapa do ciclo não avançou.");
 }
@@ -295,14 +295,14 @@ function deletePause(id,index){
  snapshotUndo([id]);
  const removed=r.pauses.splice(index,1)[0];
  r.pauseMs=Math.max(0,r.pauseMs-pauseDuration(removed));
- noteEdit(r,"pause_deleted",{pause:copy(removed)});
+ noteEdit(r,"pause_deleted",{index,durationMs:pauseDuration(removed)});
  persist();pausesModal(id);C.render();C.notify("Pausa excluída sem acrescentar tempo estudado.");
 }
 function clearPauses(id){
  const {r}=editableRecord(id);
  if(!window.confirm("Zerar todas as pausas e seus motivos? Isso não altera o tempo estudado."))return;
  snapshotUndo([id]);
- r.pauseMs=0;r.pauses=[];noteEdit(r,"pauses_cleared",{at:clock()});
+ r.pauseMs=0;r.pauses=[];r.corrections=(r.corrections||[]).filter(e=>!["pause_edited","pause_deleted"].includes(e.type));noteEdit(r,"pauses_cleared",{});
  persist();C.closeModal();C.render();C.notify("Histórico de pausas zerado; estudo preservado.");
 }
 function choicesFor(id){
@@ -378,8 +378,8 @@ function ring(){
  if(!a||!r)return "";
  const goal=Math.max(1,Number(r.goalMin)||90)*60000;
  const studied=studyMs(r),paused=pauseMs(r),percent=Math.min(100,Math.max(0,studied/goal*100));
- const stateLabel=a.phase==="paused"?"ESTUDO PAUSADO":"ESTUDO EM ANDAMENTO";
- const subtitle=a.phase==="paused"?"O tempo produtivo NÃO está sendo contabilizado.":"O tempo de estudo está sendo contabilizado.";
+ const stateLabel=a.phase==="paused"?"Pausado":"Em estudo";
+ const subtitle=a.phase==="paused"?"Contagem de estudo interrompida.":"Tempo efetivo em andamento.";
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span></div>'+
@@ -409,7 +409,7 @@ function historyHtml(){
 
 function sessionMenu(id){
  const x=session(id),r=record(id);
- const mayUndo=lastUndo?.sessionId===id&&clock()-lastUndo.at<60000;
+ const mayUndo=lastUndoAvailable(id);
  if(!x||(!r&&!mayUndo)||V?.isClosed?.(x.date))return "";
  return '<button class="btn small ghost s7-manage-trigger" aria-label="Gerenciar cronometragem" title="Gerenciar cronometragem" data-s7="manage" data-id="'+A(id)+'">⋯</button>';
 }
@@ -520,6 +520,17 @@ document.addEventListener("click",e=>{
   else if(act==="finish")askFinish(true);
   else if(act==="partial")askFinish(false);
   else if(act==="correct")correctModal();
+  else if(act==="manage")manageModal(b.dataset.id);
+  else if(act==="editTotals")editTotalsModal(b.dataset.id);
+  else if(act==="pauses")pausesModal(b.dataset.id);
+  else if(act==="editPause")editPauseModal(b.dataset.id,Number(b.dataset.index));
+  else if(act==="deletePause")deletePause(b.dataset.id,Number(b.dataset.index));
+  else if(act==="clearPauses")clearPauses(b.dataset.id);
+  else if(act==="reset")resetTimer(b.dataset.id);
+  else if(act==="discard")discardTimer(b.dataset.id);
+  else if(act==="transfer")moveModal(b.dataset.id,false);
+  else if(act==="split")moveModal(b.dataset.id,true);
+  else if(act==="undo")undo();
   else if(act==="notification"){
    if(!("Notification" in window)||!window.isSecureContext)C.notify("Notificações do dispositivo indisponíveis neste navegador.");
    else Notification.requestPermission().then(p=>{settings().desktopNotifications=p==="granted";persist();C.notify(p==="granted"?"Permissão de notificação ativada.":"Permissão não concedida.");});
@@ -527,9 +538,16 @@ document.addEventListener("click",e=>{
  }catch(err){C.notify(err.message||"Não foi possível controlar o cronômetro.");console.error(err);}
 });
 document.addEventListener("submit",e=>{
- if(e.target.id!=="s7-correction-form")return;
+ const id=e.target?.id;
+ if(!["s7-correction-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
- try{correction(new Date(new FormData(e.target).get("moment")).getTime());}catch(err){C.notify(err.message);}
+ const data=new FormData(e.target);
+ try{
+  if(id==="s7-correction-form")correction(new Date(data.get("moment")).getTime());
+  else if(id==="s7-edit-totals")editTotals(String(data.get("id")),Number(data.get("study")),Number(data.get("paused")),String(data.get("reason")||""));
+  else if(id==="s7-edit-pause")editPause(String(data.get("id")),Number(data.get("index")),new Date(data.get("start")).getTime(),new Date(data.get("end")).getTime(),String(data.get("kind")));
+  else if(id==="s7-move-record")moveRecord(String(data.get("id")),String(data.get("target")),data.get("operation")==="split",Number(data.get("minutes")));
+ }catch(err){C.notify(err.message||"Confira os valores informados.");}
 });
 document.addEventListener("change",e=>{
  const el=e.target;if(!el)return;
@@ -553,6 +571,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();tick();
 })();
