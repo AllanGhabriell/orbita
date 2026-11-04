@@ -39,7 +39,8 @@ assert.equal((markup.match(/class="day-meta"/g)||[]).length,7,"texto integral ma
 assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa para leitores de tela");
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
-assert.match(sw,/orbita-app-20261104-organize-light-mobile/,"cache PWA renovado");
+assert.match(sw,/orbita-app-20261104-timer-v1/,"cache PWA renovado para o cronômetro");
+ assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
 const html=read("index.html");
 assert.ok(html.includes("styles.css?v=20261104-organize-light-mobile"),"tema claro recebe CSS atualizado");
 assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"Organizar recebe CSS atualizado");
