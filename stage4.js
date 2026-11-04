@@ -55,7 +55,8 @@ function capture(date){
   area:x.area,discipline:x.discipline,topic:x.topic,purpose:x.purpose,
   method:studies.methods.find(m=>m.id===x.methodId)?.title||"",
   plannedMin:x.plannedMin??null,actualMin:x.actualMin??null,
-  status:x.status||"pending",startTime:x.startTime||"",actualTime:x.actualTime||"",focusId:x.focusId||"",evidence:clone(x.evidence||{questions:null,correct:null,quality:null})
+  status:x.status||"pending",startTime:x.startTime||"",actualTime:x.actualTime||"",focusId:x.focusId||"",evidence:clone(x.evidence||{questions:null,correct:null,quality:null}),
+   timing:clone(state.timing?.records?.[x.id]||null)
  }));
  const attached=new Set(sessions.filter(x=>x.focusId).map(x=>x.focusId));
  const plannedStudy=sessions.reduce((a,x)=>a+Number(x.plannedMin||0),0);
@@ -112,6 +113,7 @@ function awardMilestones(){
 function finalize(date){
  if(!validDate(date)||date<first()||!beforeNow(date))throw Error("Só é possível finalizar datas anteriores ou iguais a hoje.");
  if(isClosed(date))throw Error("Este dia já foi finalizado.");
+  if(window.OrbitaStage7?.inspect?.hasActiveForDate(date))throw Error("Encerre o cronômetro da sessão antes de finalizar o dia.");
  const older=pendingDates(date);
  if(older.length)throw Error("Finalize primeiro "+older.length+" dia(s) anterior(es) pendente(s), começando em "+older[0].split("-").reverse().join("/")+".");
  const snap=capture(date);
