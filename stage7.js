@@ -159,6 +159,212 @@ function askFinish(done){
  if(!window.confirm(done?"Concluir a sessão e avançar o ciclo, quando aplicável?":"Encerrar e salvar o tempo parcial sem avançar o ciclo?"))return;
  finish(done);
 }
+
+// Gerenciamento reversível: o planejamento nunca é apagado ao descartar a cronometragem.
+const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
+function editableRecord(id,live=false){
+ const x=session(id),r=record(id);
+ if(!x||!r||x.archived)throw Error("Registro de cronometragem não encontrado.");
+ if(V?.isClosed?.(x.date)||root.evolution?.closed?.[x.date])throw Error("Dia finalizado: não é possível modificar o histórico.");
+ if(!live&&timing.active?.sessionId===id)throw Error("Encerre o cronômetro como parcial antes de editar seu histórico. Você pode zerar ou descartar enquanto ele está em andamento.");
+ return {x,r};
+}
+function snapshotUndo(ids){
+ const at=clock();
+ lastUndo={at,ids:[...ids],entries:ids.map(id=>{
+  const r=record(id),x=session(id),saved=copy(r);
+  if(saved&&timing.active?.sessionId===id){
+   saved.studyMs=studyMs(r,at);saved.pauseMs=pauseMs(r,at);
+   if(timing.active.phase==="paused"&&saved.pauses?.at(-1)?.endedAt===null)saved.pauses.at(-1).endedAt=at;
+  }
+  return {id,record:saved,actualMin:x?.actualMin??null};
+ }),active:timing.active&&ids.includes(timing.active.sessionId)?copy(timing.active):null};
+}
+function undo(){
+ if(!lastUndo||clock()-lastUndo.at>60000)throw Error("Não há alteração recente que possa ser desfeita.");
+ if(lastUndo.ids.some(id=>!session(id)||V?.isClosed?.(session(id).date)))throw Error("Não é possível restaurar dados de um dia finalizado.");
+ for(const item of lastUndo.entries){
+  if(item.record)timing.records[item.id]=copy(item.record);
+  else delete timing.records[item.id];
+  session(item.id).actualMin=item.actualMin;
+ }
+ if(lastUndo.active){
+  const a=lastUndo.active;
+  timing.active={...a,since:clock(),alertIndex:0};
+  if(a.phase==="paused")timing.records[a.sessionId]?.pauses?.push({startedAt:clock(),endedAt:null,kind:"other",corrected:true});
+ }else if(timing.active&&lastUndo.ids.includes(timing.active.sessionId))timing.active=null;
+ lastUndo=null;
+ persist();C.closeModal();C.render();tick();C.notify("Última alteração desfeita.");
+}
+function lastUndoAvailable(id){return lastUndo?.ids?.includes(id)&&clock()-lastUndo.at<=60000;}
+function trackTimeMatches(x,r){
+ const reported=Number(x.actualMin);
+ if(x.actualMin==null)return false;
+ const recorded=r.recordedActualMin;
+ return (recorded!=null&&reported===Number(recorded))||reported===Math.max(1,Math.round(studyMs(r)/60000));
+}
+function resetTimer(id){
+ const {x,r}=editableRecord(id,true);
+ if(!window.confirm("Zerar todos os tempos e pausas desta cronometragem? A sessão planejada e a sua conclusão serão preservadas. Você poderá desfazer em até 60 segundos."))return;
+ snapshotUndo([id]);
+ if(trackTimeMatches(x,r))x.actualMin=null;
+ const keptMode=r.mode,keptGoal=r.goalMin;
+ timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,lastBlockAlert:0,goalNotified:false,finishedAt:null,resetAt:new Date().toISOString()};
+ if(timing.active?.sessionId===id)timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
+ persist();C.closeModal();C.render();tick();C.notify("Cronômetro zerado. Use ⋯ para desfazer.");
+}
+function discardTimer(id){
+ const {x,r}=editableRecord(id,true);
+ if(!window.confirm("Descartar toda a cronometragem, incluindo pausas e correções? A sessão de estudo continuará cadastrada. A conclusão será preservada."))return;
+ snapshotUndo([id]);
+ if(trackTimeMatches(x,r))x.actualMin=null;
+ delete timing.records[id];
+ if(timing.active?.sessionId===id)timing.active=null;
+ persist();C.closeModal();C.render();tick();C.notify("Cronometragem descartada. É possível desfazer pelo menu da sessão por 60 segundos.");
+}
+const pauseNames={rest:"Descanso",preparation:"Preparação de flashcards",scheduled:"Intervalo programado",other:"Interrupção"};
+function pauseDuration(p){return Math.max(0,(Number(p.endedAt)||Number(p.startedAt))-Number(p.startedAt));}
+function allPauseMs(r){return (r.pauses||[]).reduce((total,p)=>total+pauseDuration(p),0);}
+function noteEdit(r,type,details){r.corrections||(r.corrections=[]);r.corrections.push({type,registeredAt:clock(),...details});}
+function updateActual(x,r){x.actualMin=r.studyMs>0?Math.max(1,Math.round(r.studyMs/60000)):null;r.recordedActualMin=x.actualMin;}
+function editTotalsModal(id){
+ const {x,r}=editableRecord(id);
+ C.openModal("Editar tempo de estudo",'<form id="s7-edit-totals" class="section-stack">'+
+ '<input name="id" type="hidden" value="'+A(id)+'"><p class="note">'+E(x.discipline)+' · duração efetivamente estudada e tempo total pausado. Alterar pausas não acrescenta estudo automaticamente.</p>'+
+ '<div class="form-grid"><div class="field"><label>Tempo estudado (minutos)</label><input name="study" type="number" min="0" max="1440" step="0.01" required value="'+(studyMs(r)/60000).toFixed(2)+'"></div>'+
+ '<div class="field"><label>Tempo pausado (minutos)</label><input name="paused" type="number" min="0" max="1440" step="0.01" required value="'+(pauseMs(r)/60000).toFixed(2)+'"></div></div>'+
+ '<p class="note">As pausas detalhadas somam '+E(duration(allPauseMs(r)))+'. Para reduzir o total abaixo disso, edite ou remova primeiro as pausas correspondentes.</p>'+
+ '<div class="field"><label>Motivo da correção (opcional)</label><input name="reason" maxlength="180" placeholder="Ex.: esqueci de retomar o cronômetro"></div>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-s7="manage" data-id="'+A(id)+'">Voltar</button><button class="btn primary" type="submit">Salvar tempos</button></div></form>');
+}
+function editTotals(id,newStudy,newPause,reason=""){
+ const {x,r}=editableRecord(id);
+ const valid=n=>Number.isFinite(n)&&n>=0&&n<=1440;
+ if(!valid(newStudy)||!valid(newPause))throw Error("Informe tempos válidos entre 0 e 1440 minutos.");
+ const study=Math.round(newStudy*60000),paused=Math.round(newPause*60000);
+ if(paused+1000<allPauseMs(r))throw Error("O tempo total é menor que as pausas detalhadas. Corrija primeiro o histórico de pausas.");
+ snapshotUndo([id]);
+ const old={studyMs:r.studyMs,pauseMs:r.pauseMs};
+ r.studyMs=study;r.pauseMs=paused;
+ noteEdit(r,"totals_edited",{before:old,after:{studyMs:study,pauseMs:paused},reason:String(reason||"").slice(0,180)});
+ updateActual(x,r);
+ persist();C.closeModal();C.render();C.notify("Tempos corrigidos. A sessão e sua conclusão foram preservadas.");
+}
+function pausesModal(id){
+ const {r,x}=editableRecord(id);
+ const list=(r.pauses||[]).map((p,i)=>{
+  const stillOpen=p.endedAt===null;
+  return '<div class="s7-pause-line"><div><strong>'+E((i+1)+"ª pausa · "+(pauseNames[p.kind]||"Pausa"))+'</strong><small>'+E(duration(stillOpen?clock()-p.startedAt:pauseDuration(p)))+' · '+(stillOpen?"Em andamento":"Registrada")+'</small></div>'+
+   (stillOpen?'<span class="note">Retome antes de editar</span>':'<div class="row"><button type="button" class="btn small ghost" data-s7="editPause" data-id="'+A(id)+'" data-index="'+i+'">Editar</button><button type="button" class="btn small danger" data-s7="deletePause" data-id="'+A(id)+'" data-index="'+i+'">Excluir</button></div>')+'</div>';
+ }).join("");
+ C.openModal("Gerenciar pausas",'<div class="section-stack"><p class="note">'+E(x.discipline)+' · '+E(duration(pauseMs(r)))+' no total. Excluir pausas reduz o tempo pausado, mas não aumenta o tempo estudado.</p>'+
+ (list||'<p class="note">Nenhuma pausa registrada.</p>')+
+ '<div class="modal-footer"><button class="btn ghost" data-s7="manage" data-id="'+A(id)+'">Voltar</button>'+
+ '<button class="btn danger" data-s7="clearPauses" data-id="'+A(id)+'" '+(r.pauses?.some(p=>p.endedAt===null)?"disabled":"")+'>Zerar pausas</button></div></div>');
+}
+function editPauseModal(id,index){
+ const {r}=editableRecord(id);
+ const p=r.pauses?.[index];
+ if(!p||p.endedAt===null)throw Error("Retome o cronômetro antes de editar esta pausa.");
+ const local=date=>{const d=new Date(date);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
+ C.openModal("Editar pausa "+(index+1),'<form id="s7-edit-pause" class="section-stack"><input type="hidden" name="id" value="'+A(id)+'"><input type="hidden" name="index" value="'+index+'">'+
+ '<div class="field"><label>Categoria</label><select name="kind">'+Object.entries(pauseNames).map(([key,title])=>'<option value="'+key+'" '+(key===p.kind?"selected":"")+'>'+E(title)+'</option>').join("")+'</select></div>'+
+ '<div class="form-grid"><div class="field"><label>Início da pausa</label><input name="start" type="datetime-local" required value="'+A(local(p.startedAt))+'"></div>'+
+ '<div class="field"><label>Fim da pausa</label><input name="end" type="datetime-local" required value="'+A(local(p.endedAt))+'"></div></div>'+
+ '<p class="note">Ajuste os horários reais. Intervalos sobrepostos não são permitidos.</p>'+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-s7="pauses" data-id="'+A(id)+'">Voltar</button><button type="submit" class="btn primary">Salvar pausa</button></div></form>');
+}
+function editPause(id,index,start,end,kind){
+ const {r}=editableRecord(id),p=r.pauses?.[index];
+ if(!p||p.endedAt===null)throw Error("Pausa não encontrada ou ainda aberta.");
+ if(!Object.hasOwn(pauseNames,kind))throw Error("Categoria inválida.");
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end||end>clock())throw Error("Informe horários válidos para início e fim.");
+ if(start<new Date(r.startedAt).getTime())throw Error("A pausa não pode começar antes da sessão.");
+ if(r.pauses.some((other,i)=>i!==index&&start<(other.endedAt??clock())&&end>other.startedAt))throw Error("Os horários não podem se sobrepor a outra pausa.");
+ const delta=(end-start)-pauseDuration(p),newPause=r.pauseMs+delta;
+ if(newPause<0||newPause>24*3600000)throw Error("A alteração geraria um tempo de pausa inválido.");
+ snapshotUndo([id]);
+ const before=copy(p);p.startedAt=start;p.endedAt=end;p.kind=kind;p.corrected=true;
+ r.pauseMs=newPause;noteEdit(r,"pause_edited",{index,before,after:copy(p)});
+ persist();pausesModal(id);C.render();C.notify("Pausa corrigida.");
+}
+function deletePause(id,index){
+ const {r}=editableRecord(id),p=r.pauses?.[index];
+ if(!p||p.endedAt===null)throw Error("Pausa não encontrada ou ainda aberta.");
+ if(!window.confirm("Excluir esta pausa? O período será removido dos totais, sem ser convertido em estudo."))return;
+ snapshotUndo([id]);
+ const removed=r.pauses.splice(index,1)[0];
+ r.pauseMs=Math.max(0,r.pauseMs-pauseDuration(removed));
+ noteEdit(r,"pause_deleted",{pause:copy(removed)});
+ persist();pausesModal(id);C.render();C.notify("Pausa excluída sem acrescentar tempo estudado.");
+}
+function clearPauses(id){
+ const {r}=editableRecord(id);
+ if(!window.confirm("Zerar todas as pausas e seus motivos? Isso não altera o tempo estudado."))return;
+ snapshotUndo([id]);
+ r.pauseMs=0;r.pauses=[];noteEdit(r,"pauses_cleared",{at:clock()});
+ persist();C.closeModal();C.render();C.notify("Histórico de pausas zerado; estudo preservado.");
+}
+function choicesFor(id){
+ const x=session(id);
+ return (T.model.sessions||[]).filter(y=>y.id!==id&&!y.archived&&y.date===x?.date&&!record(y.id)&&y.status!=="done"&&y.actualMin==null&&!V?.isClosed?.(y.date));
+}
+function moveModal(id,split=false){
+ const {r,x}=editableRecord(id);
+ const options=choicesFor(id);
+ if(!options.length)throw Error("Não há outra sessão aberta e sem registro de tempo nesta data.");
+ const studied=studyMs(r),max=Math.floor(studied/60000)-1;
+ if(split&&max<1)throw Error("São necessários pelo menos dois minutos de estudo para dividir entre sessões.");
+ const title=split?"Dividir tempo entre sessões":"Transferir cronometragem";
+ C.openModal(title,'<form id="s7-move-record" class="section-stack"><input type="hidden" name="id" value="'+A(id)+'"><input type="hidden" name="operation" value="'+(split?"split":"transfer")+'">'+
+ '<p class="note">'+E(x.discipline)+' · '+E(duration(studied))+' estudados. Escolha outra sessão do mesmo dia, sem tempo registrado. A conclusão das matérias não será alterada automaticamente.</p>'+
+ '<div class="field"><label>Sessão de destino</label><select name="target" required>'+options.map(y=>'<option value="'+A(y.id)+'">'+E(y.discipline||"Estudo")+' · '+E(y.kind||"Sessão")+'</option>').join("")+'</select></div>'+
+ (split?'<div class="field"><label>Minutos de estudo transferidos</label><input name="minutes" type="number" min="1" max="'+max+'" step="1" required value="'+Math.max(1,Math.floor(max/2))+'"></div><p class="note">As pausas ficam na sessão original; só o tempo estudado é dividido.</p>':'<p class="note">Todas as pausas e correções acompanham o registro transferido.</p>')+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-s7="manage" data-id="'+A(id)+'">Voltar</button><button type="submit" class="btn primary">'+(split?"Dividir":"Transferir")+'</button></div></form>');
+}
+function moveRecord(id,targetId,split,minutes=0){
+ const {r,x}=editableRecord(id),target=choicesFor(id).find(y=>y.id===targetId);
+ if(!target)throw Error("Selecione uma sessão válida na mesma data e sem tempo registrado.");
+ const amount=Math.round(minutes*60000);
+ if(split&&(!Number.isInteger(minutes)||minutes<1||amount>=r.studyMs-1000))throw Error("A divisão precisa deixar tempo positivo na sessão original.");
+ if(!window.confirm(split?"Dividir o tempo estudado entre as duas sessões, sem duplicar pausas?":"Transferir o registro completo para a outra sessão?"))return;
+ snapshotUndo([id,targetId]);
+ if(split){
+  r.studyMs-=amount;updateActual(x,r);
+  timing.records[targetId]={sessionId:targetId,startedAt:r.startedAt,finishedAt:new Date().toISOString(),studyMs:amount,pauseMs:0,pauses:[],corrections:[{type:"split_from",sourceId:id,registeredAt:clock()}],mode:r.mode,goalMin:target.plannedMin||settings().goalMin,goalNotified:false,lastBlockAlert:0,status:"partial"};
+  updateActual(target,timing.records[targetId]);
+  noteEdit(r,"time_split",{to:targetId,studyMs:amount});
+ }else{
+  const matched=trackTimeMatches(x,r);
+  delete timing.records[id];r.sessionId=targetId;
+  noteEdit(r,"transferred",{from:id,to:targetId});
+  timing.records[targetId]=r;
+  if(matched)x.actualMin=null;
+  updateActual(target,r);
+ }
+ persist();C.closeModal();C.render();C.notify(split?"Tempo dividido sem duplicação.":"Cronometragem transferida para a outra sessão.");
+}
+function manageModal(id){
+ const x=session(id),r=record(id);
+ if(!x||V?.isClosed?.(x.date))throw Error("Sessão inexistente ou dia finalizado.");
+ const undoButton=lastUndoAvailable(id)?'<button class="btn small" data-s7="undo">↶ Desfazer última alteração</button>':"";
+ if(!r){
+  if(!undoButton)throw Error("Esta sessão não possui cronometragem.");
+  return C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p>O registro foi descartado.</p><div class="row">'+undoButton+'</div></div>');
+ }
+ const active=timing.active?.sessionId===id;
+ const controls='<button class="btn small ghost" data-s7="editTotals" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Editar tempos</button>'+
+ '<button class="btn small ghost" data-s7="pauses" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Gerenciar pausas</button>'+
+ '<button class="btn small ghost" data-s7="transfer" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Transferir para outra sessão</button>'+
+ '<button class="btn small ghost" data-s7="split" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Dividir tempo entre sessões</button>'+
+ '<button class="btn small ghost" data-s7="reset" data-id="'+A(id)+'">Zerar cronometragem</button>'+
+ '<button class="btn small danger" data-s7="discard" data-id="'+A(id)+'">Descartar cronometragem</button>';
+ C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p class="note">'+E(x.discipline)+' · estudo '+E(duration(studyMs(r)))+' · pausas '+E(duration(pauseMs(r)))+'</p>'+
+ (active?'<p class="note">Para editar o histórico, encerre primeiro como parcial. Zerar e descartar estão disponíveis durante a contagem.</p>':"")+
+ '<div class="s7-menu-actions">'+controls+'</div>'+undoButton+
+ '<p class="note">O planejamento e a conclusão não são excluídos ao apagar tempos. Os dias finalizados permanecem protegidos.</p></div>');
+}
+
 function metrics(filter){
  const entries=Object.values(timing.records).filter(r=>{
   const x=session(r.sessionId);return x&&(!filter||(!filter.from||x.date>=filter.from)&&(!filter.to||x.date<=filter.to));
