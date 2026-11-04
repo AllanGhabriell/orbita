@@ -13,7 +13,7 @@ if(!timing.active||typeof timing.active!=="object")timing.active=null;
 const E=C.esc,A=C.attr, $=id=>document.getElementById(id);
 const clock=()=>Date.now();
 const titleBase=document.title;
-let audioContext=null,previousTitle="",flashTimeout=0;
+let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null;
 const fmtMs=ms=>{const secs=Math.max(0,Math.floor(ms/1000));return String(Math.floor(secs/3600)).padStart(2,"0")+":"+String(Math.floor(secs%3600/60)).padStart(2,"0")+":"+String(secs%60).padStart(2,"0");};
 const duration=ms=>{const min=Math.round(Math.max(0,ms)/60000);return Math.floor(min/60)+"h"+String(min%60).padStart(2,"0");};
 const record=id=>timing.records[id]||null;
@@ -200,10 +200,26 @@ function historyHtml(){
    '<div><span>Estudo '+E(duration(studyMs(r)))+'</span><span>Pausado '+E(duration(pauseMs(r)))+'</span><small>Preparação '+E(duration(prep))+' · '+(r.pauses||[]).length+' pausa(s) registradas</small></div></div>';
  }).join("")+'</div>';
 }
+
+function sessionMenu(id){
+ const x=session(id),r=record(id);
+ const mayUndo=lastUndo?.sessionId===id&&clock()-lastUndo.at<60000;
+ if(!x||(!r&&!mayUndo)||V?.isClosed?.(x.date))return "";
+ return '<button class="btn small ghost s7-manage-trigger" aria-label="Gerenciar cronometragem" title="Gerenciar cronometragem" data-s7="manage" data-id="'+A(id)+'">⋯</button>';
+}
+
 function decorate(route,html){
  if(route==="inicio"){
   html=html.replace(/(<button class="btn small [^"]*" data-s3="quickDone" data-id="([^"]+)")/g,(full,head,id)=>homeButtons(id)+head);
-  return (timing.active?ring():"")+html;
+  // Menu de ações contextual, sem controles espalhados na página.
+  html=html.replace(/(<button class="btn small ghost" data-s3="recordSession" data-id="([^"]+)">Registrar<\/button>)/g,(whole,button,id)=>button+sessionMenu(id));
+  // Cronômetro dentro do próprio quadro de estudos (nunca no topo global).
+  if(timing.active&&session(timing.active.sessionId)?.date===C.state.date){
+   const marker='<div class="study-daily-summary">';
+   const pos=html.indexOf(marker),end=pos>=0?html.indexOf("</div>",pos+marker.length):-1;
+   if(end>=0)html=html.slice(0,end+6)+ring()+html.slice(end+6);
+  }
+  return html;
  }
  if(route==="estudos"||route==="evolucao"||route==="perfil"){
   const m=metrics(),week=metrics({from:C.addDays(C.today(),-6),to:C.today()}),ratio=m.ratio===null?"—":m.ratio+"%";
@@ -234,18 +250,11 @@ function settingsPanel(){
 }
 function tick(){
  const a=timing.active,r=activeRecord();
- const banner=$("s7-global-status");
  if(!a||!r){
-  if(banner){banner.hidden=false;banner.className="s7-global-status s7-global-idle";banner.innerHTML="<strong>◷ NENHUM ESTUDO ATIVO</strong><span>O tempo de estudo não está sendo contado.</span>";}
   if(document.title!==titleBase&&document.title.startsWith("Ⅱ PAUSADO")||document.title.startsWith("● EM ESTUDO"))document.title=titleBase;
   return;
  }
  const x=session(a.sessionId),studied=studyMs(r),paused=pauseMs(r),goal=Math.max(1,Number(r.goalMin)||90)*60000;
- if(banner){
-  banner.hidden=false;
-  banner.className="s7-global-status "+(a.phase==="paused"?"s7-global-paused":"s7-global-running");
-  banner.innerHTML='<strong>'+(a.phase==="paused"?"Ⅱ ESTUDO PAUSADO":"● ESTUDO EM ANDAMENTO")+'</strong><span>'+E(x?.discipline||"Sessão")+' · '+(a.phase==="paused"?"Pausa "+fmtMs(clock()-a.since):"Estudado "+fmtMs(studied))+'</span><button type="button" data-s7="'+(a.phase==="paused"?"resume":"pause")+'" data-kind="rest">'+(a.phase==="paused"?"▶ Retomar":"Ⅱ Pausar")+'</button>';
- }
  document.title=(a.phase==="paused"?"Ⅱ PAUSADO":"● EM ESTUDO")+" — Órbita";
  const el=$('s7-circle');
  if(el)el.style.setProperty("--s7-progress",Math.min(100,studied/goal*100)+"%");
