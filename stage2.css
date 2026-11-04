@@ -72,3 +72,69 @@
 body[data-theme="dark"] .task-priority-high{color:#ff92ab;background:rgba(238,83,120,.13)}
 body[data-theme="dark"] .task-priority-medium{color:#f3c875;background:rgba(239,178,64,.11)}
 body[data-theme="dark"] .task-priority-low{color:#8be1bc;background:rgba(73,184,135,.11)}
+
+/* Organizar: os botões são AÇÕES COM TEXTO, não ícones de 30px. */
+.view[data-route="organizar"] .organize-list{
+  max-height:none;
+  overflow:visible;
+  padding-right:0;
+}
+.view[data-route="organizar"] .organize-row{
+  display:grid;
+  grid-template-columns:31px minmax(0,1fr) auto;
+  gap:12px;
+  align-items:center;
+  min-width:0;
+}
+.view[data-route="organizar"] .organize-row .task-main{
+  min-width:0;
+  flex:auto;
+  overflow-wrap:anywhere;
+}
+.view[data-route="organizar"] .organize-actions{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+  max-width:100%;
+  margin:0;
+}
+.view[data-route="organizar"] .organize-actions .btn{
+  box-sizing:border-box;
+  display:inline-flex;
+  flex:0 0 auto;
+  width:auto;
+  min-width:max-content;
+  min-height:34px;
+  padding:8px 11px;
+  font-size:11px;
+  line-height:1.25;
+  white-space:nowrap;
+  text-align:center;
+}
+@media(max-width:1200px){
+  .view[data-route="organizar"] .organize-row{
+    grid-template-columns:31px minmax(0,1fr);
+    align-items:start;
+  }
+  .view[data-route="organizar"] .organize-actions{
+    grid-column:2;
+    justify-content:flex-start;
+  }
+}
+@media(max-width:440px){
+  .view[data-route="organizar"] .organize-row{gap:9px;padding:11px}
+  .view[data-route="organizar"] .organize-actions{
+    grid-column:1/-1;
+    margin:0;
+    gap:6px;
+  }
+  .view[data-route="organizar"] .organize-actions .btn{
+    min-width:0;
+    flex:1 1 calc(50% - 6px);
+    padding:9px 7px;
+    font-size:11px;
+  }
+}
