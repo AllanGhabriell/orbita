@@ -253,6 +253,17 @@ function pauseDuration(p){return Math.max(0,(Number(p.endedAt)||Number(p.started
 function allPauseMs(r){return (r.pauses||[]).reduce((total,p)=>total+pauseDuration(p),0);}
 function noteEdit(r,type,details){r.corrections||(r.corrections=[]);r.corrections.push({type,registeredAt:clock(),...details});}
 function updateActual(x,r){x.actualMin=r.studyMs>0?Math.max(1,Math.round(r.studyMs/60000)):null;r.recordedActualMin=x.actualMin;}
+function syncManualRecord(id,minutes){
+ const r=record(id),x=session(id);
+ if(!r||!x||timing.active?.sessionId===id||V?.isClosed?.(x.date))return;
+ const valid=minutes==null||Number.isFinite(Number(minutes))&&Number(minutes)>=0&&Number(minutes)<=1440;
+ if(!valid)return;
+ const newMs=minutes==null?0:Math.round(Number(minutes)*60000);
+ if(r.studyMs===newMs)return;
+ noteEdit(r,"manual_time_adjustment",{beforeMs:r.studyMs,afterMs:newMs});
+ r.studyMs=newMs;r.recordedActualMin=minutes;
+ lastUndo=null;
+}
 function editTotalsModal(id){
  const {x,r}=editableRecord(id);
  C.openModal("Editar tempo de estudo",'<form id="s7-edit-totals" class="section-stack">'+
@@ -604,6 +615,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();tick();
 })();
