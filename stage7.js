@@ -205,6 +205,29 @@ function trackTimeMatches(x,r){
  const recorded=r.recordedActualMin;
  return (recorded!=null&&reported===Number(recorded))||reported===Math.max(1,Math.round(studyMs(r)/60000));
 }
+function cancelAccidentalPause(){
+ const a=timing.active,r=activeRecord();
+ if(!a||!r||a.phase!=="paused")throw Error("Não há uma pausa ativa.");
+ if(!window.confirm("A pausa foi acionada por engano e você continuou estudando? O intervalo da pausa atual será convertido em estudo efetivo."))return;
+ snapshotUndo([a.sessionId]);
+ const at=clock(),time=Math.max(0,at-a.since);
+ r.studyMs+=time;
+ if(r.pauses.at(-1)?.endedAt===null)r.pauses.pop();
+ noteEdit(r,"accidental_pause_cancelled",{durationMs:time});
+ timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+ persist();C.closeModal();C.render();tick();C.notify("Pausa acidental desfeita; intervalo contado como estudo conforme sua confirmação.");
+}
+function resetCurrentPause(){
+ const a=timing.active,r=activeRecord();
+ if(!a||!r||a.phase!=="paused")throw Error("Não há pausa ativa para zerar.");
+ if(!window.confirm("Zerar somente o contador da pausa atual? O intervalo descartado não será convertido em estudo."))return;
+ snapshotUndo([a.sessionId]);
+ const at=clock();
+ if(r.pauses.at(-1)?.endedAt===null)r.pauses.at(-1).startedAt=at;
+ noteEdit(r,"active_pause_reset",{discardedMs:Math.max(0,at-a.since)});
+ timing.active={sessionId:a.sessionId,phase:"paused",since:at,alertIndex:0};
+ persist();C.closeModal();C.render();tick();C.notify("Contador da pausa atual zerado, sem acrescentar tempo de estudo.");
+}
 function resetTimer(id){
  const {x,r}=editableRecord(id,true);
  if(!window.confirm("Zerar todos os tempos e pausas desta cronometragem? A sessão planejada e a sua conclusão serão preservadas. Você poderá desfazer em até 60 segundos."))return;
@@ -281,7 +304,7 @@ function editPause(id,index,start,end,kind){
  const {r}=editableRecord(id),p=r.pauses?.[index];
  if(!p||p.endedAt===null)throw Error("Pausa não encontrada ou ainda aberta.");
  if(!Object.hasOwn(pauseNames,kind))throw Error("Categoria inválida.");
- if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end||end>clock())throw Error("Informe horários válidos para início e fim.");
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end||end>clock()||(r.finishedAt&&end>new Date(r.finishedAt).getTime()))throw Error("Informe horários válidos dentro do período da sessão.");
  if(start<new Date(r.startedAt).getTime())throw Error("A pausa não pode começar antes da sessão.");
  if(r.pauses.some((other,i)=>i!==index&&start<(other.endedAt??clock())&&end>other.startedAt))throw Error("Os horários não podem se sobrepor a outra pausa.");
  const delta=(end-start)-pauseDuration(p),newPause=r.pauseMs+delta;
@@ -339,7 +362,7 @@ function moveRecord(id,targetId,split,minutes=0){
   noteEdit(r,"time_split",{to:targetId,studyMs:amount});
  }else{
   const matched=trackTimeMatches(x,r);
-  delete timing.records[id];r.sessionId=targetId;
+  delete timing.records[id];r.sessionId=targetId;r.status="partial";
   noteEdit(r,"transferred",{from:id,to:targetId});
   timing.records[targetId]=r;
   if(matched)x.actualMin=null;
@@ -360,6 +383,7 @@ function manageModal(id){
  '<button class="btn small ghost" data-s7="pauses" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Gerenciar pausas</button>'+
  '<button class="btn small ghost" data-s7="transfer" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Transferir para outra sessão</button>'+
  '<button class="btn small ghost" data-s7="split" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Dividir tempo entre sessões</button>'+
+ (active&&timing.active.phase==="paused"?'<button class="btn small ghost" data-s7="cancelAccidentalPause">Desfazer pausa acidental</button><button class="btn small ghost" data-s7="resetCurrentPause">Zerar apenas a pausa atual</button>':"")+
  '<button class="btn small ghost" data-s7="reset" data-id="'+A(id)+'">Zerar cronometragem</button>'+
  '<button class="btn small danger" data-s7="discard" data-id="'+A(id)+'">Descartar cronometragem</button>';
  C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p class="note">'+E(x.discipline)+' · estudo '+E(duration(studyMs(r)))+' · pausas '+E(duration(pauseMs(r)))+'</p>'+
@@ -538,6 +562,8 @@ document.addEventListener("click",e=>{
   else if(act==="transfer")moveModal(b.dataset.id,false);
   else if(act==="split")moveModal(b.dataset.id,true);
   else if(act==="undo")undo();
+  else if(act==="cancelAccidentalPause")cancelAccidentalPause();
+  else if(act==="resetCurrentPause")resetCurrentPause();
   else if(act==="notification"){
    if(!("Notification" in window)||!window.isSecureContext)C.notify("Notificações do dispositivo indisponíveis neste navegador.");
    else Notification.requestPermission().then(p=>{settings().desktopNotifications=p==="granted";persist();C.notify(p==="granted"?"Permissão de notificação ativada.":"Permissão não concedida.");});
@@ -578,6 +604,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();tick();
 })();
