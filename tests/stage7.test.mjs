@@ -49,7 +49,7 @@ function harness(){
  };
  vm.runInNewContext(source,ctx,{filename:"stage7.js"});
  const stage=ctx.window.OrbitaStage7.inspect;
- return {state,item,target,stage,callbacks,notifications,alarmHost,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
+ return {state,item,target,stage,decorate:ctx.window.OrbitaStage7.decorate,callbacks,notifications,alarmHost,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
 }
 test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
  const h=harness();
@@ -238,7 +238,7 @@ test("teste de alarme abre aviso no Órbita sem criar nem concluir sessão",()=>
 
 test("preferências do cronômetro têm grupos, alternâncias acessíveis e arquivo sem caixa nativa",()=>{
  const h=harness();
- const markup=String(h.stage.decorate("configuracoes",""));
+ const markup=String(h.decorate("configuracoes",""));
  assert.match(markup,/s7-settings-grid/);
  assert.match(markup,/Ritmo de estudo/);
  assert.match(markup,/Sons e efeitos/);
