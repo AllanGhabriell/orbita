@@ -289,6 +289,47 @@ try{
  console.log("Chromium: Biblioteca, cadastro de assunto, sessão por seleção, duplicação/desfazer e cópia semanal passaram.");
 
 
+
+ // Prioridades das tarefas secundárias: rótulo, cores e conclusão inalterada.
+ await page.evaluate(()=>{
+  const C=window.OrbitaCore,S=window.OrbitaStage2.inspect,date=C.state.date;
+  for(const [key,label] of [["high","Alta"],["medium","Média"],["low","Baixa"]]){
+   S.model.entries.push({
+    id:"browser-priority-"+key,type:"task",title:"Tarefa "+label,date,
+    createdAt:new Date().toISOString(),blockId:"",priority:key,
+    goalId:"",startTime:"",estimatedMin:15,dueDate:"",
+    recurrence:{kind:"none"},archivedAt:"",origin:null
+   });
+  }
+  C.save();C.go("inicio");
+ });
+ await page.waitForSelector(".task-priority-high");
+ const priorityBadges=await page.evaluate(()=>{
+  return [...document.querySelectorAll(".task-priority")].map(el=>({
+   label:el.textContent.trim(),
+   color:getComputedStyle(el).color,
+   dot:getComputedStyle(el.querySelector(".task-priority-dot")).backgroundColor,
+   inTask:!!el.closest(".task-row"),
+   title:el.getAttribute("title")
+  }));
+ });
+ assert.equal(priorityBadges.length,3,"somente as três tarefas exibem prioridade");
+ assert.deepEqual(priorityBadges.map(x=>x.label),["Alta","Média","Baixa"],"prioridades ordenadas e legíveis");
+ assert.equal(new Set(priorityBadges.map(x=>x.color)).size,3,"baixa, média e alta têm cores distintas");
+ assert.ok(priorityBadges.every(x=>x.inTask&&x.dot===x.color&&x.title==="Prioridade "+x.label),"cor, texto e dica acessível são consistentes");
+ await page.click(".task-row:has(.task-priority-high) [data-s2='status'][data-value='done']");
+ await page.waitForFunction(()=>document.querySelector(".task-priority-high")?.closest(".task-row")?.classList.contains("task-done"));
+ assert.equal(await page.evaluate(()=>document.querySelector(".task-priority-high")?.closest(".task-row")?.querySelector("[data-value='pending']")!=null),true,"conclusão continua reversível");
+ await page.click(".task-row:has(.task-priority-high) [data-s2='status'][data-value='pending']");
+ await page.waitForFunction(()=>!document.querySelector(".task-priority-high")?.closest(".task-row")?.classList.contains("task-done"));
+ await page.setViewport({width:390,height:850,deviceScaleFactor:1});
+ const badgesOnMobile=await page.evaluate(()=>[...document.querySelectorAll(".task-priority")].map(el=>{
+  const badge=el.getBoundingClientRect(),row=el.closest(".task-row").getBoundingClientRect();
+  return {fits:badge.left>=row.left-1&&badge.right<=row.right+1,visible:badge.width>25&&badge.height>12};
+ }));
+ assert.ok(badgesOnMobile.every(x=>x.fits&&x.visible),"indicadores de prioridade legíveis no celular");
+ console.log("Chromium: prioridade baixa/média/alta com cores distintas, conclusão e desfazer preservados no mobile.");
+
  assert.equal(errors.length,0,"nenhum erro JavaScript em fluxo de salvar e reabrir: "+errors.join("; "));
  console.log("Chromium: clique de salvar, cinco dias, persistência após recarga e edição passaram.");
 }finally{
