@@ -1,6 +1,6 @@
 /* Órbita service worker: arquivos do app em cache; nunca intercepta dados da API Supabase. */
-const CACHE="orbita-app-planner-layout-20261103-session-focus";
-const CORE=["./","./index.html","./boot.js","./config.js","./app.js","./stage2.js","./stage3.js","./stage4.js","./stage5.js","./stage6.js","./styles.css","./stage2.css","./stage3.css","./stage3.css?v=20261103-session-focus","./stage4.css","./stage5.css","./stage6.css","./manifest.webmanifest","./assets/orbita.svg","./assets/icon-192.png","./assets/icon-512.png"];
+const CACHE="orbita-app-task-priority-20261104-task-priority";
+const CORE=["./","./index.html","./boot.js","./config.js","./app.js","./stage2.js","./stage3.js","./stage4.js","./stage5.js","./stage6.js","./styles.css","./stage2.css","./stage2.css?v=20261104-task-priority","./stage3.css","./stage3.css?v=20261103-session-focus","./stage4.css","./stage5.css","./stage6.css","./manifest.webmanifest","./assets/orbita.svg","./assets/icon-192.png","./assets/icon-512.png"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });
