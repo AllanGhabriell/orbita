@@ -7,11 +7,13 @@ const source=fs.readFileSync(new URL("../stage7.js",import.meta.url),"utf8");
 const baseTime=Date.parse("2026-11-04T12:00:00.000Z");
 function harness(){
  let time=baseTime;
- const state={settings:{motion:false},date:"2026-11-04",studies:{},evolution:{closed:{}}};
  const item={id:"math-1",date:"2026-11-04",plannedMin:90,status:"pending",actualMin:null,kind:"cycle",discipline:"Matemática",archived:false};
+ const target={id:"physics-2",date:"2026-11-04",plannedMin:90,status:"pending",actualMin:null,kind:"supplement",discipline:"Física",archived:false};
+ const items=[item,target];
+ const state={settings:{motion:false},date:"2026-11-04",studies:{sessions:items,events:[]},evolution:{closed:{}}};
  let saved=0,notifications=[];
  const callbacks={};
- class ClockDate extends Date{static now(){return time;}}
+ class ClockDate extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
  const fakeDocument={
   title:"Órbita",hidden:false,
   addEventListener(type,fn,capture){(callbacks[type]||=[]).push({fn,capture});},
@@ -28,7 +30,8 @@ function harness(){
     openModal(){},closeModal(){},settings:{},confirm:()=>true,
    },
    OrbitaStage3:{inspect:{
-    session:id=>id===item.id?item:null,
+    session:id=>items.find(x=>x.id===id)||null,
+    model:state.studies,
     setSessionStatus(id,status,min){assert.equal(id,item.id);item.status=status;item.actualMin=min;},
    }},
    OrbitaStage4:{inspect:{isClosed:date=>!!state.evolution.closed[date]}},
@@ -45,7 +48,7 @@ function harness(){
  };
  vm.runInNewContext(source,ctx,{filename:"stage7.js"});
  const stage=ctx.window.OrbitaStage7.inspect;
- return {state,item,stage,callbacks,notifications,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
+ return {state,item,target,stage,callbacks,notifications,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
 }
 test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
  const h=harness();
@@ -96,9 +99,67 @@ test("dia encerrado impede iniciar, sem produzir sessão falsa",()=>{
 test("interface possui indicadores e alertas configuráveis",()=>{
  const h=harness();
  assert.equal(h.stage.model.settings.mode,"continuous");
- assert.match(source,/ESTUDO PAUSADO/);
- assert.match(source,/ESTUDO EM ANDAMENTO/);
+ assert.match(source,/Pausado/);
+ assert.match(source,/Em estudo/);
+ assert.doesNotMatch(source,/NENHUM ESTUDO ATIVO/,"não deve existir a faixa de inatividade");
  assert.match(source,/pauseMinutes/);
  assert.match(source,/upload\(/);
  assert.match(source,/data-s7="correct"/);
+});
+
+test("pausas podem ser editadas, excluídas e restauradas sem criar estudo fictício",()=>{
+ const h=harness();
+ h.stage.start("math-1");h.setTime(20*60000);
+ h.stage.pause("rest");h.setTime(25*60000);
+ h.stage.resume();h.setTime(35*60000);h.stage.finish(false);
+ const r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,30*60000);
+ assert.equal(r.pauseMs,5*60000);
+ h.stage.editPause("math-1",0,baseTime+20*60000,baseTime+22*60000,"preparation");
+ assert.equal(r.pauseMs,2*60000);
+ h.stage.deletePause("math-1",0);
+ assert.equal(r.pauseMs,0);
+ assert.equal(r.studyMs,30*60000);
+ assert.equal(r.pauses.length,0);
+ h.stage.undo();
+ assert.equal(h.state.timing.records["math-1"].pauseMs,2*60000);
+ assert.equal(h.state.timing.records["math-1"].pauses.length,1);
+ h.stage.clearPauses("math-1");
+ assert.equal(h.state.timing.records["math-1"].pauseMs,0);
+ assert.equal(h.state.timing.records["math-1"].studyMs,30*60000);
+});
+test("zerar, descartar e desfazer preservam o planejamento",()=>{
+ const h=harness();
+ h.stage.start("math-1");h.setTime(20*60000);h.stage.finish(false);
+ assert.equal(h.item.actualMin,20);
+ h.stage.resetTimer("math-1");
+ assert.equal(h.state.timing.records["math-1"].studyMs,0);
+ assert.equal(h.item.actualMin,null);
+ assert.equal(h.item.status,"progress");
+ h.stage.undo();
+ assert.equal(h.state.timing.records["math-1"].studyMs,20*60000);
+ assert.equal(h.item.actualMin,20);
+ h.stage.discardTimer("math-1");
+ assert.equal(h.state.timing.records["math-1"],undefined);
+ assert.equal(h.item.status,"pending","descarte devolve ao planejamento quando o timer foi o único início");
+ h.stage.undo();
+ assert.equal(h.item.actualMin,20);
+ assert.equal(h.state.timing.records["math-1"].studyMs,20*60000);
+});
+test("dividir e transferir não duplicam o tempo nem apagam conclusão",()=>{
+ const h=harness();
+ h.stage.start("math-1");h.setTime(30*60000);h.stage.finish(false);
+ h.stage.moveRecord("math-1","physics-2",true,10);
+ assert.equal(h.state.timing.records["math-1"].studyMs,20*60000);
+ assert.equal(h.state.timing.records["physics-2"].studyMs,10*60000);
+ assert.equal(h.item.actualMin+h.target.actualMin,30);
+ assert.equal(h.target.status,"pending");
+ h.stage.undo();
+ assert.equal(h.state.timing.records["math-1"].studyMs,30*60000);
+ assert.equal(h.state.timing.records["physics-2"],undefined);
+ h.stage.moveRecord("math-1","physics-2",false);
+ assert.equal(h.state.timing.records["math-1"],undefined);
+ assert.equal(h.state.timing.records["physics-2"].studyMs,30*60000);
+ assert.equal(h.item.actualMin,null);
+ assert.equal(h.target.actualMin,30);
 });
