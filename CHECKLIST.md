@@ -1,5 +1,19 @@
 # CHECKLIST — Órbita
 
+## Cronômetro de estudos — 04/11/2026
+- [x] Botão Cronometrar nas sessões da tela Início
+- [x] Indicadores globais de estado ativo, pausado e inativo
+- [x] Pausa com descanso, preparação de flashcards, interrupção e intervalo programado
+- [x] Correção de horários com histórico e salvamento automático
+- [x] Timer circular e opções contínuo, Pomodoro e personalizado
+- [x] Sons, upload compacto, volume, notificação e destaque de conclusão
+- [x] Tempo produtivo e pausado separados e histórico por sessão
+- [x] Proteção do dia finalizado e conclusão manual da etapa
+- [x] Dados no JSON do Supabase existente, sem SQL adicional
+- [x] Testes unitários de contagem, correção e proteção
+- [ ] Validar notificações, áudio, sincronização em dispositivos reais e acessibilidade
+
+
 Legenda: [x] concluído e verificado; [ ] pendente. Itens entregues sem validação completa são explicitamente indicados em PROGRESSO.md. Esta lista é auditada ao fim de toda etapa.
 
 ## Uso diário dos ciclos — 02/11/2026
