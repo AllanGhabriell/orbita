@@ -39,10 +39,11 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.waitForSelector('[data-s7="start"][data-id="browser-test-study"]');
   await page.click('[data-s7="start"][data-id="browser-test-study"]');
   await page.waitForSelector(".s7-timer.s7-running");
-  assert.match(await page.$eval("#s7-global-status",el=>el.textContent),/ESTUDO EM ANDAMENTO/);
+  assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Em estudo/);
+  assert.equal(await page.evaluate(()=>!!document.querySelector("#s7-global-status")),false,"faixa de inatividade não ocupa o topo");
   await page.click('.s7-timer [data-s7="pause"][data-kind="preparation"]');
   await page.waitForSelector(".s7-timer.s7-paused");
-  assert.match(await page.$eval("#s7-global-status",el=>el.textContent),/ESTUDO PAUSADO/);
+  assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Pausado/);
   const stateBefore=await page.evaluate(()=>window.OrbitaCore.state.timing.active?.phase);
   assert.equal(stateBefore,"paused");
   await page.reload({waitUntil:"load"});
@@ -63,6 +64,41 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   assert.equal(result.status,"progress","encerramento parcial não conclui matéria");
   assert.equal(result.pauses,1);
   assert.equal(result.saved,true);
+  assert.equal(await page.evaluate(()=>document.querySelector(".study-home-panel .s7-timer")===null),true,"timer desaparece após encerramento");
+  // Gerenciamento está acessível no cartão da sessão, sem ocupar cabeçalho global.
+  await page.click('[data-s7="manage"][data-id="browser-test-study"]');
+  await page.waitForSelector("#modal-host [data-s7='editTotals']");
+  await page.click("#modal-host [data-s7='editTotals']");
+  await page.waitForSelector("#s7-edit-totals");
+  await page.$eval('#s7-edit-totals [name="study"]',el=>{el.value="45";});
+  await page.$eval('#s7-edit-totals [name="paused"]',el=>{el.value="10";});
+  await page.click('#s7-edit-totals button[type="submit"]');
+  await page.waitForFunction(()=>window.OrbitaCore.state.timing.records["browser-test-study"].studyMs===45*60000);
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.studies.sessions.find(x=>x.id==="browser-test-study").actualMin),45);
+  await page.click('[data-s7="manage"][data-id="browser-test-study"]');
+  page.once("dialog",dialog=>dialog.accept());
+  await page.click('#modal-host [data-s7="reset"]');
+  await page.waitForFunction(()=>window.OrbitaCore.state.timing.records["browser-test-study"].studyMs===0);
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.studies.sessions.find(x=>x.id==="browser-test-study").status),"progress");
+  await page.click('[data-s7="manage"][data-id="browser-test-study"]');
+  await page.click('#modal-host [data-s7="undo"]');
+  await page.waitForFunction(()=>window.OrbitaCore.state.timing.records["browser-test-study"].studyMs===45*60000);
+  // Conclusão manual sem cronômetro continua válida no fluxo existente.
+  await page.evaluate(()=>{
+   const c=window.OrbitaCore,t=window.OrbitaStage3.inspect,date=c.today();
+   t.model.sessions.push({id:"manual-study",date,kind:"supplement",cycleId:"",plannedMin:90,status:"pending",discipline:"Física",area:"ENEM",archived:false,createdAt:new Date().toISOString()});
+   c.save();c.render();
+  });
+  await page.click('[data-s3="recordSession"][data-id="manual-study"]');
+  await page.waitForSelector("#s3-record");
+  await page.select('#s3-record [name="status"]',"done");
+  await page.$eval('#s3-record [name="actualMin"]',el=>{el.value="90";});
+  await page.click('#s3-record button[type="submit"]');
+  await page.waitForFunction(()=>window.OrbitaCore.state.studies.sessions.find(x=>x.id==="manual-study").status==="done");
+  assert.deepEqual(await page.evaluate(()=>{
+   const s=window.OrbitaCore.state;
+   return {minutes:s.studies.sessions.find(x=>x.id==="manual-study").actualMin,hasTimer:!!s.timing.records["manual-study"]};
+  }),{minutes:90,hasTimer:false},"registro manual não depende de iniciar o cronômetro");
   assert.deepEqual(errors,[],"nenhum erro JavaScript no navegador");
  }finally{await browser?.close();await new Promise(r=>server.close(r));}
 });
