@@ -178,3 +178,13 @@ test("pausa atual pode ser zerada sem estudar ou cancelada com confirmação",()
  assert.equal(h.state.timing.records["math-1"].pauses.length,0);
  assert.equal(h.state.timing.active.phase,"running");
 });
+
+test("tempo corrigido pelo formulário manual atualiza o histórico do cronômetro",()=>{
+ const h=harness();
+ h.stage.start("math-1");h.setTime(30*60000);h.stage.finish(false);
+ h.item.actualMin=45;
+ h.stage.syncManualRecord("math-1",45);
+ assert.equal(h.state.timing.records["math-1"].studyMs,45*60000);
+ assert.equal(h.state.timing.records["math-1"].recordedActualMin,45);
+ assert.equal(h.state.timing.records["math-1"].corrections.at(-1).type,"manual_time_adjustment");
+});
