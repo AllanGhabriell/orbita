@@ -50,3 +50,13 @@ body[data-theme=light] .s7-circle-inner{background:#fff}
 @media(max-width:700px){.s7-main{grid-template-columns:1fr;gap:18px}.s7-circle{width:205px}.s7-controls{justify-content:center}.s7-controls>.btn{flex:1 1 135px}.s7-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.s7-global-status{padding:10px 12px}.s7-head{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){body.s7-completion .main-shell{animation:none}}
 body.motion-off.s7-completion .main-shell{animation:none}
+
+.s7-global-idle{background:rgba(115,120,155,.09);color:var(--text,inherit);opacity:.82}
+.s7-history{border-top:1px solid rgba(125,135,163,.2);margin-top:15px;padding-top:13px;display:grid;gap:11px}
+.s7-history-row{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;border-bottom:1px solid rgba(125,135,163,.13);padding-bottom:10px}
+.s7-history-row>div{display:grid;gap:4px}
+.s7-history-row>div:last-child{text-align:right}
+.s7-history-row strong{font-size:13px}
+.s7-history-row span{font-size:12px}
+.s7-history-row small{opacity:.74;font-size:11px}
+@media(max-width:500px){.s7-history-row>div:last-child{text-align:left}}
