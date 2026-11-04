@@ -22,7 +22,11 @@ const validTime=n=>Number.isFinite(n)&&n>0&&n<=clock();
 function activeRecord(){return timing.active?record(timing.active.sessionId):null;}
 function studyMs(r,at=clock()){return Math.max(0,Number(r.studyMs)||0)+(timing.active?.sessionId===r.sessionId&&timing.active.phase==="running"?Math.max(0,at-timing.active.since):0);}
 function pauseMs(r,at=clock()){return Math.max(0,Number(r.pauseMs)||0)+(timing.active?.sessionId===r.sessionId&&timing.active.phase==="paused"?Math.max(0,at-timing.active.since):0);}
-function settings(){return timing.settings;}
+function settings(){
+ if(!timing.settings||typeof timing.settings!=="object")timing.settings={};
+ for(const [key,value] of Object.entries(defaults))if(timing.settings[key]===undefined)timing.settings[key]=value;
+ return timing.settings;
+}
 function persist(){C.save();}
 function audioUnlock(){try{const AudioCtx=window.AudioContext||window.webkitAudioContext;if(AudioCtx){audioContext=audioContext||new AudioCtx();audioContext.resume?.().catch(()=>{});}}catch{}}
 function tone(kind){
