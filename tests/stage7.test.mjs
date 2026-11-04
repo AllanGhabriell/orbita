@@ -163,3 +163,18 @@ test("dividir e transferir não duplicam o tempo nem apagam conclusão",()=>{
  assert.equal(h.item.actualMin,null);
  assert.equal(h.target.actualMin,30);
 });
+
+test("pausa atual pode ser zerada sem estudar ou cancelada com confirmação",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(10*60000);h.stage.pause("rest");
+ h.setTime(15*60000);h.stage.resetCurrentPause();
+ assert.equal(h.state.timing.records["math-1"].studyMs,10*60000);
+ assert.equal(h.stage.pauseMs(h.state.timing.records["math-1"]),0);
+ h.setTime(18*60000);
+ h.stage.cancelAccidentalPause();
+ assert.equal(h.state.timing.records["math-1"].studyMs,13*60000);
+ assert.equal(h.state.timing.records["math-1"].pauseMs,0);
+ assert.equal(h.state.timing.records["math-1"].pauses.length,0);
+ assert.equal(h.state.timing.active.phase,"running");
+});
