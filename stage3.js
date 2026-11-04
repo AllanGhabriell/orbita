@@ -422,8 +422,10 @@ function setSessionStatus(id,status,actualMin,actualTime){
 function deleteSession(id){
  const x=session(id);if(!x)return;
  if(!editable(x.date))throw Error("Sessão em dia finalizado.");
+ if(window.OrbitaStage7?.inspect?.activeSessionId===id)throw Error("Encerre ou descarte o cronômetro antes de excluir esta sessão.");
  if(x.kind==="cycle"&&x.status==="done"&&cycle(x.cycleId)?.stepNo!==x.stepNo)canUndoCompletedStep(x);
  db.sessions=db.sessions.filter(q=>q.id!==id);
+ window.OrbitaStage7?.inspect?.removeDeletedSession?.(id);
  logs("session_deleted",{sessionId:id,cycleId:x.cycleId,date:x.date});
 }
 function summarize(filter={}){
