@@ -1,5 +1,21 @@
 # CHECKLIST — Órbita
 
+## Controles avançados do cronômetro — 04/11/2026
+- [x] Remover faixa de inatividade do topo e mostrar o timer dentro de Estudos de hoje
+- [x] Manter registro/conclusão manual sem cronometragem
+- [x] Menu de três pontos por sessão com cronômetro
+- [x] Editar tempo estudado, pausado, categoria e horários de pausas
+- [x] Excluir/zerar pausas sem transformar descanso em estudo
+- [x] Zerar ou descartar apenas a cronometragem, preservando a sessão planejada
+- [x] Cancelar pausa acidental com confirmação explícita e zerar apenas pausa atual
+- [x] Transferir/dividir tempo sem duplicar horas entre sessões do mesmo dia
+- [x] Desfazer última alteração em até 60 segundos, dentro da aba aberta
+- [x] Impedir editar dias finalizados e remover registros órfãos ao excluir sessões
+- [x] Atualizar testes automatizados e versão do cache offline
+- [ ] Verificar visualmente menu, modais, responsividade e sons em Windows e Android
+- [ ] Homologar a sincronização simultânea entre dispositivos reais
+
+
 ## Cronômetro de estudos — 04/11/2026
 - [x] Botão Cronometrar nas sessões da tela Início
 - [x] Indicadores globais de estado ativo, pausado e inativo
