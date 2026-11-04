@@ -220,3 +220,18 @@ test("pausa prolongada mostra aviso e retomar encerra o alarme sem alterar estud
  assert.equal(h.state.timing.records["math-1"].studyMs,12*60000);
  assert.equal(h.state.timing.records["math-1"].pauseMs,11*60000);
 });
+
+test("teste de alarme abre aviso no Órbita sem criar nem concluir sessão",()=>{
+ const h=harness();
+ h.stage.showDemoAlarm("test");
+ assert.equal(h.alarmHost.hidden,false);
+ assert.match(h.alarmHost.innerHTML,/Teste de alarme/);
+ assert.equal(h.state.timing.active,null);
+ assert.equal(h.state.timing.alarm,undefined);
+ assert.match(h.stage.model.settings.finishSound,/orbita/);
+ h.stage.silenceAlarm();
+ assert.match(h.alarmHost.innerHTML,/Reproduzir som/);
+ h.stage.dismissAlarm();
+ assert.equal(h.alarmHost.hidden,true);
+ assert.equal(h.item.status,"pending");
+});

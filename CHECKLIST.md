@@ -1,5 +1,17 @@
 # CHECKLIST — Órbita
 
+
+## Alarme em todos os lugares e importação automática de som — novembro de 2026
+
+- O botão **Testar conclusão / Testar pausa** agora executa o mesmo fluxo do cronômetro: aviso persistente dentro do Órbita, ícone e título destacados na aba, som em loop e notificação do sistema quando autorizada. O teste não altera estudo, minutos, ciclos ou pausas.
+- O navegador pode enviar a notificação ao Windows ou Android, mas **a apresentação de banner depende do sistema e das preferências do usuário**; um site não consegue forçar sobreposição à janela do Anki. A página aberta pode sofrer limitações de temporização e áudio em segundo plano.
+- Um som original do Órbita está incorporado no repositório (`assets/orbita-alarm.wav`) e funciona sem upload. Os sons anteriores permanecem selecionáveis.
+- Para arquivos próprios, o navegador aceita entrada de áudio de até 40 MB (conforme suporte ao formato), decodifica, mistura os canais, recorta os primeiros 5 s, reamostra para WAV PCM mono 11.025 Hz/16 bit e salva o arquivo resultante com até aproximadamente 108 KB. O limite de **120 KB é para o arquivo comprimido salvo**, não 120 MB.
+- A importação de conclusão e pausa é independente, inclusive quando o mesmo arquivo é escolhido mais de uma vez. Erros de decodificação/armazenamento são informados e preservam o som já salvo.
+- Removedida a explicação redundante sobre uso do alarme abaixo das Preferências.
+- Um backend de Web Push com agendamento continua necessário para **iniciar novos avisos com a página fechada**; não foi implementado.
+
+
 ## Alarmes em loop e notificações de dispositivo — 04/11/2026
 - [x] Exibir aviso persistente somente ao atingir meta ou pausa prolongada
 - [x] MP3 pessoal em loop e som interno sintetizado em repetição

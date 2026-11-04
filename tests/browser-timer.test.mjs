@@ -10,7 +10,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
  const chrome=["google-chrome","google-chrome-stable","chromium","chromium-browser"].map(name=>spawnSync("which",[name],{encoding:"utf8"})).find(r=>r.status===0)?.stdout.trim();
  if(!chrome)throw Error("Chromium não encontrado");
  const root=resolve(new URL("../",import.meta.url).pathname);
- const types={".js":"text/javascript",".css":"text/css",".html":"text/html",".svg":"image/svg+xml",".png":"image/png",".webmanifest":"application/manifest+json"};
+ const types={".js":"text/javascript",".css":"text/css",".html":"text/html",".svg":"image/svg+xml",".png":"image/png",".wav":"audio/wav",".webmanifest":"application/manifest+json"};
  const server=createServer(async(req,res)=>{
   try{
    const url=new URL(req.url,"http://localhost"),path=url.pathname;
@@ -125,6 +125,67 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
    const s=window.OrbitaCore.state;
    return {minutes:s.studies.sessions.find(x=>x.id==="manual-study").actualMin,hasTimer:!!s.timing.records["manual-study"]};
   }),{minutes:90,hasTimer:false},"registro manual não depende de iniciar o cronômetro");
+
+  // Testar notificação deve mostrar o aviso dentro do site e sinalizar a aba.
+  await page.evaluate(()=>window.OrbitaCore.go("configuracoes"));
+  await page.waitForSelector('[data-s7="testNotification"]');
+  await page.click('[data-s7="testNotification"]');
+  await page.waitForSelector('#s7-alarm-host:not([hidden])');
+  assert.match(await page.$eval('#s7-alarm-host',el=>el.textContent),/Teste de alarme/);
+  assert.match(await page.title(),/TESTE DE ALARME/);
+  assert.match(await page.$eval('link[rel="icon"]',el=>el.getAttribute("href")) , /^data:image\/svg\+xml/);
+  await page.click('#s7-alarm-host [data-s7="alarmSilence"]');
+  assert.match(await page.$eval('#s7-alarm-host',el=>el.textContent),/Reproduzir som/);
+  await page.click('#s7-alarm-host [data-s7="alarmDismiss"]');
+  assert.equal(await page.$eval('#s7-alarm-host',el=>el.hidden),true);
+  assert.doesNotMatch(await page.title(),/TESTE DE ALARME/);
+
+  // O som incluído pode ser carregado sem upload.
+  const bundled=await page.evaluate(async()=>{
+   const response=await fetch("./assets/orbita-alarm.wav");
+   const bytes=await response.arrayBuffer();
+   return {ok:response.ok,size:bytes.byteLength,header:String.fromCharCode(...new Uint8Array(bytes.slice(0,4)))};
+  });
+  assert.equal(bundled.ok,true);
+  assert.equal(bundled.header,"RIFF");
+  assert.ok(bundled.size>40000);
+  // Dois uploads do MESMO arquivo — sem travar seleção nem misturar conclusão/pausa.
+  await page.evaluate(async()=>{
+   const bytes=await (await fetch("./assets/orbita-alarm.wav")).arrayBuffer();
+   window.__uploadedSound=new File([bytes],"alarme-repetido.wav",{type:"audio/wav"});
+   window.__uploadChoice=which=>{
+    const input=document.getElementById("s7-upload-"+which);
+    const dt=new DataTransfer();dt.items.add(window.__uploadedSound);
+    input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));
+   };
+   window.__uploadChoice("finish");
+  });
+  await page.waitForFunction(()=>window.OrbitaCore.state.timing.settings.finishSound==="custom");
+  const first=await page.evaluate(()=>window.OrbitaCore.state.timing.settings.finishUpload);
+  await page.evaluate(()=>window.__uploadChoice("finish"));
+  await page.waitForFunction(()=>document.getElementById("s7-upload-status-finish")?.textContent.includes("alarme-repetido"));
+  await page.evaluate(()=>window.__uploadChoice("pause"));
+  await page.waitForFunction(()=>window.OrbitaCore.state.timing.settings.pauseSound==="custom");
+  const uploads=await page.evaluate(()=>{
+   const q=window.OrbitaCore.state.timing.settings;
+   return {finish:q.finishUpload,pause:q.pauseUpload,finishBytes:q.finishUploadBytes,pauseBytes:q.pauseUploadBytes,finishName:q.finishUploadName,pauseName:q.pauseUploadName};
+  });
+  assert.equal(uploads.finish,first);
+  assert.equal(uploads.pause,first);
+  assert.ok(uploads.finishBytes<=120*1024);
+  assert.ok(uploads.pauseBytes<=120*1024);
+  assert.equal(uploads.finishName,"alarme-repetido.wav");
+  assert.equal(uploads.pauseName,"alarme-repetido.wav");
+
+  // Conversão de entrada mais longa limita a cinco segundos.
+  const compressed=await page.evaluate(()=>{
+   const ctx=new (window.AudioContext||window.webkitAudioContext)();
+   const longer=ctx.createBuffer(2,ctx.sampleRate*7,ctx.sampleRate);
+   return window.OrbitaStage7.inspect.compactWav(longer);
+  });
+  assert.ok(compressed.bytes<=120*1024);
+  assert.ok(compressed.seconds<=5);
+  assert.ok(compressed.seconds>=4.9);
   assert.deepEqual(errors,[],"nenhum erro JavaScript no navegador");
  }finally{await browser?.close();await new Promise(r=>server.close(r));}
 });
