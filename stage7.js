@@ -609,26 +609,51 @@ function decorate(route,html){
 }
 function option(value,label,selected){return '<option value="'+A(value)+'" '+(selected===value?"selected":"")+'>'+E(label)+'</option>';}
 function soundOptions(value){return option("orbita","Alarme Órbita · som incluído",value)+option("bell","Sino de conclusão",value)+option("digital","Alarme digital",value)+option("soft","Aviso suave",value)+option("custom","Meu áudio",value)+option("none","Silencioso",value);}
+
+function s7Switch(id,enabled,title){
+ return '<label class="s7-switch" for="'+A(id)+'"><input id="'+A(id)+'" type="checkbox" aria-label="'+A(title)+'" '+(enabled?"checked":"")+'><span class="s7-switch-track" aria-hidden="true"></span></label>';
+}
+function s7SettingRow(title,control,hint="",extra=""){
+ return '<div class="setting-row s7-setting-row '+extra+'"><div class="s7-setting-copy"><strong>'+E(title)+'</strong>'+(hint?'<small>'+E(hint)+'</small>':"")+'</div><div class="s7-setting-control">'+control+'</div></div>';
+}
+function s7AudioPicker(which,name){
+ const id="s7-upload-"+which,saveName=settings()[which==="finish"?"finishUploadName":"pauseUploadName"];
+ return '<div class="s7-audio-picker"><input class="s7-file-input" id="'+id+'" type="file" aria-label="Escolher '+A(name)+'" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac">'+
+ '<label class="s7-file-action" for="'+id+'"><span aria-hidden="true">＋</span> Escolher áudio</label>'+
+ '<span class="s7-file-status" role="status" id="s7-upload-status-'+which+'">'+E(saveName||"Nenhum arquivo enviado")+'</span></div>';
+}
 function settingsPanel(){
- const q=settings();
- return '<section class="card s7-settings"><div class="card-head"><h2>◷ Cronômetro e notificações</h2><span class="note">Preferências salvas com a conta</span></div>'+
- '<div class="setting-row"><div><strong>Método de estudo</strong><small>Contínuo, Pomodoro ou blocos personalizados</small></div><select id="s7-setting-mode">'+option("continuous","Contínuo — pausas livres",q.mode)+option("pomodoro","Pomodoro (25/5)",q.mode)+option("custom","Blocos personalizados",q.mode)+'</select></div>'+
- '<div class="setting-row"><div><strong>Meta padrão</strong><small>Usada quando a sessão não tiver duração planejada</small></div><input id="s7-setting-goalMin" type="number" min="1" max="720" value="'+Number(q.goalMin)+'" aria-label="Meta padrão em minutos"></div>'+
- '<div class="setting-row"><div><strong>Bloco personalizado</strong><small>Minutos de estudo antes da sugestão de descanso</small></div><input id="s7-setting-blockMin" type="number" min="1" max="180" value="'+Number(q.blockMin)+'"></div>'+
- '<div class="setting-row"><div><strong>Descanso personalizado</strong><small>Minutos sugeridos na pausa programada</small></div><input id="s7-setting-restMin" type="number" min="1" max="90" value="'+Number(q.restMin)+'"></div>'+
- '<div class="setting-row"><div><strong>Lembrete de pausa prolongada</strong><small>Minutos antes do primeiro alerta (0 desativa)</small></div><input id="s7-setting-pauseMinutes" type="number" min="0" max="240" value="'+Number(q.pauseMinutes)+'"></div>'+
- '<div class="setting-row"><div><strong>Repetir lembrete de pausa</strong><small>Repete a cada intervalo configurado, enquanto estiver pausado</small></div><input id="s7-setting-repeatPause" type="checkbox" '+(q.repeatPause?"checked":"")+'></div>'+
- '<div class="setting-row"><div><strong>Som de conclusão</strong></div><select id="s7-setting-finishSound">'+soundOptions(q.finishSound)+'</select></div>'+
- '<div class="setting-row"><div><strong>Som de pausa prolongada</strong></div><select id="s7-setting-pauseSound">'+soundOptions(q.pauseSound)+'</select></div>'+
- '<div class="setting-row"><div><strong>Repetir som até silenciar — conclusão</strong><small>MP3 e sons internos podem tocar em loop até você silenciar o alarme.</small></div><input id="s7-setting-loopFinish" type="checkbox" '+(q.loopFinish?"checked":"")+'> </div>'+
- '<div class="setting-row"><div><strong>Repetir som até silenciar — pausa longa</strong><small>O aviso também permanece na tela até ser resolvido.</small></div><input id="s7-setting-loopPause" type="checkbox" '+(q.loopPause?"checked":"")+'> </div>'+
- '<div class="setting-row"><div><strong>Meu som de conclusão</strong><small>MP3, WAV, OGG ou M4A (arquivo até 40 MB); recorte dos primeiros 5 s e compressão automática para até 120 KB.</small><small id="s7-upload-status-finish" role="status">'+E(q.finishUploadName||"Nenhum áudio próprio selecionado")+'</small></div><input id="s7-upload-finish" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"></div>'+
- '<div class="setting-row"><div><strong>Meu som de pausa</strong><small>O mesmo arquivo também pode ser usado no alarme de conclusão.</small><small id="s7-upload-status-pause" role="status">'+E(q.pauseUploadName||"Nenhum áudio próprio selecionado")+'</small></div><input id="s7-upload-pause" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"></div>'+
- '<div class="setting-row"><div><strong>Volume</strong></div><input id="s7-setting-volume" type="range" min="0" max="100" value="'+Number(q.volume)+'"></div>'+
- '<div class="setting-row"><div><strong>Brilho ao alcançar a meta</strong></div><input id="s7-setting-visual" type="checkbox" '+(q.visual?"checked":"")+'></div>'+
- '<div class="setting-row"><div><strong>Notificações do Windows/Android</strong><small>Exibidas pelo navegador, após sua autorização, enquanto a página estiver em execução.</small></div><button class="btn small" data-s7="notification">'+(q.desktopNotifications?"Desativar notificações":"Ativar notificações") +'</button></div>'+
- '<div class="setting-row"><div><strong>Testar alarmes</strong><small>Som, aviso dentro do site, destaque na aba e notificação do sistema quando autorizada.</small></div><div class="row"><button class="btn small ghost" data-s7="testNotification">Testar conclusão</button><button class="btn small ghost" data-s7="testPauseNotification">Testar pausa</button></div></div>'+
- '</section>';
+ const q=settings(),number=(id,value,min,max,suffix)=>'<div class="s7-numeric"><input id="s7-setting-'+id+'" type="number" inputmode="numeric" min="'+min+'" max="'+max+'" value="'+Number(value)+'" aria-label="'+A(id)+'">'+(suffix?'<span>'+E(suffix)+'</span>':"")+'</div>';
+ return '<section class="card s7-settings" aria-label="Preferências do cronômetro">'+
+ '<div class="card-head"><div><h2>Cronômetro e alarmes</h2><p class="s7-settings-intro">Ajuste o ritmo de estudo e os avisos.</p></div></div>'+
+ '<div class="s7-settings-grid">'+
+ '<section class="s7-setting-group" aria-labelledby="s7-study-heading">'+
+ '<header class="s7-group-head"><span class="s7-group-icon" aria-hidden="true">◷</span><div><h3 id="s7-study-heading">Ritmo de estudo</h3><p>Contagem e intervalos</p></div></header>'+
+ s7SettingRow("Método",'<select id="s7-setting-mode" aria-label="Método de estudo">'+option("continuous","Contínuo",q.mode)+option("pomodoro","Pomodoro (25/5)",q.mode)+option("custom","Personalizado",q.mode)+'</select>')+
+ s7SettingRow("Meta padrão",number("goalMin",q.goalMin,1,720,"min"))+
+ s7SettingRow("Bloco personalizado",number("blockMin",q.blockMin,1,180,"min"))+
+ s7SettingRow("Descanso personalizado",number("restMin",q.restMin,1,90,"min"))+
+ s7SettingRow("Avisar pausa prolongada",number("pauseMinutes",q.pauseMinutes,0,240,"min"),"0 para desativar")+
+ s7SettingRow("Repetir lembrete",s7Switch("s7-setting-repeatPause",q.repeatPause,"Repetir lembrete de pausa"))+
+ '</section>'+
+ '<section class="s7-setting-group" aria-labelledby="s7-sound-heading">'+
+ '<header class="s7-group-head"><span class="s7-group-icon" aria-hidden="true">♫</span><div><h3 id="s7-sound-heading">Sons e efeitos</h3><p>Escolha como será avisado</p></div></header>'+
+ s7SettingRow("Som de conclusão",'<select id="s7-setting-finishSound" aria-label="Som de conclusão">'+soundOptions(q.finishSound)+'</select>')+
+ s7SettingRow("Som de pausa",'<select id="s7-setting-pauseSound" aria-label="Som de pausa">'+soundOptions(q.pauseSound)+'</select>')+
+ s7SettingRow("Repetir som de conclusão",s7Switch("s7-setting-loopFinish",q.loopFinish,"Repetir som de conclusão"))+
+ s7SettingRow("Repetir som de pausa",s7Switch("s7-setting-loopPause",q.loopPause,"Repetir som de pausa"))+
+ s7SettingRow("Áudio próprio · conclusão",s7AudioPicker("finish","áudio de conclusão"),"Recorte e compressão automáticos","s7-setting-row-file")+
+ s7SettingRow("Áudio próprio · pausa",s7AudioPicker("pause","áudio de pausa"),"Até 5 segundos de áudio salvo","s7-setting-row-file")+
+ s7SettingRow("Volume",'<div class="s7-volume"><span aria-hidden="true">♪</span><input id="s7-setting-volume" aria-label="Volume do alarme" type="range" min="0" max="100" value="'+Number(q.volume)+'"></div>')+
+ s7SettingRow("Efeito visual ao concluir",s7Switch("s7-setting-visual",q.visual,"Efeito visual ao concluir"))+
+ '</section>'+
+ '<section class="s7-setting-group s7-setting-group-wide" aria-labelledby="s7-notification-heading">'+
+ '<header class="s7-group-head"><span class="s7-group-icon" aria-hidden="true">◎</span><div><h3 id="s7-notification-heading">Notificações</h3><p>Windows, Android e avisos no Órbita</p></div></header>'+
+ '<div class="s7-notification-grid">'+
+ s7SettingRow("Notificações do dispositivo",'<button type="button" class="btn small '+(q.desktopNotifications?"ghost":"primary")+'" data-s7="notification">'+(q.desktopNotifications?"Desativar":"Ativar notificações")+'</button>',"Requer permissão do navegador")+
+ s7SettingRow("Testar alarmes",'<div class="s7-test-actions"><button type="button" class="btn small ghost" data-s7="testNotification">Testar conclusão</button><button type="button" class="btn small ghost" data-s7="testPauseNotification">Testar pausa</button></div>')+
+ '</div></section>'+
+ '</div></section>';
 }
 function tick(){
  const a=timing.active,r=activeRecord();

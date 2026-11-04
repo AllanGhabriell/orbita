@@ -39,7 +39,7 @@ assert.equal((markup.match(/class="day-meta"/g)||[]).length,7,"texto integral ma
 assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa para leitores de tela");
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
-assert.match(sw,/orbita-app-20261104-alarm-import-v2/,"cache PWA renovado para alarmes persistentes");
+assert.match(sw,/orbita-app-20261104-settings-layout-v3/,"cache PWA renovado para alarmes persistentes");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v=20261104-alarm-loop-v1"),"assets atuais presentes no cache");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
 const html=read("index.html");

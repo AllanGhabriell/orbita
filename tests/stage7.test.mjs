@@ -235,3 +235,19 @@ test("teste de alarme abre aviso no Órbita sem criar nem concluir sessão",()=>
  assert.equal(h.alarmHost.hidden,true);
  assert.equal(h.item.status,"pending");
 });
+
+test("preferências do cronômetro têm grupos, alternâncias acessíveis e arquivo sem caixa nativa",()=>{
+ const h=harness();
+ const markup=String(h.stage.decorate("configuracoes",""));
+ assert.match(markup,/s7-settings-grid/);
+ assert.match(markup,/Ritmo de estudo/);
+ assert.match(markup,/Sons e efeitos/);
+ assert.match(markup,/Notificações/);
+ assert.match(markup,/s7-file-action/);
+ assert.match(markup,/id="s7-upload-finish"/);
+ assert.match(markup,/id="s7-upload-pause"/);
+ assert.match(markup,/id="s7-setting-loopFinish"/);
+ assert.match(markup,/data-s7="testNotification"/);
+ assert.match(markup,/data-s7="testPauseNotification"/);
+ assert.doesNotMatch(markup,/O alarme permanece na tela até ser resolvido/);
+});
