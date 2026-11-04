@@ -582,7 +582,8 @@ document.addEventListener("click",e=>{
  }catch(err){C.notify(err.message||"Não foi possível controlar o cronômetro.");console.error(err);}
 });
 document.addEventListener("submit",e=>{
- const id=e.target?.id;
+ // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
+ const id=e.target?.getAttribute?.("id")||e.target?.id;
  if(!["s7-correction-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
  const data=new FormData(e.target);
