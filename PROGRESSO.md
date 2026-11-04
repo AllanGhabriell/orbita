@@ -1,5 +1,16 @@
 # PROGRESSO — Órbita
 
+## Revisão visual e gerenciamento flexível do cronômetro — 04/11/2026
+
+- Faixa global de inatividade retirada do cabeçalho. Cronômetro circular reduzido e recolocado dentro do painel **Estudos de hoje**, sem ocupar a navegação original.
+- Menu contextual `⋯` em sessões cronometradas: editar duração estudada/pausada; editar/excluir pausas individuais; zerar somente pausas; reiniciar o cronômetro; descartar registro mantendo a sessão planejada.
+- Transferência de cronometragem e divisão de tempo apenas para outra sessão aberta e sem tempo lançado no mesmo dia. Nenhum intervalo de pausa é automaticamente convertido em estudo. Conclusões de matérias não são modificadas pela transferência.
+- Reversão da última alteração disponível durante até 60 segundos enquanto a aba permanece aberta, com proteção a dias encerrados e conferência contra registros duplicados.
+- Pausa atual pode ser cancelada como acionamento acidental (contabilizando estudo somente com consentimento explícito) ou ter apenas seu contador zerado, sem atribuir o intervalo ao estudo.
+- Botões manuais Concluir e Registrar preservados. Registros automáticos continuam dentro do JSON de sincronização existente, com imutabilidade após o fechamento diário; sem SQL novo.
+- Testes estáticos/unitários e navegação Chromium atualizados; validação definitiva de responsividade, áudio, interações e sincronização real entre dispositivos permanece recomendada.
+
+
 ## Cronômetro de estudos e alertas — 04/11/2026
 
 - Motor `stage7.js` e visual `stage7.css` conectados às sessões existentes da tela Início; contagem de estudo, pausas, classificação da pausa e tempo de preparação de flashcards sem duplicar horas.
