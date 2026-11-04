@@ -14,10 +14,11 @@ function harness(){
  let saved=0,notifications=[];
  const callbacks={};
  class ClockDate extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
+ const alarmHost={innerHTML:"",hidden:true};
  const fakeDocument={
   title:"Órbita",hidden:false,
   addEventListener(type,fn,capture){(callbacks[type]||=[]).push({fn,capture});},
-  getElementById(){return null;},
+  getElementById(id){return id==="s7-alarm-host"?alarmHost:null;},
   querySelector(){return null;},
   body:{classList:{add(){},remove(){}},offsetWidth:10}
  };
@@ -48,7 +49,7 @@ function harness(){
  };
  vm.runInNewContext(source,ctx,{filename:"stage7.js"});
  const stage=ctx.window.OrbitaStage7.inspect;
- return {state,item,target,stage,callbacks,notifications,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
+ return {state,item,target,stage,callbacks,notifications,alarmHost,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
 }
 test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
  const h=harness();
@@ -187,4 +188,35 @@ test("tempo corrigido pelo formulário manual atualiza o histórico do cronômet
  assert.equal(h.state.timing.records["math-1"].studyMs,45*60000);
  assert.equal(h.state.timing.records["math-1"].recordedActualMin,45);
  assert.equal(h.state.timing.records["math-1"].corrections.at(-1).type,"manual_time_adjustment");
+});
+
+test("meta dispara aviso persistente, que pode ser silenciado sem terminar a sessão",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(90*60000);
+ h.stage.tick();
+ assert.equal(h.state.timing.alarm.which,"finish");
+ assert.equal(h.alarmHost.hidden,false);
+ assert.match(h.alarmHost.innerHTML,/Meta de estudo atingida/);
+ h.stage.silenceAlarm();
+ assert.equal(h.state.timing.alarm.silenced,true);
+ assert.equal(h.item.status,"progress");
+ assert.equal(h.alarmHost.hidden,false);
+ h.stage.dismissAlarm();
+ assert.equal(h.state.timing.alarm,null);
+ assert.equal(h.alarmHost.hidden,true);
+ assert.equal(h.item.status,"progress");
+ h.stage.tick();
+ assert.equal(h.state.timing.alarm,null,"meta já notificada não dispara novamente");
+});
+test("pausa prolongada mostra aviso e retomar encerra o alarme sem alterar estudo",()=>{
+ const h=harness();
+ h.stage.start("math-1");h.setTime(12*60000);h.stage.pause("preparation");
+ h.setTime(23*60000);
+ h.stage.tick();
+ assert.equal(h.state.timing.alarm.which,"pause");
+ h.stage.resume();
+ assert.equal(h.state.timing.alarm,null);
+ assert.equal(h.state.timing.records["math-1"].studyMs,12*60000);
+ assert.equal(h.state.timing.records["math-1"].pauseMs,11*60000);
 });

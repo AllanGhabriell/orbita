@@ -94,6 +94,32 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.select('#s3-record [name="status"]',"done");
   await page.$eval('#s3-record [name="actualMin"]',el=>{el.value="90";});
   await page.click('#s3-record button[type="submit"]');
+  // Alarme de meta: notificação persistente, silenciar, continuar e reabrir após recarga.
+  await page.evaluate(()=>{
+   const c=window.OrbitaCore,t=window.OrbitaStage3.inspect,date=c.today();
+   t.model.sessions.push({id:"alarm-case",date,kind:"supplement",cycleId:"",plannedMin:1,status:"pending",discipline:"História",area:"ENEM",archived:false,createdAt:new Date().toISOString()});
+   c.save();c.render();
+  });
+  await page.click('[data-s7="start"][data-id="alarm-case"]');
+  await page.evaluate(()=>{
+   const t=window.OrbitaCore.state.timing;
+   t.records["alarm-case"].studyMs=60000;
+   window.OrbitaStage7.inspect.tick();
+  });
+  await page.waitForSelector('#s7-alarm-host:not([hidden]) .s7-alarm-card');
+  assert.match(await page.$eval("#s7-alarm-host",x=>x.textContent),/Meta de estudo atingida/);
+  await page.click('#s7-alarm-host [data-s7="alarmSilence"]');
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.alarm.silenced),true);
+  await page.reload({waitUntil:"load"});
+  await page.waitForFunction(()=>!!window.OrbitaStage7,{timeout:20000});
+  await page.waitForSelector('#s7-alarm-host:not([hidden])');
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.alarm.silenced),true);
+  await page.click('#s7-alarm-host [data-s7="alarmContinue"]');
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.alarm),null);
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.active.sessionId),"alarm-case");
+  page.once("dialog",dialog=>dialog.accept());
+  await page.click('.s7-timer [data-s7="partial"]');
+  await page.waitForFunction(()=>window.OrbitaCore.state.timing.active===null);
   await page.waitForFunction(()=>window.OrbitaCore.state.studies.sessions.find(x=>x.id==="manual-study").status==="done");
   assert.deepEqual(await page.evaluate(()=>{
    const s=window.OrbitaCore.state;

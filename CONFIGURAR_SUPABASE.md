@@ -1,5 +1,11 @@
 # CONFIGURAÇÃO FINAL DO SUPABASE — ÓRBITA
 
+## Alarme em loop e avisos de sistema
+
+O alarme persistente e suas preferências utilizam o documento JSON já existente. **Não há SQL novo.** As notificações locais do Windows/Android utilizam permissões do navegador e Service Worker; não precisam do Supabase.
+
+Receber notificações **novas** quando o site estiver fechado requer Web Push, subscrição VAPID e serviço de agendamento no backend. Esta infraestrutura ainda não está configurada nem deve ser presumida como ativa.
+
 ## Novidade: cronômetro inteligente
 
 **Não precisa executar nenhum SQL novo.** O cronômetro, as pausas, correções e sons personalizados são salvos em `timing` dentro do campo JSONB já existente `public.orbita_documents.content`, pela função `public.orbita_commit`. O snapshot de dia fechado permanece protegido pela mesma estrutura.

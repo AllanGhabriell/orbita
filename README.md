@@ -11,6 +11,15 @@
 - Nenhuma migração SQL adicional é exigida: dados permanecem no documento sincronizado `orbita_documents.content`. Novos testes de lógica e do navegador foram preparados para validar as operações.
 
 
+## Alarmes persistentes e notificações do dispositivo — 04/11/2026
+
+- Ao atingir a meta de estudo ou o limite de uma pausa prolongada, o Órbita mostra um aviso persistente no canto da tela, em qualquer seção, até o usuário resolver ou dispensar. Sem alarme, nada ocupa espaço.
+- MP3 personalizado é reproduzido com loop, se habilitado (padrão). Sons internos usam buffer Web Audio em repetição. Silenciar interrompe só o áudio e mantém a sessão intacta; é possível reproduzir novamente.
+- Botões permitem continuar estudando, finalizar via confirmação, retomar de pausa ou corrigir horário. Avisos de bloco Pomodoro permanecem discretos, sem alarme persistente.
+- Nas Preferências é possível configurar repetição de som de meta/pausa, volume, arquivos pessoais e habilitar notificações do Windows ou Android mediante permissão. O site usa Service Worker quando disponível, com alternativa do navegador.
+- Notificações do sistema são enviadas enquanto a página executa. A existência do Service Worker **não significa que o site consiga disparar alarmes novos com o navegador fechado**: isso depende de Web Push com subscription, servidor e agendamento, não configurados nesta versão.
+- O navegador pode impedir autoplay ou suspender áudio em segundo plano. O aviso visual é recuperado após recarga; se o som não iniciar, o usuário pode usar Reproduzir som.
+
 ## Cronômetro inteligente — 04/11/2026
 
 O Órbita agora disponibiliza o botão **Cronometrar** em cada sessão de estudo na tela Início, um indicador global de **ESTUDO EM ANDAMENTO / ESTUDO PAUSADO / NENHUM ESTUDO ATIVO**, contagem circular de progresso, pausas com motivo (descanso, preparação de flashcards, interrupção, pausa programada), correção auditada de horários e salvamento automático local e sincronizável.

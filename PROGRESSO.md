@@ -1,5 +1,15 @@
 # PROGRESSO — Órbita
 
+## Alarme persistente e notificações do sistema — 04/11/2026
+
+- Alerta contextual persistente ao concluir meta ou exceder pausa, sem mostrar banner enquanto não há atividade.
+- Loop para MP3 personalizado e sons internos (Web Audio), com silenciar, tocar novamente, continuar, retomar, corrigir e finalizar mediante confirmação.
+- Preferências independentes de som em loop para conclusão e pausa, volume e notificações Windows/Android por permissão explícita. Service Worker entrega clique de notificação para o site.
+- Aviso permanece registrado no documento local e reaparece após recarga; reprodução automática ao recarregar depende das permissões de áudio do navegador.
+- Blocos de Pomodoro mantêm alertas discretos para não gerar modais repetidos. Alarmes podem ser dispensados sem concluir a sessão.
+- Notificação com aba fechada depende de Web Push mais servidor/agendamento — não foi implementado o backend desse recurso.
+- Banco de dados inalterado; novos campos residem nas preferências/estado existentes.
+
 ## Revisão visual e gerenciamento flexível do cronômetro — 04/11/2026
 
 - Faixa global de inatividade retirada do cabeçalho. Cronômetro circular reduzido e recolocado dentro do painel **Estudos de hoje**, sem ocupar a navegação original.

@@ -1,5 +1,17 @@
 # CHECKLIST — Órbita
 
+## Alarmes em loop e notificações de dispositivo — 04/11/2026
+- [x] Exibir aviso persistente somente ao atingir meta ou pausa prolongada
+- [x] MP3 pessoal em loop e som interno sintetizado em repetição
+- [x] Silenciar sem encerrar estudo, reproduzir novamente, continuar, retomar e corrigir
+- [x] Configurações de repetição independentes para meta e pausa
+- [x] Solicitar permissão e emitir notificação de sistema via Service Worker ou API do navegador
+- [x] Clique na notificação do sistema retorna ao Órbita
+- [x] Preservar aviso visual após recarregar a página
+- [x] Testes de estado persistente e silêncio sem avanço de sessão
+- [ ] Web Push com servidor/agendamento para entrega de alarmes novos após fechar o site
+- [ ] Homologar reprodução em segundo plano e suporte Windows/Android reais
+
 ## Controles avançados do cronômetro — 04/11/2026
 - [x] Remover faixa de inatividade do topo e mostrar o timer dentro de Estudos de hoje
 - [x] Manter registro/conclusão manual sem cronometragem

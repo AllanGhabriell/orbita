@@ -7,13 +7,13 @@ const root=C.state;
 const timing=root.timing&&typeof root.timing==="object"?root.timing:(root.timing={});
 if(!timing.records||typeof timing.records!=="object"||Array.isArray(timing.records))timing.records={};
 if(!timing.settings||typeof timing.settings!=="object")timing.settings={};
-const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"bell",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false};
+const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"bell",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true};
 for(const [k,v] of Object.entries(defaults))if(timing.settings[k]===undefined)timing.settings[k]=v;
 if(!timing.active||typeof timing.active!=="object")timing.active=null;
 const E=C.esc,A=C.attr, $=id=>document.getElementById(id);
 const clock=()=>Date.now();
 const titleBase=document.title;
-let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null;
+let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null;
 const fmtMs=ms=>{const secs=Math.max(0,Math.floor(ms/1000));return String(Math.floor(secs/3600)).padStart(2,"0")+":"+String(Math.floor(secs%3600/60)).padStart(2,"0")+":"+String(secs%60).padStart(2,"0");};
 const duration=ms=>{const min=Math.round(Math.max(0,ms)/60000);return Math.floor(min/60)+"h"+String(min%60).padStart(2,"0");};
 const record=id=>timing.records[id]||null;
@@ -53,15 +53,56 @@ function tone(kind){
   });
  }catch{}
 }
-function sound(which){
- const selected=settings()[which==="finish"?"finishSound":"pauseSound"];
- if(selected!=="none"){
-  if(selected==="custom"){
-   const data=settings()[which==="finish"?"finishUpload":"pauseUpload"];
-   if(!data)return;
-   try{const audio=new Audio(data);audio.volume=Number(settings().volume)/100;audio.play().catch(()=>{});}catch{}
-  }else tone(selected);
+// Alarme persistente e independente da navegação: não ocupa espaço quando inativo.
+function stopAlarmAudio(){
+ if(alarmAudio){try{alarmAudio.pause();alarmAudio.currentTime=0;}catch{}alarmAudio=null;}
+ if(alarmSource){try{alarmSource.stop();alarmSource.disconnect();}catch{}alarmSource=null;}
+ if(alarmGain){try{alarmGain.disconnect();}catch{}alarmGain=null;}
+}
+function alarmSound(which){
+ const key=which==="pause"?"pauseSound":"finishSound";
+ const selected=settings()[key];
+ const loop=which==="pause"?settings().loopPause:settings().loopFinish;
+ if(selected==="none"||Number(settings().volume)===0)return;
+ stopAlarmAudio();
+ if(selected==="custom"){
+  const data=settings()[which==="pause"?"pauseUpload":"finishUpload"];
+  if(!data)return;
+  try{
+   const audio=new Audio(data);
+   audio.loop=!!loop;
+   audio.volume=Math.max(0,Math.min(1,Number(settings().volume)/100));
+   alarmAudio=audio;
+   const playing=audio.play();
+   if(playing?.catch)playing.catch(()=>{if(timing.alarm&&!timing.alarm.silenced)C.notify("O navegador bloqueou o som automático. Toque em Reproduzir som no aviso.");});
+  }catch{C.notify("Não foi possível reproduzir o arquivo de áudio. Confira o formato.");}
+  return;
  }
+ if(!loop){tone(selected);return;}
+ try{
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  audioContext=audioContext||new AC();
+  const rate=audioContext.sampleRate||22050,seconds=2.4;
+  const buffer=audioContext.createBuffer(1,Math.round(rate*seconds),rate);
+  const samples=buffer.getChannelData(0);
+  const notes=selected==="digital"?[[0,784,.2],[.35,784,.2],[.7,784,.2]]:selected==="soft"?[[0,440,.29],[.35,554,.38]]:[[0,523,.3],[.34,659,.3],[.68,784,.45]];
+  for(const [begin,freq,len] of notes){
+   const start=Math.round(begin*rate),limit=Math.min(samples.length,Math.round((begin+len)*rate));
+   for(let i=start;i<limit;i++){
+    const elapsed=(i-start)/rate,decay=Math.pow(Math.max(0,1-elapsed/len),2),attack=Math.min(1,elapsed*85);
+    const wave=selected==="digital"?Math.sign(Math.sin(2*Math.PI*freq*elapsed)):Math.sin(2*Math.PI*freq*elapsed);
+    samples[i]+=wave*attack*decay*.45;
+   }
+  }
+  alarmSource=audioContext.createBufferSource();
+  alarmSource.buffer=buffer;alarmSource.loop=true;
+  alarmGain=audioContext.createGain();
+  alarmGain.gain.value=Math.max(0,Math.min(1,Number(settings().volume)/100))*.5;
+  alarmSource.connect(alarmGain);alarmGain.connect(audioContext.destination);
+  alarmSource.start();
+  audioContext.resume?.().catch(()=>{if(timing.alarm&&!timing.alarm.silenced)C.notify("Toque em Reproduzir som para autorizar o alarme.");});
+ }catch{stopAlarmAudio();tone(selected);}
 }
 function visualAlert(){
  if(!settings().visual||C.state.settings?.motion===false||window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches)return;
@@ -70,13 +111,71 @@ function visualAlert(){
  document.body.classList.add("s7-completion");
  clearTimeout(flashTimeout);flashTimeout=setTimeout(()=>document.body.classList.remove("s7-completion"),2200);
 }
-function alertUser(message,which){
- C.notify(message);
- if(which==="finish")visualAlert();
- sound(which);
- if(settings().desktopNotifications&&document.hidden&&"Notification" in window&&Notification.permission==="granted"){
-  try{new Notification("Órbita — "+(which==="finish"?"Meta alcançada":"Pausa prolongada"),{body:message,tag:"orbita-study-"+which});}catch{}
+function notificationTitle(which){return which==="pause"?"Órbita · Pausa prolongada":which==="block"?"Órbita · Bloco concluído":"Órbita · Tempo de estudo concluído";}
+function systemNotification(which,message){
+ const N=window.Notification;
+ if(!settings().desktopNotifications||!N||N.permission!=="granted")return;
+ const title=notificationTitle(which);
+ const data={url:new URL("./#inicio",location.href).href,which};
+ const options={body:message,icon:"./assets/icon-192.png",badge:"./assets/icon-192.png",tag:"orbita-timer-"+which,renotify:true,requireInteraction:which==="finish",data};
+ const direct=()=>{
+  try{const n=new N(title,options);n.onclick=()=>{window.focus?.();C.go?.("inicio");n.close();};}catch{}
+ };
+ if(typeof navigator!=="undefined"&&navigator.serviceWorker?.getRegistration){
+  navigator.serviceWorker.getRegistration("./").then(reg=>{
+   if(reg?.active&&typeof reg.showNotification==="function")return reg.showNotification(title,options).catch(direct);
+   direct();
+  }).catch(direct);
+ }else direct();
+}
+function renderAlarm(){
+ const host=$("s7-alarm-host");
+ if(!host)return;
+ const a=timing.alarm,active=timing.active;
+ if(!a||!active||a.sessionId!==active.sessionId){
+  host.hidden=true;host.innerHTML="";return;
  }
+ const isPause=a.which==="pause",title=isPause?"Pausa prolongada":"Meta de estudo atingida";
+ const x=session(a.sessionId),name=x?.discipline||"Sessão de estudo";
+ const silence=a.silenced?'<button class="btn small ghost" data-s7="alarmReplay">▶ Reproduzir som</button>':'<button class="btn small ghost" data-s7="alarmSilence">Silenciar alarme</button>';
+ const actions=isPause?
+  '<button class="btn small primary" data-s7="alarmResume">Retomar estudo</button><button class="btn small ghost" data-s7="alarmCorrect">Corrigir horário</button><button class="btn small ghost" data-s7="alarmDismiss">Continuar pausado</button>':
+  '<button class="btn small primary" data-s7="alarmContinue">Continuar estudando</button><button class="btn small ghost" data-s7="alarmFinish">Finalizar sessão</button>';
+ host.hidden=false;
+ host.innerHTML='<section class="s7-alarm-card '+(isPause?"s7-alarm-pause":"s7-alarm-finish")+'" role="alertdialog" aria-label="'+A(title)+'" aria-describedby="s7-alarm-desc">'+
+ '<div class="s7-alarm-header"><span class="s7-alarm-symbol" aria-hidden="true">'+(isPause?"◷":"◉")+'</span><div><small>'+E(name)+'</small><h2>'+E(title)+'</h2></div><button type="button" class="s7-alarm-close" data-s7="alarmDismiss" aria-label="Dispensar aviso">×</button></div>'+
+ '<p id="s7-alarm-desc">'+E(a.message)+'</p>'+
+ '<div class="s7-alarm-actions">'+silence+actions+'</div>'+
+ (a.silenced?'<small class="s7-alarm-note">Som silenciado. A sessão permanece '+(isPause?"pausada":"em andamento")+'.</small>':'')+
+ '</section>';
+}
+function dismissAlarm(){
+ stopAlarmAudio();
+ if(timing.alarm){timing.alarm=null;persist();}
+ renderAlarm();
+}
+function silenceAlarm(){
+ if(!timing.alarm)return;
+ stopAlarmAudio();timing.alarm.silenced=true;persist();renderAlarm();
+}
+function replayAlarm(){
+ if(!timing.alarm)return;
+ audioUnlock();timing.alarm.silenced=false;persist();renderAlarm();alarmSound(timing.alarm.which);
+}
+function alertUser(message,which){
+ if(which==="block"){
+  C.notify(message);tone(settings().finishSound==="custom"?"bell":settings().finishSound);
+  systemNotification(which,message);return;
+ }
+ if(!timing.active)return;
+ // Um aviso não atendido não pode gerar novas janelas nem sons sobrepostos.
+ if(timing.alarm&&timing.alarm.sessionId===timing.active.sessionId&&timing.alarm.which===which)return;
+ stopAlarmAudio();
+ timing.alarm={sessionId:timing.active.sessionId,which,message,raisedAt:clock(),silenced:false};
+ persist();renderAlarm();
+ if(which==="finish")visualAlert();
+ alarmSound(which);
+ systemNotification(which,message);
 }
 function makeRecord(x){
  return timing.records[x.id]|| (timing.records[x.id]={sessionId:x.id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],lastBlockAlert:0,goalNotified:false,mode:settings().mode,goalMin:Number(x.plannedMin)||Number(settings().goalMin)||90,finishedAt:null});
@@ -111,6 +210,7 @@ function resume(){
  const at=clock();r.pauseMs=pauseMs(r,at);
  if(r.pauses.length&&r.pauses.at(-1).endedAt===null)r.pauses.at(-1).endedAt=at;
  timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+ if(timing.alarm?.which==="pause")dismissAlarm();
  persist();C.render();tick();
 }
 function changePause(kind){
@@ -133,6 +233,7 @@ function correction(timestamp){
   r.corrections.push({type:"pause",registeredAt:now,effectiveAt:at,previousExpectedAt:now});
   timing.active={sessionId:a.sessionId,phase:"paused",since:at,alertIndex:0};
  }
+ if(timing.alarm?.which==="pause"&&timing.active?.phase==="running")dismissAlarm();
  persist();C.closeModal();C.render();tick();C.notify("Horário corrigido. A alteração ficou registrada no histórico.");
 }
 function finish(done){
@@ -147,6 +248,7 @@ function finish(done){
  if(a.phase==="paused"&&r.pauses.at(-1)?.endedAt===null)r.pauses.at(-1).endedAt=at;
  r.finishedAt=new Date(at).toISOString();r.status=done?"done":"partial";r.recordedActualMin=x.actualMin;
  timing.active=null;
+ if(timing.alarm)dismissAlarm();
  persist();C.render();tick();C.notify(done?"Sessão concluída e tempo registrado.":"Tempo parcial salvo; a etapa do ciclo não avançou.");
 }
 function correctModal(){
@@ -236,6 +338,7 @@ function resetTimer(id){
  const keptMode=r.mode,keptGoal=r.goalMin,originalStatus=r.originalStatus;
  timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,originalStatus,lastBlockAlert:0,goalNotified:false,finishedAt:null,resetAt:new Date().toISOString()};
  if(timing.active?.sessionId===id)timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
+ if(timing.alarm?.sessionId===id)dismissAlarm();
  persist();C.closeModal();C.render();tick();C.notify("Cronômetro zerado. Use ⋯ para desfazer.");
 }
 function discardTimer(id){
@@ -245,6 +348,7 @@ function discardTimer(id){
  if(trackTimeMatches(x,r))x.actualMin=null;
  delete timing.records[id];
  if(timing.active?.sessionId===id)timing.active=null;
+ if(timing.alarm?.sessionId===id)dismissAlarm();
  if(x.status==="progress"&&r.originalStatus==="pending"&&x.actualMin==null)T.setSessionStatus(x.id,"pending",null,x.actualTime||"");
  persist();C.closeModal();C.render();tick();C.notify("Cronometragem descartada. É possível desfazer pelo menu da sessão por 60 segundos.");
 }
@@ -448,6 +552,7 @@ function historyHtml(){
 function removeDeletedSession(id){
  if(timing.active?.sessionId===id)throw Error("Encerre ou descarte o cronômetro antes de excluir a sessão.");
  if(record(id)){delete timing.records[id];lastUndo=null;}
+ if(timing.alarm?.sessionId===id)dismissAlarm();
 }
 function sessionMenu(id){
  const x=session(id),r=record(id);
@@ -489,12 +594,15 @@ function settingsPanel(){
  '<div class="setting-row"><div><strong>Repetir lembrete de pausa</strong><small>Repete a cada intervalo configurado, enquanto estiver pausado</small></div><input id="s7-setting-repeatPause" type="checkbox" '+(q.repeatPause?"checked":"")+'></div>'+
  '<div class="setting-row"><div><strong>Som de conclusão</strong></div><select id="s7-setting-finishSound">'+soundOptions(q.finishSound)+'</select></div>'+
  '<div class="setting-row"><div><strong>Som de pausa prolongada</strong></div><select id="s7-setting-pauseSound">'+soundOptions(q.pauseSound)+'</select></div>'+
+ '<div class="setting-row"><div><strong>Repetir som até silenciar — conclusão</strong><small>MP3 e sons internos podem tocar em loop até você silenciar o alarme.</small></div><input id="s7-setting-loopFinish" type="checkbox" '+(q.loopFinish?"checked":"")+'> </div>'+
+ '<div class="setting-row"><div><strong>Repetir som até silenciar — pausa longa</strong><small>O aviso também permanece na tela até ser resolvido.</small></div><input id="s7-setting-loopPause" type="checkbox" '+(q.loopPause?"checked":"")+'> </div>'+
  '<div class="setting-row"><div><strong>Enviar som de conclusão</strong><small>MP3, OGG ou WAV; até 120 KB (sincronizado no documento)</small></div><input id="s7-upload-finish" type="file" accept="audio/mpeg,audio/ogg,audio/wav,audio/mp3"></div>'+
  '<div class="setting-row"><div><strong>Enviar som de lembrete</strong><small>MP3, OGG ou WAV; até 120 KB</small></div><input id="s7-upload-pause" type="file" accept="audio/mpeg,audio/ogg,audio/wav,audio/mp3"></div>'+
  '<div class="setting-row"><div><strong>Volume</strong></div><input id="s7-setting-volume" type="range" min="0" max="100" value="'+Number(q.volume)+'"></div>'+
  '<div class="setting-row"><div><strong>Brilho ao alcançar a meta</strong></div><input id="s7-setting-visual" type="checkbox" '+(q.visual?"checked":"")+'></div>'+
- '<div class="setting-row"><div><strong>Notificação do dispositivo</strong><small>Depende de permissão, navegador e sistema operacional</small></div><button class="btn small" data-s7="notification">Solicitar permissão</button></div>'+
- '<p class="note">Sons em segundo plano e com o navegador fechado não são garantidos pelo sistema operacional. Preferências são locais até a sincronização da conta.</p></section>';
+ '<div class="setting-row"><div><strong>Notificações do Windows/Android</strong><small>Exibidas pelo navegador, após sua autorização, enquanto a página estiver em execução.</small></div><button class="btn small" data-s7="notification">'+(q.desktopNotifications?"Desativar notificações":"Ativar notificações") +'</button></div>'+
+ '<div class="setting-row"><div><strong>Verificar notificação do dispositivo</strong><small>Envia um aviso de demonstração sem iniciar o cronômetro.</small></div><button class="btn small ghost" data-s7="testNotification">Testar notificação</button></div>'+
+ '<p class="note">O alarme permanece na tela até ser resolvido. Silenciar o som não conclui a sessão. Áudio e notificações dependem das permissões do navegador; com o site fechado, avisos novos exigem Web Push e um servidor de agendamento, que ainda não estão configurados.</p></section>';
 }
 function tick(){
  const a=timing.active,r=activeRecord();
@@ -529,7 +637,7 @@ function tick(){
  }else if(r.mode!=="continuous"){
   const step=(r.mode==="pomodoro"?25:Number(settings().blockMin))*60000;
   const blocks=step>0?Math.floor(studied/step):0;
-  if(blocks>r.lastBlockAlert&&studied<goal){r.lastBlockAlert=blocks;persist();alertUser("Bloco de concentração concluído. Você pode fazer uma pausa programada.","finish");}
+  if(blocks>r.lastBlockAlert&&studied<goal){r.lastBlockAlert=blocks;persist();alertUser("Bloco de concentração concluído. Você pode fazer uma pausa programada.","block");}
  }
 }
 async function upload(which,file){
@@ -575,9 +683,23 @@ document.addEventListener("click",e=>{
   else if(act==="undo")undo();
   else if(act==="cancelAccidentalPause")cancelAccidentalPause();
   else if(act==="resetCurrentPause")resetCurrentPause();
+  else if(act==="alarmSilence")silenceAlarm();
+  else if(act==="alarmReplay")replayAlarm();
+  else if(act==="alarmDismiss"||act==="alarmContinue")dismissAlarm();
+  else if(act==="alarmResume"){if(timing.active?.phase==="paused")resume();else dismissAlarm();}
+  else if(act==="alarmCorrect")correctModal();
+  else if(act==="alarmFinish")askFinish(true);
   else if(act==="notification"){
-   if(!("Notification" in window)||!window.isSecureContext)C.notify("Notificações do dispositivo indisponíveis neste navegador.");
-   else Notification.requestPermission().then(p=>{settings().desktopNotifications=p==="granted";persist();C.notify(p==="granted"?"Permissão de notificação ativada.":"Permissão não concedida.");});
+   if(settings().desktopNotifications){settings().desktopNotifications=false;persist();C.render();C.notify("Notificações do dispositivo desativadas.");}
+   else if(!window.Notification||!window.isSecureContext)C.notify("Notificações do dispositivo indisponíveis neste navegador.");
+   else Promise.resolve(window.Notification.requestPermission()).then(p=>{
+    settings().desktopNotifications=p==="granted";persist();C.render();
+    C.notify(p==="granted"?"Notificações do dispositivo ativadas.":"Permissão não concedida. Verifique as configurações do navegador.");
+   }).catch(()=>C.notify("Não foi possível solicitar permissão de notificações."));
+  }
+  else if(act==="testNotification"){
+   if(!settings().desktopNotifications||window.Notification?.permission!=="granted")C.notify("Ative e autorize as notificações do dispositivo primeiro.");
+   else{systemNotification("finish","Notificação de teste do Órbita. Nenhum cronômetro foi alterado.");C.notify("Notificação de teste solicitada ao sistema.");}
   }
  }catch(err){C.notify(err.message||"Não foi possível controlar o cronômetro.");console.error(err);}
 });
@@ -609,13 +731,13 @@ document.addEventListener("change",e=>{
  }else if(key in strings){
   if(!strings[key].includes(el.value))return;
   settings()[key]=el.value;
- }else if(["visual","repeatPause"].includes(key))settings()[key]=el.checked;
+ }else if(["visual","repeatPause","loopFinish","loopPause"].includes(key))settings()[key]=el.checked;
  else return;
  persist();C.render();
 });
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
-C.render();tick();
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced)alarmSound(timing.alarm.which);tick();
 })();
