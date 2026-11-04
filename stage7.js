@@ -663,15 +663,59 @@ function tick(){
   if(blocks>r.lastBlockAlert&&studied<goal){r.lastBlockAlert=blocks;persist();alertUser("Bloco de concentração concluído. Você pode fazer uma pausa programada.","block");}
  }
 }
+// Compactação local. WAV PCM mono 11.025 kHz/16 bits; até 5 segundos ≈ 108 KB.
+function compactWav(decoded){
+ const rate=11025,seconds=Math.min(5,decoded.duration);
+ if(!Number.isFinite(seconds)||seconds<=0||!decoded.numberOfChannels||!decoded.length)throw Error("Não foi possível encontrar áudio válido neste arquivo.");
+ const count=Math.max(1,Math.min(rate*5,Math.floor(seconds*rate)));
+ const bytes=new Uint8Array(44+count*2),view=new DataView(bytes.buffer);
+ const ascii=(at,word)=>{for(let i=0;i<word.length;i++)view.setUint8(at+i,word.charCodeAt(i));};
+ ascii(0,"RIFF");view.setUint32(4,bytes.length-8,true);ascii(8,"WAVE");ascii(12,"fmt ");
+ view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+ view.setUint32(24,rate,true);view.setUint32(28,rate*2,true);view.setUint16(32,2,true);
+ view.setUint16(34,16,true);ascii(36,"data");view.setUint32(40,count*2,true);
+ const channels=Array.from({length:decoded.numberOfChannels},(_,i)=>decoded.getChannelData(i));
+ for(let i=0;i<count;i++){
+  const at=Math.min(decoded.length-1,i*decoded.sampleRate/rate),left=Math.floor(at),right=Math.min(decoded.length-1,left+1),fraction=at-left;
+  let v=0;for(const ch of channels)v+=ch[left]*(1-fraction)+ch[right]*fraction;
+  v=Math.max(-1,Math.min(1,v/channels.length));
+  const t=i/rate,duration=count/rate,fade=Math.min(1,t/.006,Math.max(0,(duration-t)/.045));
+  view.setInt16(44+i*2,Math.round(v*fade*32767),true);
+ }
+ let binary="";
+ for(let i=0;i<bytes.length;i+=4096)binary+=String.fromCharCode(...bytes.subarray(i,i+4096));
+ return {value:"data:audio/wav;base64,"+btoa(binary),bytes:bytes.length,seconds:count/rate};
+}
 async function upload(which,file){
  if(!file)return;
- if(file.size>120*1024||file.size===0||!["audio/mpeg","audio/ogg","audio/wav","audio/x-wav","audio/mp3"].includes(file.type))throw Error("Escolha MP3, OGG ou WAV com até 120 KB.");
- const reader=new FileReader();
- const value=await new Promise((resolve,reject)=>{reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(Error("Falha ao ler arquivo."));reader.readAsDataURL(file);});
- if(value.length>170000)throw Error("O áudio ultrapassa o tamanho aceito.");
- settings()[which==="finish"?"finishUpload":"pauseUpload"]=value;
- settings()[which==="finish"?"finishSound":"pauseSound"]="custom";
- persist();C.render();C.notify("Som salvo nas preferências.");
+ if(uploadBusy[which])throw Error("Já existe um áudio sendo processado para este aviso.");
+ if(file.size===0||file.size>40*1024*1024)throw Error("Selecione um áudio de até 40 MB. O Órbita irá reduzi-lo automaticamente.");
+ if(file.type&&!file.type.startsWith("audio/")&&!/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name))throw Error("Selecione um arquivo de áudio válido.");
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC)throw Error("Este navegador não oferece compactação de áudio.");
+ uploadBusy[which]=true;
+ const status=$("s7-upload-status-"+which);
+ if(status)status.textContent="Preparando áudio...";
+ try{
+  audioContext=audioContext||new AC();
+  const buffer=await file.arrayBuffer();
+  let decoded;
+  try{decoded=await audioContext.decodeAudioData(buffer);}catch{throw Error("Não foi possível decodificar este áudio. Tente MP3 ou WAV.");}
+  const result=compactWav(decoded);
+  if(result.bytes>120*1024||result.value.length>170000)throw Error("O áudio não coube no limite de armazenamento.");
+  const q=settings(),prefix=which==="finish"?"finish":"pause",name=String(file.name||"Áudio personalizado").slice(0,100);
+  const keys=[prefix+"Upload",prefix+"Sound",prefix+"UploadName",prefix+"UploadSeconds",prefix+"UploadBytes"];
+  const prior=Object.fromEntries(keys.map(key=>[key,q[key]]));
+  q[prefix+"Upload"]=result.value;q[prefix+"Sound"]="custom";
+  q[prefix+"UploadName"]=name;q[prefix+"UploadSeconds"]=Number(result.seconds.toFixed(1));q[prefix+"UploadBytes"]=result.bytes;
+  if(C.save()===false){for(const key of keys){if(prior[key]===undefined)delete q[key];else q[key]=prior[key];}throw Error("Não foi possível salvar. Verifique o armazenamento do navegador.");}
+  C.render();
+  C.notify('Áudio "'+name+'" salvo. '+result.seconds.toFixed(1)+' s · '+Math.round(result.bytes/1024)+' KB.');
+ }finally{
+  uploadBusy[which]=false;
+  const current=$("s7-upload-status-"+which);
+  if(current&&current.textContent==="Preparando áudio...")current.textContent="Selecione outro arquivo para tentar novamente.";
+ }
 }
 const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100]};
 const strings={mode:["continuous","pomodoro","custom"],finishSound:["orbita","bell","digital","soft","custom","none"],pauseSound:["orbita","bell","digital","soft","custom","none"]};
@@ -741,7 +785,10 @@ document.addEventListener("change",e=>{
  const el=e.target;if(!el)return;
  if(el.id==="s7-current-kind"){changePause(el.value);return;}
  if(el.id==="s7-upload-finish"||el.id==="s7-upload-pause"){
-  upload(el.id==="s7-upload-finish"?"finish":"pause",el.files?.[0]).catch(err=>C.notify(err.message));return;
+  const which=el.id==="s7-upload-finish"?"finish":"pause",file=el.files?.[0];
+  el.value=""; // Permite selecionar o mesmo arquivo várias vezes.
+  if(file)upload(which,file).catch(err=>{C.notify(err.message);const status=$("s7-upload-status-"+which);if(status)status.textContent=err.message;});
+  return;
  }
  if(!el.id?.startsWith("s7-setting-"))return;
  const key=el.id.slice("s7-setting-".length);
@@ -759,6 +806,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced)alarmSound(timing.alarm.which);tick();
 })();
