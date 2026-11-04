@@ -112,3 +112,13 @@ Em cada etapa: listar pronto, testado, parcial, não feito, defeitos, mudanças 
 - Não alterar dia finalizado: bloquear encerramento com cronômetro ativo e congelar o registro da sessão no snapshot.
 - Não inferir estudo real por atividade ou inatividade do navegador, nem garantir sons com app fechado.
 - Persistir no objeto timing do JSON existente, sem migração SQL complementar.
+
+## 12. Edição e controle de cronometragem (04/11/2026)
+- Status de inatividade nunca ocupa uma faixa global: a tela Início fica limpa quando não há sessão ativa; a cronometragem ativa/pausada aparece dentro de Estudos de hoje.
+- Concluir e Registrar com tempo manual é um caminho integralmente válido; iniciar cronômetro é opcional.
+- Menu contextual por sessão com edições de duração e histórico detalhado de pausas, exclusão individual e total, reinício e descarte independente do planejamento.
+- Exclusão de pausa nunca transforma o intervalo removido em estudo; quando uma pausa foi acionada acidentalmente, somente confirmação explícita permite creditar o intervalo.
+- Transferir registro ou dividir tempo estudado entre sessões abertas do mesmo dia não altera conclusões nem duplica minutos. Pausas só acompanham uma transferência integral.
+- Desfazer alteração recente no mesmo navegador durante janela limitada, sem possibilidade de mutar dia finalizado. Edição de histórico de sessão em execução requer primeiro encerramento parcial.
+- Preservar relatório do dia fechado, autorizações de conta, proteção de snapshots, carga de matérias e modelo JSON sincronizado; sem migração complementar.
+
