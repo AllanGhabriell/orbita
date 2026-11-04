@@ -88,8 +88,10 @@ function start(id){
  if(V?.isClosed?.(x.date))throw Error("Este dia já foi finalizado.");
  if(timing.active)throw Error("Já existe uma sessão ativa. Finalize-a antes de iniciar outra.");
  audioUnlock();
+ const beforeStatus=x.status;
  T.setSessionStatus(id,"progress",x.actualMin,x.actualTime||"");
  const r=makeRecord(x);
+ if(r.originalStatus===undefined)r.originalStatus=beforeStatus;
  r.finishedAt=null;
  timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
  persist();C.render();tick();
@@ -220,6 +222,7 @@ function discardTimer(id){
  if(trackTimeMatches(x,r))x.actualMin=null;
  delete timing.records[id];
  if(timing.active?.sessionId===id)timing.active=null;
+ if(x.status==="progress"&&r.originalStatus==="pending"&&x.actualMin==null)T.setSessionStatus(x.id,"pending",null,x.actualTime||"");
  persist();C.closeModal();C.render();tick();C.notify("Cronometragem descartada. É possível desfazer pelo menu da sessão por 60 segundos.");
 }
 const pauseNames={rest:"Descanso",preparation:"Preparação de flashcards",scheduled:"Intervalo programado",other:"Interrupção"};
@@ -407,6 +410,10 @@ function historyHtml(){
  }).join("")+'</div>';
 }
 
+function removeDeletedSession(id){
+ if(timing.active?.sessionId===id)throw Error("Encerre ou descarte o cronômetro antes de excluir a sessão.");
+ if(record(id)){delete timing.records[id];lastUndo=null;}
+}
 function sessionMenu(id){
  const x=session(id),r=record(id);
  const mayUndo=lastUndoAvailable(id);
@@ -571,6 +578,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();tick();
 })();
