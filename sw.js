@@ -1,6 +1,6 @@
 /* Órbita service worker: arquivos do app em cache; nunca intercepta dados da API Supabase. */
-const CACHE="orbita-app-20261104-organize-light-mobile";
-const CORE=["./","./index.html","./boot.js","./config.js","./app.js","./stage2.js","./stage3.js","./stage4.js","./stage5.js","./stage6.js","./styles.css","./styles.css?v=20261104-organize-light-mobile","./stage2.css","./stage2.css?v=20261104-organize-light-mobile","./stage3.css","./stage3.css?v=20261103-session-focus","./stage4.css","./stage5.css","./stage6.css","./manifest.webmanifest","./assets/orbita.svg","./assets/icon-192.png","./assets/icon-512.png"];
+const CACHE="orbita-app-20261104-timer-v1";
+const CORE=["./","./index.html","./boot.js","./config.js","./app.js","./stage2.js","./stage3.js","./stage4.js","./stage5.js","./stage6.js","./stage7.js","./stage7.css","./stage7.css?v=20261104-timer","./styles.css","./styles.css?v=20261104-organize-light-mobile","./stage2.css","./stage2.css?v=20261104-organize-light-mobile","./stage3.css","./stage3.css?v=20261103-session-focus","./stage4.css","./stage5.css","./stage6.css","./manifest.webmanifest","./assets/orbita.svg","./assets/icon-192.png","./assets/icon-512.png"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });
