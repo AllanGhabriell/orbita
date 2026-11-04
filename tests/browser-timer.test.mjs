@@ -187,6 +187,42 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   assert.ok(compressed.bytes<=120*1024);
   assert.ok(compressed.seconds<=5);
   assert.ok(compressed.seconds>=4.9);
+
+  // Mesmo objetivo longo mostrado nas capturas: a largura do texto não pode cair
+  // para uma coluna de letras quando os botões coexistem no cartão.
+  await page.setViewport({width:390,height:850,deviceScaleFactor:1,isMobile:true,hasTouch:true});
+  await page.evaluate(()=>{
+   const c=window.OrbitaCore;
+   c.state.goals=[
+    {id:"browser-main-goal",title:"INGRESSAR EM ENGENHARIA DA COMPUTAÇÃO NA UFPB EM 2027",description:"Conquistar uma vaga no curso de Engenharia da Computação. Desenvolver rotina sustentável de estudos em Matemática, Ciências e redação.",area:"Estudos",deadline:"2027-11-08",archived:false},
+    {id:"browser-secondary-goal",title:"DESENVOLVIMENTO PROFISSIONAL EM TECNOLOGIA E ELETRÔNICA",area:"Carreira",archived:false}
+   ];
+   c.state.primaryGoalId="browser-main-goal";
+   c.go("perfil");
+  });
+  await page.waitForSelector('.view[data-route="perfil"] .goal-list-entry .goal-actions');
+  const profileBox=await page.evaluate(()=>{
+   const rect=selector=>document.querySelector(selector)?.getBoundingClientRect();
+   const list=document.querySelector('.view[data-route="perfil"] .goal-list-entry');
+   const title=rect('.view[data-route="perfil"] .goal-list-entry .list-main');
+   const actions=rect('.view[data-route="perfil"] .goal-list-entry .goal-actions');
+   const card=rect('.view[data-route="perfil"] .goal-list-entry');
+   const primaryTitle=rect('.view[data-route="perfil"] .profile-primary-goal .hero-content');
+   const primary=rect('.view[data-route="perfil"] .profile-primary-goal');
+   return {
+    cardWidth:card.width,titleWidth:title.width,actionsWidth:actions.width,
+    titleBottom:title.bottom,actionsTop:actions.top,
+    primaryWidth:primary.width,primaryTextWidth:primaryTitle.width,
+    anyHorizontalOverflow:document.getElementById("view").scrollWidth>document.getElementById("view").clientWidth+2,
+    secondGoalText:document.querySelectorAll(".view[data-route='perfil'] .goal-list-entry .list-main strong")[1]?.textContent
+   };
+  });
+  assert.ok(profileBox.titleWidth>220,"título do objetivo deve ocupar largura legível no celular");
+  assert.ok(profileBox.titleWidth>=profileBox.cardWidth-38,"texto tem praticamente a largura total do cartão");
+  assert.ok(profileBox.actionsTop>=profileBox.titleBottom-2,"ações ficam abaixo do texto");
+  assert.ok(profileBox.primaryTextWidth>=profileBox.primaryWidth-10,"ícone não comprime objetivo principal");
+  assert.ok(!profileBox.anyHorizontalOverflow,"perfil não cria rolagem horizontal");
+  assert.match(profileBox.secondGoalText,/DESENVOLVIMENTO PROFISSIONAL/);
   assert.deepEqual(errors,[],"nenhum erro JavaScript no navegador");
  }finally{await browser?.close();await new Promise(r=>server.close(r));}
 });

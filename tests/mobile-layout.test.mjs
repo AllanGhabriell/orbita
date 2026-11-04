@@ -45,7 +45,7 @@ assert.match(sw,/orbita-app-20261104-settings-layout-v3/,"cache PWA renovado par
  assert.ok(cssVersion,"CSS do cronômetro tem versão explícita no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v="+cssVersion),"o Service Worker contém a versão de CSS realmente usada no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
-assert.ok(html.includes("styles.css?v=20261104-organize-light-mobile"),"tema claro recebe CSS atualizado");
+assert.ok(html.includes("styles.css?v=20261104-profile-goals-mobile"),"CSS do perfil no celular tem versão nova");
 assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"Organizar recebe CSS atualizado");
 assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"CSS das prioridades de tarefas com versão atualizada");
 assert.ok(html.includes("stage3.css?v=20261103-session-focus"),"stylesheet recebe versão para superar cache antigo");
@@ -60,3 +60,18 @@ assert.match(stage3Styles,/Layout do planejador semanal: cartões legíveis/,"re
 assert.match(stage3Styles,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"grade de três colunas");
 assert.match(stage3Styles,/@media\(max-width:760px\)/,"layout de uma coluna para mobile");
 console.log("Mobile: calendario compacto acessível, rota isolada, CSS sob media query e cache PWA atualizados.");
+
+
+// Regressão: textos longos em "Meus objetivos" não podem ser comprimidos por ações.
+const mainGoal={id:"objective-1",title:"INGRESSAR EM ENGENHARIA DA COMPUTAÇÃO NA UFPB EM 2027",description:"Um planejamento detalhado de preparação para o ENEM e disciplinas do curso técnico",area:"Estudos",deadline:"2027-11-08",archived:false};
+C.state.goals.push(mainGoal,{id:"objective-2",title:"DESENVOLVIMENTO PROFISSIONAL EM TECNOLOGIA E ELETRÔNICA",area:"Carreira",archived:false});
+C.state.primaryGoalId=mainGoal.id;
+C.go("perfil");
+const profileMarkup=node("view").innerHTML;
+assert.equal((profileMarkup.match(/class="list-entry goal-accent goal-list-entry"/g)||[]).length,2,"objetivos recebem estrutura própria responsiva");
+assert.equal((profileMarkup.match(/class="row goal-actions"/g)||[]).length,2,"botões de objetivo ficam em contêiner separado");
+assert.match(profileMarkup,/class="hero-goal profile-primary-goal"/,"objetivo principal identificado no CSS");
+assert.match(profileMarkup,/INGRESSAR EM ENGENHARIA DA COMPUTAÇÃO NA UFPB EM 2027/,"título integral preservado");
+assert.match(styles,/@media\(max-width:760px\)\{\s*\.view\[data-route="perfil"\] \.profile-primary-goal/,"layout de perfil mobile");
+assert.match(styles,/\.goal-list-entry \.goal-actions\{\s*grid-column:1;\s*display:grid;/,"ações fora da largura do texto");
+assert.match(styles,/\.goal-list-entry \.list-main\{\s*display:block;\s*width:100%/,"título ocupa toda a largura");

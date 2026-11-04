@@ -340,3 +340,89 @@ body[data-theme="light"] .mobile-nav{
   .slot-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .slot-row>.btn{grid-column:1/-1}
 }
+
+
+/* Perfil: em telas pequenas, os botões não podem comprimir o título do objetivo. */
+.view[data-route="perfil"] .goal-list-entry .list-main>strong{
+  display:block;
+  line-height:1.48;
+  overflow-wrap:break-word;
+  word-break:normal;
+}
+.view[data-route="perfil"] .goal-list-entry .list-main>small{
+  overflow-wrap:break-word;
+  word-break:normal;
+  line-height:1.5;
+}
+@media(max-width:760px){
+  .view[data-route="perfil"] .profile-primary-goal{
+    display:block;
+    width:100%;
+    min-width:0;
+  }
+  .view[data-route="perfil"] .profile-primary-goal .orbital-icon{
+    display:none;
+  }
+  .view[data-route="perfil"] .profile-primary-goal .hero-content{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+  }
+  .view[data-route="perfil"] .profile-primary-goal .hero-content h2{
+    font-size:clamp(17px,4.9vw,21px);
+    line-height:1.35;
+    letter-spacing:-.025em;
+    overflow-wrap:break-word;
+    word-break:normal;
+    margin:0 0 9px;
+  }
+  .view[data-route="perfil"] .profile-primary-goal .hero-content .kicker{
+    font-size:13px;
+    line-height:1.55;
+    overflow-wrap:break-word;
+    word-break:normal;
+    margin:0;
+  }
+  .view[data-route="perfil"] .goal-list-entry{
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    align-items:start;
+    justify-content:stretch;
+    gap:13px;
+    padding:15px;
+    width:100%;
+    max-width:100%;
+  }
+  .view[data-route="perfil"] .goal-list-entry .list-main{
+    display:block;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    flex:none;
+  }
+  .view[data-route="perfil"] .goal-list-entry .goal-actions{
+    grid-column:1;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px;
+    margin:0;
+    width:100%;
+    max-width:100%;
+    min-width:0;
+  }
+  .view[data-route="perfil"] .goal-list-entry .goal-actions>.btn{
+    display:inline-flex;
+    min-width:0;
+    width:100%;
+    min-height:36px;
+    padding:8px 9px;
+    font-size:11px;
+    overflow-wrap:normal;
+    white-space:normal;
+  }
+}
+@media(min-width:600px) and (max-width:760px){
+  .view[data-route="perfil"] .goal-list-entry .goal-actions{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
