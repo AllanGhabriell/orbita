@@ -1078,6 +1078,7 @@ function submission(id,data){
  if(correct!==null&&(questions===null||correct>questions))throw Error("Informe primeiro o total de questões; acertos não podem exceder o total.");
  if(quality!==null&&(!Number.isInteger(quality)||quality<1||quality>5))throw Error("Qualidade percebida inválida.");
  const x=setSessionStatus(String(data.get("id")),String(data.get("status")),data.get("actualMin"),String(data.get("actualTime")||""));
+ window.OrbitaStage7?.inspect?.syncManualRecord?.(x.id,x.actualMin);
  x.evidence={questions,correct,quality};logs("learning_evidence",{sessionId:x.id,questions,correct,quality});save();close();render();notify(x.status==="done"?"Sessão concluída.":"Registro atualizado.");return;
  }
 }
