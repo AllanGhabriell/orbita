@@ -1,5 +1,16 @@
 # Órbita
 
+## Gerenciamento de cronometragens e interface contextual — 04/11/2026
+
+- Removida a faixa persistente de "Nenhum estudo ativo" acima do planejamento. O cronômetro, mais compacto, aparece exclusivamente dentro de **Estudos de hoje**, associado à sessão atual. Sem cronômetro ativo, a tela permanece limpa.
+- A sessão mantém **Concluir** e **Registrar** independentemente de utilizar o cronômetro; o tempo informado manualmente continua válido.
+- O menu `⋯` no cartão da sessão cronometrada permite editar totais, alterar horários/motivos de pausas, excluir uma pausa sem convertê-la em estudo, zerar todas as pausas, zerar o cronômetro ou descartar apenas a cronometragem.
+- Permite ainda transferir o registro ou repartir somente o tempo estudado entre sessões abertas do **mesmo dia**, sem duplicar horas, e desfazer a última alteração durante 60 segundos (enquanto a aba permanecer aberta).
+- Enquanto pausado, o menu permite desfazer uma pausa acidental, creditando o intervalo como estudo **somente com confirmação explícita**, ou zerar apenas a pausa atual sem acrescentar estudo.
+- Edição do histórico requer encerrar a cronometragem como parcial; dias finalizados permanecem somente leitura. Descartar um cronômetro iniciado numa sessão pendente devolve a sessão a pendente quando apropriado, sem apagar o planejamento.
+- Nenhuma migração SQL adicional é exigida: dados permanecem no documento sincronizado `orbita_documents.content`. Novos testes de lógica e do navegador foram preparados para validar as operações.
+
+
 ## Cronômetro inteligente — 04/11/2026
 
 O Órbita agora disponibiliza o botão **Cronometrar** em cada sessão de estudo na tela Início, um indicador global de **ESTUDO EM ANDAMENTO / ESTUDO PAUSADO / NENHUM ESTUDO ATIVO**, contagem circular de progresso, pausas com motivo (descanso, preparação de flashcards, interrupção, pausa programada), correção auditada de horários e salvamento automático local e sincronizável.
