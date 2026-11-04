@@ -157,7 +157,7 @@ function askFinish(done){
 }
 function metrics(filter){
  const entries=Object.values(timing.records).filter(r=>{
-  const x=session(r.sessionId);return x&&(!filter||x.date>=filter.from&&x.date<=filter.to);
+  const x=session(r.sessionId);return x&&(!filter||(!filter.from||x.date>=filter.from)&&(!filter.to||x.date<=filter.to));
  });
  const study=entries.reduce((n,r)=>n+studyMs(r),0),paused=entries.reduce((n,r)=>n+pauseMs(r),0);
  const prep=entries.reduce((n,r)=>n+(r.pauses||[]).filter(p=>p.kind==="preparation").reduce((v,p)=>v+Math.max(0,(p.endedAt||((timing.active?.sessionId===r.sessionId&&timing.active?.phase==="paused")?clock():p.startedAt))-p.startedAt),0),0);
@@ -173,7 +173,7 @@ function ring(){
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span></div>'+
- (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button>':
+ (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<button class="btn primary" data-s7="resume">▶ Retomar estudo</button><div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
  '<button class="btn ghost small" data-s7="correct">Corrigir horário esquecido</button><div class="row"><button class="btn small ghost" data-s7="partial">Encerrar parcial</button><button class="btn small" data-s7="finish">Finalizar como concluído</button></div></div></div>'+
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
@@ -185,14 +185,25 @@ function homeButtons(id){
  if(timing.active?.sessionId===id)return '<span class="s7-inline-state '+(timing.active.phase==="paused"?"s7-muted":"")+'">'+(timing.active.phase==="paused"?"Ⅱ PAUSADO":"● EM ESTUDO")+'</span>';
  return '<button class="btn small ghost" data-s7="start" data-id="'+A(id)+'" '+(timing.active?"disabled title=\"Outra sessão ativa\"":"")+'>◷ Cronometrar</button>';
 }
+function historyHtml(){
+ const rows=Object.values(timing.records).map(r=>({r,x:session(r.sessionId)})).filter(row=>row.x)
+  .sort((a,b)=>(b.x.date||"").localeCompare(a.x.date||"")||(b.r.startedAt||"").localeCompare(a.r.startedAt||"")).slice(0,10);
+ if(!rows.length)return '<p class="note">Ainda não há sessões cronometradas.</p>';
+ return '<div class="s7-history"><strong>Histórico recente das sessões</strong>'+
+ rows.map(({r,x})=>{
+  const prep=(r.pauses||[]).filter(p=>p.kind==="preparation").reduce((n,p)=>n+Math.max(0,(p.endedAt||(timing.active?.sessionId===r.sessionId&&timing.active.phase==="paused"?clock():p.startedAt))-p.startedAt),0);
+  return '<div class="s7-history-row"><div><strong>'+E(x.discipline||"Estudo")+'</strong><small>'+E(x.date||"")+' · '+E(x.status==="done"?"Concluída":"Parcial/em andamento")+'</small></div>'+
+   '<div><span>Estudo '+E(duration(studyMs(r)))+'</span><span>Pausado '+E(duration(pauseMs(r)))+'</span><small>Preparação '+E(duration(prep))+' · '+(r.pauses||[]).length+' pausa(s) registradas</small></div></div>';
+ }).join("")+'</div>';
+}
 function decorate(route,html){
  if(route==="inicio"){
   html=html.replace(/(<button class="btn small [^"]*" data-s3="quickDone" data-id="([^"]+)")/g,(full,head,id)=>homeButtons(id)+head);
   return (timing.active?ring():"")+html;
  }
  if(route==="estudos"||route==="evolucao"||route==="perfil"){
-  const m=metrics(),ratio=m.ratio===null?"—":m.ratio+"%";
-  return html+'<section class="card s7-stats"><div class="card-head"><h2>Tempo de concentração e pausas</h2><span class="note">Registros do cronômetro</span></div><div class="s7-stat-grid"><div><small>Estudo efetivo</small><strong>'+E(duration(m.studyMs))+'</strong></div><div><small>Tempo pausado</small><strong>'+E(duration(m.pauseMs))+'</strong></div><div><small>Preparação de material</small><strong>'+E(duration(m.preparationMs))+'</strong></div><div><small>Parcela em estudo</small><strong>'+E(ratio)+'</strong></div></div><p class="note">A quantidade de pausas, isoladamente, não indica baixa produtividade. O orientador considera duração e contexto; tempo de estudo não prova aprendizagem.</p></section>';
+  const m=metrics(),week=metrics({from:C.addDays(C.today(),-6),to:C.today()}),ratio=m.ratio===null?"—":m.ratio+"%";
+  return html+'<section class="card s7-stats"><div class="card-head"><h2>Tempo de concentração e pausas</h2><span class="note">Registros do cronômetro</span></div><div class="s7-stat-grid"><div><small>Estudo efetivo</small><strong>'+E(duration(m.studyMs))+'</strong></div><div><small>Tempo pausado</small><strong>'+E(duration(m.pauseMs))+'</strong></div><div><small>Preparação de material</small><strong>'+E(duration(m.preparationMs))+'</strong></div><div><small>Parcela em estudo</small><strong>'+E(ratio)+'</strong></div></div><p class="note">A quantidade de pausas, isoladamente, não indica baixa produtividade. O orientador considera duração e contexto; tempo de estudo não prova aprendizagem.</p><p class="note">Últimos 7 dias: '+E(duration(week.studyMs))+' estudados e '+E(duration(week.pauseMs))+' em pausas.</p>'+historyHtml()+'</section>';
  }
  if(route==="configuracoes")return html+settingsPanel();
  return html;
@@ -221,7 +232,7 @@ function tick(){
  const a=timing.active,r=activeRecord();
  const banner=$("s7-global-status");
  if(!a||!r){
-  if(banner){banner.hidden=true;banner.textContent="";}
+  if(banner){banner.hidden=false;banner.className="s7-global-status s7-global-idle";banner.innerHTML="<strong>◷ NENHUM ESTUDO ATIVO</strong><span>O tempo de estudo não está sendo contado.</span>";}
   if(document.title!==titleBase&&document.title.startsWith("Ⅱ PAUSADO")||document.title.startsWith("● EM ESTUDO"))document.title=titleBase;
   return;
  }
@@ -240,6 +251,7 @@ function tick(){
  if(sEl)sEl.textContent=fmtMs(studied);
  if(pEl)pEl.textContent=fmtMs(paused);
  if(!r.goalNotified&&studied>=goal){r.goalNotified=true;persist();alertUser("Você alcançou a meta de estudo. Pode continuar ou finalizar a sessão.","finish");}
+ if(a.phase==="running"&&!r.overtimeWarned&&studied>=goal+120*60000){r.overtimeWarned=true;persist();C.notify("O cronômetro está ativo há muito tempo. Se esqueceu de pausar, utilize Corrigir horário.");}
  if(a.phase==="paused"){
   const threshold=Number(settings().pauseMinutes)*60000;
   if(threshold>0){
