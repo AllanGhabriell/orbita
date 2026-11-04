@@ -185,6 +185,7 @@ function normalizeImportedDoc(doc){
  source.studies||={version:3,cycles:[],subjects:[],methods:[],sessions:[],events:[]};
  source.evolution||={version:4,closed:{},visitedDays:{},settings:{reminders:true,strictness:"firm"},milestones:[]};
  source.extension||={version:6,busyWeekly:[[],[],[],[],[],[],[]],busyDates:{}};
+  source.timing||={records:{},active:null,settings:{}};
  return source;
 }
 function hydrateInPlace(target,source){
