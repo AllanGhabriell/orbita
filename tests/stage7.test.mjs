@@ -1,0 +1,104 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+
+const source=fs.readFileSync(new URL("../stage7.js",import.meta.url),"utf8");
+const baseTime=Date.parse("2026-11-04T12:00:00.000Z");
+function harness(){
+ let time=baseTime;
+ const state={settings:{motion:false},date:"2026-11-04",studies:{},evolution:{closed:{}}};
+ const item={id:"math-1",date:"2026-11-04",plannedMin:90,status:"pending",actualMin:null,kind:"cycle",discipline:"Matemática",archived:false};
+ let saved=0,notifications=[];
+ const callbacks={};
+ class ClockDate extends Date{static now(){return time;}}
+ const fakeDocument={
+  title:"Órbita",hidden:false,
+  addEventListener(type,fn,capture){(callbacks[type]||=[]).push({fn,capture});},
+  getElementById(){return null;},
+  querySelector(){return null;},
+  body:{classList:{add(){},remove(){}},offsetWidth:10}
+ };
+ const ctx={
+  Date:ClockDate,console,
+  window:{
+   OrbitaCore:{
+    state,esc:x=>String(x),attr:x=>String(x),today:()=> "2026-11-04",
+    save(){saved++;},render(){},notify:x=>notifications.push(x),
+    openModal(){},closeModal(){},settings:{},confirm:()=>true,
+   },
+   OrbitaStage3:{inspect:{
+    session:id=>id===item.id?item:null,
+    setSessionStatus(id,status,min){assert.equal(id,item.id);item.status=status;item.actualMin=min;},
+   }},
+   OrbitaStage4:{inspect:{isClosed:date=>!!state.evolution.closed[date]}},
+   addEventListener(){},
+   matchMedia:()=>({matches:false}),
+   confirm:()=>true,
+   isSecureContext:true,
+  },
+  document:fakeDocument,
+  setInterval(){},
+  setTimeout(){return 1;},
+  clearTimeout(){},
+  Notification:{permission:"default"},
+ };
+ vm.runInNewContext(source,ctx,{filename:"stage7.js"});
+ const stage=ctx.window.OrbitaStage7.inspect;
+ return {state,item,stage,callbacks,notifications,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
+}
+test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(30*60000);
+ h.stage.pause("preparation");
+ assert.equal(h.stage.studyMs(h.state.timing.records["math-1"]),30*60000);
+ h.setTime(36*60000);
+ h.stage.resume();
+ h.setTime(96*60000);
+ assert.equal(h.stage.studyMs(h.state.timing.records["math-1"]),90*60000);
+ assert.equal(h.stage.pauseMs(h.state.timing.records["math-1"]),6*60000);
+ assert.equal(h.item.status,"progress");
+ h.stage.finish(true);
+ assert.equal(h.item.status,"done");
+ assert.equal(h.item.actualMin,90);
+ assert.equal(h.state.timing.active,null);
+ const m=h.stage.metrics();
+ assert.equal(m.studyMs,90*60000);
+ assert.equal(m.pauseMs,6*60000);
+ assert.equal(m.preparationMs,6*60000);
+ assert.equal(h.state.timing.records["math-1"].pauses.length,1);
+});
+test("correção do horário de retomada preserva trilha de auditoria",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(20*60000);
+ h.stage.pause("rest");
+ h.setTime(35*60000);
+ h.stage.correction(baseTime+30*60000);
+ h.setTime(40*60000);
+ h.stage.finish(false);
+ const r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,30*60000);
+ assert.equal(r.pauseMs,10*60000);
+ assert.equal(r.corrections.length,1);
+ assert.equal(r.corrections[0].type,"resume");
+ assert.equal(h.item.status,"progress");
+ assert.equal(h.item.actualMin,30);
+});
+test("dia encerrado impede iniciar, sem produzir sessão falsa",()=>{
+ const h=harness();
+ h.state.evolution.closed["2026-11-04"]={confirmed:"2026-11-04"};
+ assert.throws(()=>h.stage.start("math-1"),/finalizado/);
+ assert.equal(h.state.timing.active,null);
+ assert.equal(h.item.status,"pending");
+});
+test("interface possui indicadores e alertas configuráveis",()=>{
+ const h=harness();
+ assert.equal(h.stage.model.settings.mode,"continuous");
+ assert.match(source,/ESTUDO PAUSADO/);
+ assert.match(source,/ESTUDO EM ANDAMENTO/);
+ assert.match(source,/pauseMinutes/);
+ assert.match(source,/upload\(/);
+ assert.match(source,/data-s7="correct"/);
+});
