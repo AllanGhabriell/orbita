@@ -101,3 +101,14 @@ Referência obrigatória para todas as etapas. Atualize este documento quando o 
 5. Login, Supabase, SQL, segurança, offline e publicação definitiva.
 
 Em cada etapa: listar pronto, testado, parcial, não feito, defeitos, mudanças no GitHub e próxima etapa. Somente avançar com ordem expressa do usuário.
+
+## 11. Cronômetro integrado e notificações (04/11/2026)
+- Cronometrar a sessão planejada no Início, respeitando duração prevista e permitindo pausas livres, retomar, encerrar parcial e concluir apenas por confirmação.
+- Manter indicador global permanente de ESTUDO EM ANDAMENTO, ESTUDO PAUSADO ou NENHUM ESTUDO ATIVO, além de anel regressivo.
+- Registrar milissegundos estudados e pausados separadamente, motivo de cada pausa (descanso, preparação de flashcards, intervalo programado ou interrupção) e histórico auditado de correções de horário.
+- Salvar transições no documento offline e na sincronização já existente, recuperando após recarregamento por timestamps.
+- Modos contínuo, Pomodoro 25/5 e personalizado; avisos de meta, pausa longa e blocos com sons configuráveis (inclusive áudios próprios pequenos), volume, brilho opcional e notificação do dispositivo mediante permissão.
+- Dar preferência ao tempo total pausado, sua finalidade e contexto na orientação, sem penalizar a contagem bruta de pausas.
+- Não alterar dia finalizado: bloquear encerramento com cronômetro ativo e congelar o registro da sessão no snapshot.
+- Não inferir estudo real por atividade ou inatividade do navegador, nem garantir sons com app fechado.
+- Persistir no objeto timing do JSON existente, sem migração SQL complementar.
