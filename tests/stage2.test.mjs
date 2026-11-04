@@ -60,6 +60,25 @@ assert.equal(S.model.records[focus.id+"@"+today].actualMin,undefined);
 submit("s2-entry",{type:"task",title:"Comprar caderno",date:today,blockId:"",estimatedMin:"15",priority:"high",repeat:"none"});
 assert.equal(S.kindOn(C.addDays(today,1),"task").length,1,"tarefa pendente continua acessível no dia seguinte");
 const task=S.model.entries.find(x=>x.type==="task");
+
+C.go("inicio");
+assert.match(html(),/task-priority-high/,"prioridade alta aparece visualmente na tela Início");
+assert.match(html(),/Prioridade Alta/,"prioridade alta tem rótulo legível");
+assert.equal((html().match(/class="task-priority task-priority-/g)||[]).length,1,"o indicador aparece somente na tarefa secundária, não no foco");
+task.priority="medium";
+C.render();
+assert.match(html(),/task-priority-medium/);
+assert.match(html(),/Prioridade Média/);
+task.priority="low";
+C.render();
+assert.match(html(),/task-priority-low/);
+assert.match(html(),/Prioridade Baixa/);
+task.priority="high";
+C.render();
+assert.match(html(),/data-value="done" title="Concluir"/,"botão de conclusão não foi alterado");
+
+
+assert.match(html(),/task-priority-high/,"prioridade permanece após ações de registro");
 S.quickRecord(task.id,C.addDays(today,1),"done");
 assert.equal(S.kindOn(C.addDays(today,2),"task").length,0,"tarefa concluída deixa de aparecer");
 
