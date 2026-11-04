@@ -1,5 +1,18 @@
 # PROGRESSO — Órbita
 
+## Cronômetro de estudos e alertas — 04/11/2026
+
+- Motor `stage7.js` e visual `stage7.css` conectados às sessões existentes da tela Início; contagem de estudo, pausas, classificação da pausa e tempo de preparação de flashcards sem duplicar horas.
+- Indicador global persistente com estados ativos/pausados/inativos, animação circular e aviso de tempo ativo excessivo.
+- Correção explícita de pausa/retomada esquecida com horário verdadeiro e trilha de auditoria. Transições ficam salvas no mesmo documento local, IndexedDB e Supabase, quando conectado.
+- Alerta sonoro/visual de meta, pausa prolongada e intervalos de técnica, sons/volume/arquivos pessoais pequenos personalizados nas Preferências; notificações do sistema dependem de autorização.
+- Modos contínuo, Pomodoro (25/5) e personalizado. Meta atingida não conclui automaticamente; encerrar parcial preserva a progressão.
+- Histórico das sessões, tempo efetivo, tempo pausado, preparação e totais recentes. Quantidade de pausas não vira crítica sem contexto.
+- Fechamento diário bloqueia cronômetro em execução e guarda o histórico no snapshot. `stage5.js` mantém os novos campos também ao importar/sincronizar a conta.
+- Testes unitários `tests/stage7.test.mjs` incluídos no pipeline.
+- **Não houve mudança no SQL:** novo objeto `timing` é persistido em `orbita_documents.content`. Validação manual de áudio, sincronização multiaparelho e navegadores permanece necessária.
+
+
 ## Organizador semanal de estudos e Biblioteca (2026-11-03)
 
 - A área **Estudos → Planejar semana** agora dispõe de calendário visual de sete dias, prévia do Início, edição rápida por seleção, organização por arrastar no computador ou ação Mover no celular, duplicação, exclusão, seleção e edição de várias sessões, desfazer última alteração, copiar dia e semana, salvar/aplicar modelos reutilizáveis.
