@@ -271,6 +271,13 @@ async function upload(which,file){
 }
 const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100]};
 const strings={mode:["continuous","pomodoro","custom"],finishSound:["bell","digital","soft","custom","none"],pauseSound:["bell","digital","soft","custom","none"]};
+// Evita dupla contabilização se a pessoa tentar concluir/registrar a sessão com o timer ainda aberto.
+document.addEventListener("click",e=>{
+ const b=e.target.closest?.('[data-s3="quickDone"],[data-s3="recordSession"]');
+ if(!b||!timing.active||b.dataset.id!==timing.active.sessionId)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ C.notify("Encerre o cronômetro para registrar ou concluir esta sessão.");
+},true);
 document.addEventListener("click",e=>{
  const b=e.target.closest?.("[data-s7]");if(!b)return;
  e.preventDefault();
