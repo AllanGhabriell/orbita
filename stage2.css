@@ -57,3 +57,18 @@
  .month-day span{font-size:7px}
  .task-actions{width:100%;margin-left:0;justify-content:flex-end}
 }
+
+/* Prioridade das tarefas secundárias — cor + texto para não depender apenas da cor. */
+.task-priority{
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:3px 8px;border-radius:999px;border:1px solid currentColor;
+  font-size:10px;font-weight:750;line-height:1.45;
+  flex:0 0 auto;
+}
+.task-priority-dot{display:inline-block;width:6px;height:6px;flex:none;border-radius:50%;background:currentColor}
+.task-priority-high{color:#a92d4a;background:rgba(223,66,103,.12)}
+.task-priority-medium{color:#8b5d0a;background:rgba(235,175,56,.13)}
+.task-priority-low{color:#187b5b;background:rgba(58,168,123,.12)}
+body[data-theme="dark"] .task-priority-high{color:#ff92ab;background:rgba(238,83,120,.13)}
+body[data-theme="dark"] .task-priority-medium{color:#f3c875;background:rgba(239,178,64,.11)}
+body[data-theme="dark"] .task-priority-low{color:#8be1bc;background:rgba(73,184,135,.11)}
