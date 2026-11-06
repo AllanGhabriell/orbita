@@ -151,7 +151,7 @@ function renderAlarm(){
   host.hidden=true;host.innerHTML="";updateTabIndicator();return;
  }
  const isPause=a.which==="pause",demo=!!a.demo;
- const title=demo?"Teste de alarme":isPause?"Pausa prolongada":"Meta de estudo atingida";
+ const title=demo?"Teste de alarme":isPause?(a.message?.startsWith("Sua pausa de ")?"Pausa programada concluída":"Pausa prolongada"):"Meta de estudo atingida";
  const x=!demo?session(a.sessionId):null,name=demo?"Órbita":x?.discipline||"Sessão de estudo";
  const silence=a.silenced?'<button class="btn small ghost" data-s7="alarmReplay">▶ Reproduzir som</button>':'<button class="btn small ghost" data-s7="alarmSilence">Silenciar alarme</button>';
  const actions=demo?'<button class="btn small primary" data-s7="alarmDismiss">Encerrar teste</button>':isPause?
@@ -220,6 +220,20 @@ function start(id){
  r.finishedAt=null;
  timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
  persist();C.render();tick();
+}
+function timedPauseModal(){
+ if(timing.active?.phase!=="running")return C.notify("Inicie ou retome o estudo para programar uma pausa.");
+ C.openModal("Pausa com timer",'<form id="s7-timed-pause-form" class="section-stack"><p class="note">O estudo será pausado; o alarme avisará ao final. Retome quando estiver pronto.</p><div class="field"><label>Minutos de descanso</label><input name="minutes" type="number" inputmode="numeric" min="1" max="240" value="5" required></div><div class="field"><label>Motivo (opcional)</label><input name="reason" maxlength="180" placeholder="Ex.: descanso mental"></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Iniciar pausa</button></div></form>');
+}
+function startTimedPause(minutes,reason){
+ const min=Number(minutes);
+ if(!Number.isInteger(min)||min<1||min>240)throw Error("Defina de 1 a 240 minutos.");
+ if(timing.active?.phase!=="running")throw Error("Nenhuma sessão em estudo.");
+ pause("scheduled");
+ const p=activeRecord()?.pauses?.at(-1);
+ if(!p)throw Error("Não foi possível iniciar a pausa.");
+ p.plannedMinutes=min;p.reason=String(reason||"").trim().slice(0,180);p.restNotified=false;
+ persist();C.closeModal();C.render();tick();
 }
 function pause(kind="rest"){
  const a=timing.active,r=activeRecord();
@@ -550,8 +564,8 @@ function ring(){
  const subtitle=a.phase==="paused"?"Contagem de estudo interrompida.":"Tempo efetivo em andamento.";
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
- '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span></div>'+
- (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
+ '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span></div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
+ (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<button class="btn primary" data-s7="resume">▶ Retomar estudo</button><div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
  '<button class="btn ghost small" data-s7="correct">Corrigir horário esquecido</button><div class="row"><button class="btn small ghost" data-s7="partial">Encerrar parcial</button><button class="btn small" data-s7="finish">Finalizar como concluído</button></div></div></div>'+
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
@@ -667,20 +681,22 @@ function tick(){
  const sEl=document.querySelector('[data-s7-el="study"]'),pEl=document.querySelector('[data-s7-el="pause"]');
  if(sEl)sEl.textContent=fmtMs(studied);
  if(pEl)pEl.textContent=fmtMs(paused);
+ const pauseLeft=document.querySelector('[data-s7-el="pauseLeft"]'),currentPause=r.pauses.at(-1);
+ if(pauseLeft&&a.phase==="paused"&&currentPause?.plannedMinutes)pauseLeft.textContent=fmtMs(Math.max(0,currentPause.plannedMinutes*60000-(clock()-a.since)));
  if(!r.goalNotified&&studied>=goal){r.goalNotified=true;persist();alertUser("Você alcançou a meta de estudo. Pode continuar ou finalizar a sessão.","finish");}
  if(a.phase==="running"&&!r.overtimeWarned&&studied>=goal+120*60000){r.overtimeWarned=true;persist();C.notify("O cronômetro está ativo há muito tempo. Se esqueceu de pausar, utilize Corrigir horário.");}
  if(a.phase==="paused"){
+  const pp=r.pauses.at(-1);
   const threshold=Number(settings().pauseMinutes)*60000;
-  if(threshold>0){
+  if(threshold>0&&!pp?.plannedMinutes){
    const n=Math.floor(Math.max(0,clock()-a.since)/threshold);
    if(n>=1&&n>a.alertIndex&&(settings().repeatPause||a.alertIndex===0)){
     a.alertIndex=n;persist();alertUser("O estudo continua pausado. Se você já retomou, corrija o horário no cronômetro.","pause");
    }
   }
-  const pp=r.pauses.at(-1);
-  const restThreshold=r.mode==="pomodoro"?5:r.mode==="custom"?Number(settings().restMin):0;
+  const restThreshold=pp?.plannedMinutes|| (r.mode==="pomodoro"?5:r.mode==="custom"?Number(settings().restMin):0);
   if(pp?.kind==="scheduled"&&restThreshold>0&&!pp.restNotified&&clock()-a.since>=restThreshold*60000){
-   pp.restNotified=true;persist();alertUser("Sua pausa programada terminou. Retome quando estiver pronto.","pause");
+   pp.restNotified=true;persist();alertUser(pp.plannedMinutes?"Sua pausa de "+pp.plannedMinutes+" minuto(s) terminou. Retome quando estiver pronto.":"Sua pausa programada terminou. Retome quando estiver pronto.","pause");
   }
  }else if(r.mode!=="continuous"){
   const step=(r.mode==="pomodoro"?25:Number(settings().blockMin))*60000;
@@ -757,6 +773,7 @@ document.addEventListener("click",e=>{
  try{
   const act=b.dataset.s7;
   if(act==="start")start(b.dataset.id);
+  else if(act==="timedPause")timedPauseModal();
   else if(act==="pause")pause(b.dataset.kind||"rest");
   else if(act==="resume")resume();
   else if(act==="finish")askFinish(true);
@@ -796,11 +813,12 @@ document.addEventListener("click",e=>{
 document.addEventListener("submit",e=>{
  // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
  const id=e.target?.getAttribute?.("id")||e.target?.id;
- if(!["s7-correction-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
+ if(!["s7-correction-form","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
  const data=new FormData(e.target);
  try{
   if(id==="s7-correction-form")correction(new Date(data.get("moment")).getTime());
+   else if(id==="s7-timed-pause-form")startTimedPause(data.get("minutes"),data.get("reason"));
   else if(id==="s7-edit-totals")editTotals(String(data.get("id")),Number(data.get("study")),Number(data.get("paused")),String(data.get("reason")||""));
   else if(id==="s7-edit-pause")editPause(String(data.get("id")),Number(data.get("index")),new Date(data.get("start")).getTime(),new Date(data.get("end")).getTime(),String(data.get("kind")));
   else if(id==="s7-move-record")moveRecord(String(data.get("id")),String(data.get("target")),data.get("operation")==="split",Number(data.get("minutes")));
