@@ -69,7 +69,7 @@ function load(src){
  });
 }
 for(const file of ["config.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js","stage6.js","stage7.js"]){
- try{await load("./"+file);}catch(err){
+ try{await load("./"+file+(file==="stage2.js"?"?v=20261106-routines-v2":""));}catch(err){
   console.error(err);
   const view=document.getElementById("view");if(view)view.textContent="Não foi possível carregar o aplicativo. Verifique a conexão e atualize a página.";
   return;
