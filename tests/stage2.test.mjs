@@ -86,6 +86,27 @@ submit("s2-entry",{type:"habit",title:"Correr",date:today,estimatedMin:"30",repe
 const habit=S.model.entries.find(x=>x.type==="habit");
 assert.ok(S.occurrence(habit,C.addDays(today,7)),"rotina semanal no dia equivalente");
 assert.equal(S.occurrence(habit,C.addDays(today,7)).displayTitle,"Correr 2");
+assert.ok(S.occurrence(habit,C.addDays(today,1))===null,"rotina semanal não aparece em dia não selecionado");
+submit("s2-entry",{type:"habit",title:"Ler todos os dias",date:today,repeat:"daily",repeatTermination:"never"});
+const daily=S.model.entries.find(x=>x.title==="Ler todos os dias");
+assert.equal(daily.recurrence.kind,"daily");
+assert.equal(daily.recurrence.end,undefined,"rotina sem fim não recebe data limite");
+assert.ok(S.occurrence(daily,C.addDays(today,1)),"rotina diária reaparece amanhã");
+S.quickRecord(daily.id,today,"done");
+assert.ok(S.occurrence(daily,C.addDays(today,1)),"concluir hoje não remove a rotina de amanhã");
+assert.equal(S.occurrence(daily,C.addDays(today,1)).status,"pending","a próxima ocorrência começa pendente");
+submit("s2-entry",{type:"habit",title:"Limpeza de 3 em 3 dias",date:today,repeat:"interval",everyDays:"3",repeatTermination:"never"});
+const spaced=S.model.entries.find(x=>x.title==="Limpeza de 3 em 3 dias");
+assert.ok(S.occurrence(spaced,C.addDays(today,3)),"intervalo de três dias respeitado");
+assert.equal(S.occurrence(spaced,C.addDays(today,2)),null,"não aparece antes do intervalo");
+submit("s2-entry",{type:"habit",title:"Rotina durante 2 dias",date:today,repeat:"daily",repeatTermination:"date",repeatEnd:C.addDays(today,1)});
+const limited=S.model.entries.find(x=>x.title==="Rotina durante 2 dias");
+assert.ok(S.occurrence(limited,C.addDays(today,1)));
+assert.equal(S.occurrence(limited,C.addDays(today,2)),null,"rotina termina na data configurada");
+submit("s2-entry",{type:"habit",title:"Rotina pontual",date:today,repeat:"none"});
+const once=S.model.entries.find(x=>x.title==="Rotina pontual");
+assert.equal(S.occurrence(once,C.addDays(today,1)),null,"rotina pontual não repete");
+
 
 submit("s2-pause",{date:today,kind:"imprevisto",reason:"Compromisso familiar"});
 assert.equal(S.model.dayPauses[today].kind,"imprevisto");
