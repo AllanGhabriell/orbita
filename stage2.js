@@ -36,7 +36,8 @@ function blockLabel(id){let b=block(id);return b?'<span class="block-pill"><i st
 function entryTitle(o){return o.displayTitle||o.title}
 function statusText(st){return ({done:"Concluída",progress:"Em andamento",notdone:"Não realizada",moved:"Remanejada",pending:"Pendente"})[st]||"Pendente"}
 function dtClock(isoString){return isoString?new Date(isoString).toLocaleString("pt-BR"):""}
-function recurLabel(r){if(!r||r.kind==="none")return "Única";if(r.kind==="weekdays")return "Semanal · "+r.weekdays.map(x=>SHORT[x]).join(", ");return "Mensal · dia "+r.monthDay}
+function recurLabel(r){if(!r||r.kind==="none")return "Pontual";const label=r.kind==="daily"?"Diária":r.kind==="weekdays"?"Semanal · "+(r.weekdays||[]).map(x=>SHORT[x]).join(", "):r.kind==="interval"?"A cada "+r.everyDays+" dia(s)":"Mensal · dia "+r.monthDay;return label+" · "+(r.end?"até "+r.end.split("-").reverse().join("/"):"sem término")}
+function routineStats(x){let planned=0,done=0;const end=x.recurrence?.end&&x.recurrence.end<day()?x.recurrence.end:day();for(let d=x.date;d<=end;d=D(d,1)){if(!occDate(x,d)||p.overrides[uidKey(x.id,d)]?.removed)continue;planned++;const status=p.records[uidKey(x.id,d)]?.status||s.evolution?.closed?.[d]?.activities?.find(a=>a.id===x.id)?.status;if(status==="done")done++;}return {planned,done,percent:planned?Math.round(100*done/planned):0};}
 function baseEntry(b){return {id:ID(),type:b.type||"focus",title:b.title||"",date:b.date||s.date,createdAt:new Date().toISOString(),blockId:b.blockId||"",priority:b.priority||"medium",goalId:b.goalId||"",startTime:b.startTime||"",estimatedMin:b.estimatedMin||null,dueDate:b.dueDate||"",recurrence:b.recurrence||{kind:"none"},archivedAt:"",origin:b.origin||null};}
 function occDate(entry,date){
  if(date<entry.date)return false;
@@ -44,6 +45,8 @@ function occDate(entry,date){
  let r=entry.recurrence||{kind:"none"};
  if(r.end&&date>r.end)return false;
  if(r.kind==="none")return entry.date===date;
+ if(r.kind==="daily")return true;
+ if(r.kind==="interval")return Number.isInteger(Number(r.everyDays))&&Number(r.everyDays)>0&&Math.round((C.parse(date)-C.parse(entry.date))/86400000)%Number(r.everyDays)===0;
  if(r.kind==="weekdays")return (r.weekdays||[]).includes(C.parse(date).getDay());
  if(r.kind==="monthday")return C.parse(date).getDate()===Number(r.monthDay);
  return false;
@@ -97,7 +100,7 @@ function itemRow(o,date,compact=false){
  const st=rec?.status||o.status||"pending";
  const color=block(o.blockId)?.color||"transparent";
  const taskAge=o.type==="task"&&dueAge(o,date)>=4?'<span class="age-chip" title="Dias desde a criação">'+dueAge(o,date)+'d</span>':"";
- const desc=[o.goalId?s.goals.find(g=>g.id===o.goalId)?.title||"": "",o.startTime?o.startTime:"",o.estimatedMin?C.hoursLabel(o.estimatedMin/60):"",o.type==="task"&&o.dueDate?"Prazo "+o.dueDate.split("-").reverse().join("/"):""].filter(Boolean).join(" · ");
+ const desc=[o.goalId?s.goals.find(g=>g.id===o.goalId)?.title||"": "",o.type==="habit"?recurLabel(o.recurrence):"",o.startTime?o.startTime:"",o.estimatedMin?C.hoursLabel(o.estimatedMin/60):"",o.type==="task"&&o.dueDate?"Prazo "+o.dueDate.split("-").reverse().join("/"):""].filter(Boolean).join(" · ");
  // Prioridade visível apenas nas tarefas secundárias; nenhuma ação de conclusão muda.
  const priority=o.type==="task"?(["high","medium","low"].includes(o.priority)?o.priority:"medium"):null;
  const priorityText={high:"Alta",medium:"Média",low:"Baixa"};
@@ -174,8 +177,8 @@ function decorateOrganize(){
   out+='</section>';return out;
  }
  const entries=p.entries.filter(x=>x.type===organizing);
- out+='<section class="card board"><div class="card-head"><h2>'+({focus:"Focos obrigatórios",task:"Tarefas secundárias",habit:"Rotinas e hábitos"})[organizing]+'</h2>'+tag(entries.length+" criado(s)")+'</div>';
- out+=entries.length?'<div class="task-list organize-list">'+entries.map(x=>'<div class="task-row organize-row" style="--task-color:'+a(block(x.blockId)?.color||"transparent")+'"><div class="task-mark">◈</div><div class="task-main"><div class="task-title">'+e(x.title)+'</div><div class="task-meta">'+blockLabel(x.blockId)+'<span>'+e(x.recurrence?.kind!=="none"?recurLabel(x.recurrence):fmt(x.date,false))+'</span><span>'+e(x.archivedAt?"Arquivada":"Ativa")+'</span></div></div><div class="task-actions organize-actions"><button class="btn small" data-s2="editEntry" data-id="'+a(x.id)+'" data-date="'+a(x.date)+'">Editar</button><button class="btn small ghost" data-s2="duplicateEntry" data-id="'+a(x.id)+'">Copiar</button><button class="btn small ghost" data-s2="archiveEntry" data-id="'+a(x.id)+'">'+(x.archivedAt?"Reativar":"Arquivar")+'</button><button class="btn small danger" data-s2="deleteEntry" data-id="'+a(x.id)+'">Excluir</button></div></div>').join("")+'</div>':emptyList("Nenhum item cadastrado.");
+ out+='<section class="card board"><div class="card-head"><h2>'+({focus:"Focos obrigatórios",task:"Tarefas secundárias",habit:"Rotinas e hábitos"})[organizing]+'</h2>'+tag(entries.length+" criado(s)")+'</div>'+(organizing==="habit"?'<p class="note">Concluir hoje não remove as próximas ocorrências. Cada execução mantém seu registro.</p>':"");
+ out+=entries.length?'<div class="task-list organize-list">'+entries.map(x=>'<div class="task-row organize-row" style="--task-color:'+a(block(x.blockId)?.color||"transparent")+'"><div class="task-mark">◈</div><div class="task-main"><div class="task-title">'+e(x.title)+'</div><div class="task-meta">'+blockLabel(x.blockId)+'<span>'+e(x.recurrence?.kind!=="none"?recurLabel(x.recurrence):fmt(x.date,false))+'</span><span>'+e(x.archivedAt?"Arquivada":"Ativa")+'</span>'+(organizing==="habit"?'<span>'+routineStats(x).done+' de '+routineStats(x).planned+' realizadas ('+routineStats(x).percent+'%)</span>':"")+'</div></div><div class="task-actions organize-actions"><button class="btn small" data-s2="editEntry" data-id="'+a(x.id)+'" data-date="'+a(x.date)+'">Editar</button><button class="btn small ghost" data-s2="duplicateEntry" data-id="'+a(x.id)+'">Copiar</button><button class="btn small ghost" data-s2="archiveEntry" data-id="'+a(x.id)+'">'+(x.archivedAt?"Reativar":"Arquivar")+'</button><button class="btn small danger" data-s2="deleteEntry" data-id="'+a(x.id)+'">Excluir</button></div></div>').join("")+'</div>':emptyList("Nenhum item cadastrado.");
  out+='</section>';return out;
 }
 function blockOptions(selected){return '<option value="">Sem bloco</option>'+p.blocks.filter(b=>!b.archived||b.id===selected).map(b=>'<option value="'+a(b.id)+'" '+(selected===b.id?"selected":"")+'>'+e(b.title)+(b.archived?" (arquivado)":"")+'</option>').join("");}
@@ -184,7 +187,7 @@ function entryModal(type,id,date){
  if(locked(date||s.date))return notify("Dia finalizado: apenas consulta ao registro original.");
  let original=id?find(id):null;
  if(!original&&!C.availabilityReady())return notify("Configure sua disponibilidade antes de planejar.");
- const x=id?(occurrence(original,date||original.date)||original):baseEntry({type,date:date||s.date});
+ const x=id?(occurrence(original,date||original.date)||original):baseEntry({type,date:date||s.date,recurrence:type==="habit"?{kind:"daily"}:{kind:"none"}});
  const editing=!!original;
  const form='<form id="s2-entry" class="section-stack"><input type="hidden" name="id" value="'+a(id||"")+'"><input type="hidden" name="editDate" value="'+a(date||x.date)+'"><input type="hidden" name="type" value="'+a(type||x.type)+'">'+
  formField("Nome da atividade","title",x.title,"text",'required maxlength="140"')+
@@ -194,19 +197,19 @@ function entryModal(type,id,date){
  (type==="task"?'<div class="form-grid"><div class="field"><label>Prioridade</label><select name="priority"><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="medium" '+(x.priority==="medium"?"selected":"")+'>Média</option><option value="low" '+(x.priority==="low"?"selected":"")+'>Baixa</option></select></div>'+formField("Prazo opcional","dueDate",x.dueDate,"date")+'</div>':"")+
  '<div class="form-grid">'+formField(type==="habit"?"Horário-alvo (opcional)":"Horário (opcional)","startTime",x.startTime||"","time")+
  formField("Duração estimada em minutos","estimatedMin",x.estimatedMin??"","number",'min="1" max="1440" step="1" placeholder="Opcional"')+'</div>'+
- '<div class="field"><label>Repetição</label><select name="repeat"><option value="none" '+(x.recurrence?.kind==="none"?"selected":"")+'>Nenhuma</option><option value="weekdays" '+(x.recurrence?.kind==="weekdays"?"selected":"")+'>Dias da semana</option><option value="monthday" '+(x.recurrence?.kind==="monthday"?"selected":"")+'>Dia do mês</option></select></div>'+
+ '<div class="field"><label>'+(type==="habit"?"Tipo de rotina":"Repetição")+'</label><select name="repeat"><option value="daily" '+(x.recurrence?.kind==="daily"?"selected":"")+'>Diária — todos os dias</option><option value="weekdays" '+(x.recurrence?.kind==="weekdays"?"selected":"")+'>Semanal — dias escolhidos</option><option value="interval" '+(x.recurrence?.kind==="interval"?"selected":"")+'>Por intervalo — a cada N dias</option><option value="monthday" '+(x.recurrence?.kind==="monthday"?"selected":"")+'>Mensal — dia do mês</option><option value="none" '+(x.recurrence?.kind==="none"?"selected":"")+'>Pontual — somente uma vez</option></select></div>'+
  '<div class="repeat-fields" id="s2-repeat-fields">'+repeatFields(x.recurrence||{kind:"none"},x.date)+'</div>'+
- (editing&&x.recurrence?.kind!=="none"?'<div class="field"><label>Alcance da edição</label><select name="scope"><option value="single">Somente esta ocorrência</option><option value="future">Esta e futuras ocorrências</option></select></div>':"")+
+ (editing&&x.recurrence?.kind!=="none"?'<div class="field"><label>Alcance da edição</label><select name="scope"><option value="future" '+((date||x.date)===original?.date?"selected":"")+'>Esta e futuras ocorrências</option><option value="single" '+((date||x.date)!==original?.date?"selected":"")+'>Somente esta ocorrência</option></select></div>':"")+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>';
  C.openModal(editing?"Editar atividade":"Nova atividade",form,"");
 }
 function repeatFields(r,date){
- if(r.kind==="none")return '<p class="note">A atividade aparecerá apenas na data selecionada. Tarefas secundárias permanecem pendentes até a conclusão.</p>';
- const fields=['<div class="field"><label>Último dia da repetição</label><input type="date" name="repeatEnd" min="'+a(date)+'" value="'+a(r.end||endMonth(date))+'" required></div>'];
- if(r.kind==="weekdays")fields.unshift('<div class="field"><span class="label">Selecione os dias</span><div class="pill-row">'+SHORT.map((name,i)=>'<label class="checkline" style="padding-right:8px"><input type="checkbox" name="weekday" value="'+i+'" '+((r.weekdays||[C.parse(date).getDay()]).includes(i)?"checked":"")+'>'+name+'</label>').join("")+'</div></div>');
+ if(r.kind==="none")return '<p class="note">Atividade pontual. Para repetir, selecione outro tipo.</p>';
+ const fields=['<div class="field"><label>Encerramento</label><select name="repeatTermination"><option value="never" '+(!r.end?"selected":"")+'>Sem data de término</option><option value="date" '+(r.end?"selected":"")+'>Até uma data</option></select></div>','<div id="s2-repeat-end" '+(!r.end?'hidden':'')+' class="field"><label>Último dia da repetição</label><input type="date" name="repeatEnd" min="'+a(date)+'" value="'+a(r.end||endMonth(date))+'"></div>'];
+ if(r.kind==="weekdays")fields.unshift('<div class="field"><span class="label">Dias de execução</span><div class="pill-row">'+SHORT.map((name,i)=>'<label class="checkline" style="padding-right:8px"><input type="checkbox" name="weekday" value="'+i+'" '+((r.weekdays||[C.parse(date).getDay()]).includes(i)?"checked":"")+'>'+name+'</label>').join("")+'</div></div>');
+ if(r.kind==="interval")fields.unshift(formField("Intervalo em dias","everyDays",r.everyDays||2,"number",'required min="1" max="365" step="1"'));
  if(r.kind==="monthday")fields.unshift(formField("Dia do mês","monthDay",r.monthDay||Number(date.slice(-2)),"number",'min="1" max="31"'));
- fields.push('<label class="checkline"><input name="numbered" type="checkbox" '+(r.numbered?"checked":"")+'> Numerar ocorrências dentro de cada mês (ex.: Correr 1, Correr 2)</label>');
- return fields.join("");
+ fields.push('<label class="checkline"><input name="numbered" type="checkbox" '+(r.numbered?"checked":"")+'> Numerar ocorrências do mês (opcional)</label>');return fields.join("");
 }
 function readForm(formData,old){
  const date=ds(formData.get("date"));if(!validDate(date)||date<firstUse())throw Error("Selecione uma data válida desde o primeiro acesso.");
@@ -217,12 +220,14 @@ function readForm(formData,old){
  const repeat=String(formData.get("repeat")||"none");
  let recurrence={kind:repeat};
  if(repeat!=="none"){
-  const end=ds(formData.get("repeatEnd"));
-  if(!validDate(end)||end<date)throw Error("Informe uma data final válida.");
-  recurrence.end=end;
+  const termination=String(formData.get("repeatTermination")||"date");
+  if(!["never","date"].includes(termination))throw Error("Encerramento inválido.");
+  if(termination==="date"){const end=ds(formData.get("repeatEnd"));if(!validDate(end)||end<date)throw Error("Informe uma data final válida.");recurrence.end=end;}
   recurrence.numbered=formData.has("numbered");
   if(repeat==="weekdays"){recurrence.weekdays=formData.getAll("weekday").map(Number).filter(x=>x>=0&&x<7);if(!recurrence.weekdays.length)throw Error("Selecione ao menos um dia da semana.");}
+  if(repeat==="interval"){recurrence.everyDays=Number(formData.get("everyDays"));if(!Number.isInteger(recurrence.everyDays)||recurrence.everyDays<1||recurrence.everyDays>365)throw Error("Informe um intervalo de 1 a 365 dias.");}
   if(repeat==="monthday"){recurrence.monthDay=Number(formData.get("monthDay"));if(!Number.isInteger(recurrence.monthDay)||recurrence.monthDay<1||recurrence.monthDay>31)throw Error("Escolha um dia do mês válido.");}
+  if(!["daily","weekdays","interval","monthday"].includes(repeat))throw Error("Tipo de repetição inválido.");
  }
  return {type,title,date,blockId:String(formData.get("blockId")||""),goalId:String(formData.get("goalId")||""),priority:String(formData.get("priority")||"medium"),startTime:String(formData.get("startTime")||""),estimatedMin:minutes,dueDate:ds(formData.get("dueDate")||""),recurrence};
 }
@@ -377,7 +382,7 @@ function submission(id,data){
   const origin=find(String(data.get("id")||"")),date=ds(data.get("editDate")||"");
   const payload=readForm(data,origin);
   if(!canChange(date||payload.date)||!canChange(payload.date))return;
-  if(payload.recurrence.kind!=="none"&&payload.recurrence.end> D(payload.date,365))throw Error("Por enquanto, limite cada repetição a até 12 meses.");
+  if(payload.recurrence.kind!=="none"&&payload.recurrence.end&&payload.recurrence.end>D(payload.date,3650))throw Error("O período máximo por sequência é de dez anos.");
   const scope=String(data.get("scope")||"single");
   if(origin)updateEntry(payload,origin,date,scope);
   else p.entries.push(baseEntry(payload));
@@ -439,6 +444,7 @@ document.addEventListener("change",(ev)=>{
  const form=ev.target.closest("form");const date=form?.querySelector('[name="date"]')?.value||s.date;
  $("s2-repeat-fields").innerHTML=repeatFields({kind:ev.target.value,weekdays:[C.parse(date).getDay()]},date);
 });
+document.addEventListener("change",ev=>{if(ev.target?.name!=="repeatTermination")return;const field=$("s2-repeat-end");if(!field)return;field.hidden=ev.target.value!=="date";const input=field.querySelector('input[name="repeatEnd"]');if(input)input.required=ev.target.value==="date";});
 const originalRender=window.OrbitaStage2?.decorate;
 window.OrbitaStage2={decorate(route,base){
  if(route==="inicio")return decorateHome()||base;
