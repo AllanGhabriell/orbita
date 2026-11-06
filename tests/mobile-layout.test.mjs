@@ -39,7 +39,9 @@ assert.equal((markup.match(/class="day-meta"/g)||[]).length,7,"texto integral ma
 assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa para leitores de tela");
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
-assert.match(sw,/orbita-app-20261104-settings-layout-v3/,"cache PWA renovado para alarmes persistentes");
+assert.match(sw,/orbita-app-20261106-routines-v2/,"cache PWA renovado para a versao das rotinas");
+assert.match(read("boot.js"),/stage2\.js"\?"\?v=20261106-routines-v2/,"bootstrap carrega versao especifica do modulo de rotinas");
+assert.match(html,/boot\.js\?v=20261106-routines-v2/,"HTML carrega bootstrap atualizado");
  const html=read("index.html");
  const cssVersion=html.match(/stage7\.css\?v=([a-zA-Z0-9-]+)/)?.[1];
  assert.ok(cssVersion,"CSS do cronômetro tem versão explícita no HTML");
