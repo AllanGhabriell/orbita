@@ -90,4 +90,22 @@ assert.equal(a.activities.length,0,"dia futuro pode ser visto como prévia sem p
 assert.throws(()=>V.finalize(C.addDays(date,1)),/Só é possível/);
 assert.ok(store.has("orbita:stage1:v1"),"persistido localmente");
 
+// Ausência por vários dias: visitas sem movimentação não exigem fechamento.
+const emptyDay=C.addDays(date,-5),firstRoutineDay=C.addDays(date,-4),performedDay=C.addDays(date,-3),unperformedDay=C.addDays(date,-2);
+C.state.firstAccess=emptyDay;
+V.model.visitedDays[emptyDay]=true;
+P.submission("s2-entry",form({type:"habit",title:"Leitura diária",date:firstRoutineDay,repeat:"daily",repeatTermination:"never"}));
+const routine=P.model.entries.find(x=>x.title==="Leitura diária");
+P.quickRecord(routine.id,performedDay,"done");
+assert.equal(V.pendingDates().includes(emptyDay),false,"dia visitado mas sem compromisso não pede revisão");
+assert.equal(V.dayHasMovement(firstRoutineDay),false,"planejamento sem execução não configura movimentação");
+assert.equal(V.dayHasMovement(performedDay),true,"registro real exige revisão");
+assert.equal(V.pendingDates().length,3,"somente datas com planejamento ou execução aguardam fechamento");
+const closedBatch=V.finalizeBatch();
+assert.equal(closedBatch.length,3,"fechamento em lote resolve todas as datas pendentes");
+assert.equal(V.model.closed[performedDay].activities[0].status,"done","conclusão real preservada no snapshot");
+assert.equal(V.model.closed[unperformedDay].activities[0].status,"pending","ausência não vira conclusão");
+assert.equal(V.pendingDates().length,0,"sem pendências depois do lote");
+assert.equal(V.isClosed(emptyDay),false,"dia vazio nunca foi encerrado artificialmente");
+
 console.log("Etapa 4: snapshots, irreversibilidade, precedência de fechamento, feedback por amostra, descanso e bloqueio.");
