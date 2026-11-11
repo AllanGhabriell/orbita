@@ -60,5 +60,5 @@ assert.match(read("stage8.css"),/touch-action:none/,"arraste por toque não rola
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261111-reminders-v1"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261111-reminders-layout-v2"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
