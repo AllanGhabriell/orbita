@@ -34,3 +34,5 @@ body[data-theme="light"] .s8-panel,body[data-theme="light"] .s8-trigger{backgrou
 .s8-resize-handle{position:absolute;right:0;bottom:0;width:34px;height:34px;display:flex;align-items:flex-end;justify-content:flex-end;padding:4px 6px;color:var(--soft,#a89ac6);cursor:nwse-resize;touch-action:none;user-select:none;font-size:19px;line-height:1}
 .s8-trigger[aria-expanded="true"]{border-color:#b3a0ff;box-shadow:0 0 0 2px rgba(143,120,231,.15),0 10px 30px rgba(0,0,0,.24)}
 @media(hover:hover){.s8-trigger:hover{cursor:grab}.s8-trigger:active{cursor:grabbing}}
+
+@media(max-width:760px){.s8-panel{padding-bottom:max(15px,env(safe-area-inset-bottom,0px))}}
