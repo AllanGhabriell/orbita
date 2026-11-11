@@ -181,6 +181,7 @@ function normalizeImportedDoc(doc){
  // Nunca preencher lacunas com dados da pessoa que usava este navegador antes.
  const source=JSON.parse(JSON.stringify(doc));
  source.availability||={weekly:[null,null,null,null,null,null,null],overrides:{}};
+ source.reminders=Array.isArray(source.reminders)?source.reminders:[];
  source.planner||={version:2,blocks:[],entries:[],records:{},overrides:{},dayPauses:{},closedDays:[],events:[]};
  source.studies||={version:3,cycles:[],subjects:[],methods:[],sessions:[],events:[]};
  source.evolution||={version:4,closed:{},visitedDays:{},settings:{reminders:true,strictness:"firm"},milestones:[]};
