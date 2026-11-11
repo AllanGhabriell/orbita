@@ -182,6 +182,7 @@ function normalizeImportedDoc(doc){
  const source=JSON.parse(JSON.stringify(doc));
  source.availability||={weekly:[null,null,null,null,null,null,null],overrides:{}};
  source.reminders=Array.isArray(source.reminders)?source.reminders:[];
+ source.reminderUi=source.reminderUi&&typeof source.reminderUi==="object"&&!Array.isArray(source.reminderUi)?source.reminderUi:{x:null,y:null,width:340,height:430,locked:false};
  source.planner||={version:2,blocks:[],entries:[],records:{},overrides:{},dayPauses:{},closedDays:[],events:[]};
  source.studies||={version:3,cycles:[],subjects:[],methods:[],sessions:[],events:[]};
  source.evolution||={version:4,closed:{},visitedDays:{},settings:{reminders:true,strictness:"firm"},milestones:[]};
