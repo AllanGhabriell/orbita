@@ -10,7 +10,7 @@ const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
 const labels={high:"Alta",medium:"Média",low:"Baixa"};
 const rank={high:0,medium:1,low:2};
-let opened=false,drag=null,skipClick=false;
+let opened=false,drag=null,skipClickUntil=0;
 const defaults={x:null,y:null,width:340,height:430,locked:false};
 if(!root.reminderUi||typeof root.reminderUi!=="object")root.reminderUi={...defaults};
 const ui=root.reminderUi;
@@ -73,7 +73,7 @@ function pointerMove(ev){
 }
 function pointerEnd(ev){
  if(!drag||ev.pointerId!==drag.id)return;
- if(drag.moved){skipClick=true;C.save();setTimeout(()=>{skipClick=false},80);}
+ if(drag.moved){skipClickUntil=Date.now()+600;C.save();}
  drag=null;
 }
 
@@ -175,7 +175,7 @@ document.addEventListener("click",ev=>{
  ev.preventDefault();
  const action=b.dataset.s8;
  try{
-  if(action==="toggle"){if(skipClick){ev.stopPropagation?.();return;}opened=!opened;redraw();}
+  if(action==="toggle"){if(Date.now()<skipClickUntil){ev.stopPropagation?.();return;}opened=!opened;redraw();}
   else if(action==="new")edit();
   else if(action==="lock")toggleLock();
   else if(action==="reset")resetLayout();
