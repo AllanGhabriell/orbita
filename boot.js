@@ -68,8 +68,8 @@ function load(src){
   const script=document.createElement("script");script.src=src;script.onload=resolve;script.onerror=()=>reject(Error("Não foi possível carregar "+src));document.head.appendChild(script);
  });
 }
-for(const file of ["config.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js","stage6.js","stage7.js"]){
- try{await load("./"+file+(file==="stage2.js"?"?v=20261106-routines-v2":file==="stage4.js"?"?v=20261111-batch-close-v1":file==="stage7.js"?"?v=20261106-timed-pause-v1":""));}catch(err){
+for(const file of ["config.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js","stage6.js","stage7.js","stage8.js"]){
+ try{await load("./"+file+(file==="stage2.js"?"?v=20261106-routines-v2":file==="stage4.js"?"?v=20261111-batch-close-v1":file==="stage7.js"?"?v=20261106-timed-pause-v1":file==="stage8.js"?"?v=20261111-reminders-v1":""));}catch(err){
   console.error(err);
   const view=document.getElementById("view");if(view)view.textContent="Não foi possível carregar o aplicativo. Verifique a conexão e atualize a página.";
   return;
