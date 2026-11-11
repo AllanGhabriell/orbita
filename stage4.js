@@ -89,7 +89,6 @@ function dailyCounts(snapshot){
 }
 function hasCommitment(date){
  if(ev.closed[date])return true;
- if(ev.visitedDays[date])return true;
  if(p.dayPauses[date])return true;
  if(studies.sessions.some(x=>x.date===date&&!x.archived))return true;
  // Recurring obligations mean this date has a plan, even if never opened.
@@ -102,6 +101,36 @@ function pendingDates(until=today()){
   res.push(d);
  }
  return res;
+}
+function dayHasMovement(date){
+ const snap=capture(date);
+ if(p.dayPauses[date])return true;
+ if(snap.activities.some(x=>x.recordedAt||x.actualMin!=null||x.actualTime||x.status!=="pending"))return true;
+ if(snap.studies.some(x=>x.status!=="pending"||x.actualMin!=null||x.actualTime||x.timing))return true;
+ return false;
+}
+function batchReview(){
+ const dates=pendingDates();
+ if(!dates.length)return C.notify("Não há dias anteriores aguardando fechamento.");
+ const recorded=dates.filter(dayHasMovement),unrecorded=dates.filter(d=>!dayHasMovement(d));
+ const row=d=>{const snap=capture(d),n=dailyCounts(snap);return '<div class="review-line"><div><strong>'+E(fmt(d,false))+'</strong><small>'+snap.activities.length+' atividade(s) prevista(s) · '+snap.studies.length+' estudo(s) · '+n.unmarked+' pendente(s)'+(dayHasMovement(d)?' · há registros de execução':' · sem execução registrada')+'</small></div></div>';};
+ C.openModal("Revisar dias pendentes",'<form id="s4-batch-finalize" class="section-stack"><p class="note">Feche '+dates.length+' dia(s) de uma só vez. Apenas datas com movimentação aparecem para revisão detalhada. Dias sem registro de execução serão fechados mantendo as atividades pendentes, nunca concluídas automaticamente.</p>'+
+ (recorded.length?'<section><h3>Com movimentação · '+recorded.length+'</h3><div class="review-lines">'+recorded.map(row).join("")+'</div></section>':"")+
+ (unrecorded.length?'<section><h3>Sem execução registrada · '+unrecorded.length+'</h3><p class="note">Estas datas possuem planejamento, mas não possuem execução registrada. Não será inventado nenhum resultado.</p><div class="review-lines">'+unrecorded.map(row).join("")+'</div></section>':"")+
+ '<label class="checkline"><input type="checkbox" name="reviewed" required> Conferi o resumo e concordo em finalizar definitivamente todas as datas listadas.</label>'+
+ '<p class="note">O fechamento é irreversível. Se precisar corrigir algum registro, cancele e abra aquele dia antes.</p>'+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Finalizar '+dates.length+' dia(s)</button></div></form>');
+}
+function finalizeBatch(){
+ const dates=pendingDates(),done=[];
+ if(!dates.length)throw Error("Não há dias pendentes.");
+ // Validação completa antes de iniciar: impedimentos devem ser resolvidos sem fechar parcialmente o lote.
+ for(const d of dates){
+  if(window.OrbitaStage7?.inspect?.hasActiveForDate(d))throw Error("Encerre o cronômetro do dia "+fmt(d,false)+" antes do fechamento em lote.");
+ }
+ for(const d of dates){finalize(d);done.push(d);}
+ C.closeModal();C.go("inicio");C.notify(done.length+" dia(s) finalizado(s). Registros preservados sem conclusões automáticas.");
+ return done;
 }
 function awardMilestones(){
  const qualifying=Object.values(ev.closed).filter(x=>{const n=dailyCounts(x);return n.foci>0&&n.doneFocus===n.foci;}).length;
@@ -233,7 +262,7 @@ function dayReview(date){
    (lastStudyDayOfWeek(date)?'<button class="btn small primary" data-s4="viewStats">Balanço da semana</button>':"")+
    '</div></section>';
  }
- if(!closed&&remaining.length)content+='<div class="evo-alert evo-warning">Há '+remaining.length+' dia(s) anteriores aguardando fechamento. Comece por '+E(fmt(remaining[0],false))+'. <button class="btn small" data-s4="reviewDate" data-date="'+A(remaining[0])+'">Revisar data</button></div>';
+ if(!closed&&remaining.length)content+='<div class="evo-alert evo-warning">Há '+remaining.length+' dia(s) anteriores aguardando fechamento. <button class="btn small" data-s4="batchReview">Revisar e finalizar em lote</button> <button class="btn small ghost" data-s4="reviewDate" data-date="'+A(remaining[0])+'">Primeiro dia</button></div>';
  content+='<div class="metrics-grid">'+metric("Focos concluídos",n.doneFocus+"/"+n.foci,n.missedFocus+" não realizados/remanejados")+metric("Estudos concluídos",n.studiesDone+"/"+n.plannedStudy,n.studiesPartial+" parcial(is)")+metric("Estudo real",minutes(snap.result.actualStudyMin),n.missingStudyTimes+" sem tempo registrado")+metric("Carga planejada",minutes(snap.plan.totalMin),"Tempo previsto, não execução")+'</div>';
  if(snap.pause)content+='<div class="evo-alert">☾ '+E(snap.pause.kind==="planejado"?"Descanso planejado":snap.pause.kind==="imprevisto"?"Pausa por imprevisto":"Descanso decidido no dia")+(snap.pause.reason?" — "+E(snap.pause.reason):"")+'</div>';
  content+='<section class="card"><div class="card-head"><h2>Revisão dos compromissos</h2>'+C.tag(n.unmarked+" sem conclusão")+'</div>'+(
@@ -336,7 +365,7 @@ function homeDecor(base){
  const date=state.date,closed=ev.closed[date],pending=pendingDates();
  if(date<=today()&&!ev.visitedDays[date]){ev.visitedDays[date]=true;C.save();}
  let upper="";
- if(pending.length&&date===today())upper+='<div class="evo-alert evo-warning"><strong>Fechamento pendente</strong><span> Há '+pending.length+' dia(s) anteriores sem conclusão. Revise primeiro '+E(fmt(pending[0],false))+'.</span><button class="btn small" data-s4="reviewDate" data-date="'+A(pending[0])+'">Revisar</button></div>';
+ if(pending.length&&date===today())upper+='<div class="evo-alert evo-warning"><strong>Fechamento pendente</strong><span> Há '+pending.length+' dia(s) anteriores com planejamento ou registros. Você pode revisar e finalizar tudo de uma vez.</span><button class="btn small" data-s4="batchReview">Revisar e finalizar em lote</button><button class="btn small ghost" data-s4="reviewDate" data-date="'+A(pending[0])+'">Ver primeiro dia</button></div>';
  if(closed){
   const ct=dailyCounts(closed);
   return '<section class="hero-row"><div><div class="overline">REGISTRO DEFINITIVO</div><h1>'+E(fmt(date,true))+'</h1><p class="kicker">Histórico somente leitura; os dados abaixo foram preservados no fechamento.</p></div><div class="row">'+C.dateNavigator()+'<button class="btn small" data-s4="reviewDate" data-date="'+A(date)+'">Relatório diário</button></div></section>'+
@@ -387,6 +416,7 @@ function confirmSubmit(data){
  if(lastStudyDayOfWeek(date))C.notify("Fechamento concluído. A prévia semanal está disponível em Evolução.");
 }
 const actions={
+ batchReview(){batchReview()},
  reviewDate(b){const date=b.dataset.date||state.date;if(date<first()||!validDate(date))return;state.date=date;C.save();C.go("fechamento");},
  backHome(){C.go("inicio")},
  backProfile(){C.go("perfil")},
@@ -403,13 +433,18 @@ document.addEventListener("click",event=>{
  event.preventDefault();try{actions[b.dataset.s4]?.(b);}catch(err){C.notify(err.message||"Erro ao consultar dados.");}
 });
 document.addEventListener("submit",event=>{
- if((event.target?.getAttribute?.("id")||event.target?.id)!=="s4-finalize")return;
- event.preventDefault();try{confirmSubmit(new FormData(event.target));}catch(err){C.notify(err.message||"Confira a confirmação.");}
+ const id=event.target?.getAttribute?.("id")||event.target?.id;
+ if(!["s4-finalize","s4-batch-finalize"].includes(id))return;
+ event.preventDefault();try{
+  const data=new FormData(event.target);
+  if(id==="s4-batch-finalize"){if(!data.has("reviewed"))throw Error("Confirme a revisão do lote.");finalizeBatch();}
+  else confirmSubmit(data);
+ }catch(err){C.notify(err.message||"Confira a confirmação.");}
 });
 document.addEventListener("change",event=>{
  if(event.target.id==="s4-tone"){ev.settings.strictness=event.target.value;C.save();C.render();}
  if(event.target.id==="s4-reminders"){ev.settings.reminders=event.target.checked;C.save();C.render();}
 });
-window.OrbitaStage4={decorate,inspect:{get model(){return ev},capture,finalize,isClosed,dailyCounts,periodData,pendingDates,sampleLevel,guidance,reminderEligible,lastStudyDayOfWeek,actions}};
+window.OrbitaStage4={decorate,inspect:{get model(){return ev},capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,reminderEligible,lastStudyDayOfWeek,actions}};
 C.render();
 })();
