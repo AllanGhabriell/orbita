@@ -19,7 +19,7 @@ const clamp=(v,low,high)=>Math.min(Math.max(v,low),high);
 function bounds(){
  const width=window.innerWidth||document.documentElement?.clientWidth||1024;
  const height=window.innerHeight||document.documentElement?.clientHeight||768;
- const bottom=width<=760?Math.max(82,Number(getComputedStyle?.(document.documentElement)?.getPropertyValue("--s8-bottom-gap"))||82):10;
+ const bottom=width<=760?82:10;
  return {width,height,bottom};
 }
 function position(){
@@ -201,9 +201,13 @@ document.addEventListener("submit",ev=>{
 });
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&opened){opened=false;redraw();}});
 window.OrbitaStage8={decorate(route,base){return route==="inicio"?base+markup():base},afterRender(route){
- const previous=$("s8-floating-root");
- if(route!=="inicio"){previous?.remove?.();return;}
- if(previous&&document.body?.appendChild&&previous.parentElement!==document.body)document.body.appendChild(previous);
+ const incoming=document.querySelector?.('#view #s8-floating-root');
+ const detached=document.querySelectorAll?.('body > #s8-floating-root')||[];
+ if(route!=="inicio"){for(const node of detached)node.remove?.();return;}
+ if(incoming&&document.body?.appendChild){
+  for(const node of detached)if(node!==incoming)node.remove?.();
+  document.body.appendChild(incoming);
+ }
  place();
 },inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout}};
 C.render();
