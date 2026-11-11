@@ -10,7 +10,73 @@ const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
 const labels={high:"Alta",medium:"Média",low:"Baixa"};
 const rank={high:0,medium:1,low:2};
-let opened=false;
+let opened=false,drag=null,skipClick=false;
+const defaults={x:null,y:null,width:340,height:430,locked:false};
+if(!root.reminderUi||typeof root.reminderUi!=="object")root.reminderUi={...defaults};
+const ui=root.reminderUi;
+for(const [key,value] of Object.entries(defaults))if(ui[key]===undefined)ui[key]=value;
+const clamp=(v,low,high)=>Math.min(Math.max(v,low),high);
+function bounds(){
+ const width=window.innerWidth||document.documentElement?.clientWidth||1024;
+ const height=window.innerHeight||document.documentElement?.clientHeight||768;
+ const bottom=width<=760?Math.max(82,Number(getComputedStyle?.(document.documentElement)?.getPropertyValue("--s8-bottom-gap"))||82):10;
+ return {width,height,bottom};
+}
+function position(){
+ const {width,height,bottom}=bounds(),size=width<=760?46:49;
+ ui.x=clamp(Number.isFinite(ui.x)?ui.x:width-size-22,8,Math.max(8,width-size-8));
+ ui.y=clamp(Number.isFinite(ui.y)?ui.y:height-size-bottom-20,8,Math.max(8,height-size-bottom));
+ return {size,width,height,bottom};
+}
+function panelRect(){
+ const b=position(),margin=10;
+ const w=clamp(Number(ui.width)||340,Math.min(230,b.width-20),Math.max(230,b.width-20));
+ const h=clamp(Number(ui.height)||430,Math.min(170,b.height-32),Math.max(170,b.height-32));
+ // Preferir abrir acima do botão, mas alternar para baixo quando falta espaço.
+ const top=b.height-(ui.y+b.size)>=h+16?ui.y+b.size+10:ui.y>=h+16?ui.y-h-10:clamp(ui.y+((b.height-ui.y)>ui.y?b.size+10:-h-10),8,Math.max(8,b.height-h-8));
+ const left=clamp(ui.x+b.size-w,8,Math.max(8,b.width-w-8));
+ return {width:w,height:h,left,top:clamp(top,8,Math.max(8,b.height-h-8))};
+}
+function place(){
+ const floater=$("s8-floating-root");if(!floater)return;
+ const b=position();
+ floater.style.left=ui.x+"px";floater.style.top=ui.y+"px";
+ const panel=$("s8-panel");if(panel){
+  const rect=panelRect();
+  panel.style.left=rect.left+"px";panel.style.top=rect.top+"px";panel.style.width=rect.width+"px";panel.style.height=rect.height+"px";
+ }
+}
+function toggleLock(){ui.locked=!ui.locked;C.save();redraw();C.notify(ui.locked?"Posição e tamanho travados.":"Agora você pode mover e redimensionar o mural.");}
+function resetLayout(){const b=bounds();ui.x=b.width-(b.width<=760?46:49)-18;ui.y=b.height-(b.width<=760?46:49)-b.bottom-18;ui.width=340;ui.height=430;C.save();redraw();}
+function pointerStart(ev){
+ const target=ev.target.closest?.('[data-s8="toggle"],[data-s8="resize"]');
+ if(!target||ui.locked||ev.button!==undefined&&ev.button!==0)return;
+ const kind=target.dataset.s8==="resize"?"resize":"move",p=panelRect();
+ drag={id:ev.pointerId,kind,startX:ev.clientX,startY:ev.clientY,x:ui.x,y:ui.y,w:p.width,h:p.height,moved:false};
+ // Evitar capturar clique: só considerar arrasto depois de 7 px.
+}
+function pointerMove(ev){
+ if(!drag||ev.pointerId!==drag.id)return;
+ const dx=ev.clientX-drag.startX,dy=ev.clientY-drag.startY;
+ if(!drag.moved&&Math.hypot(dx,dy)<7)return;
+ drag.moved=true;ev.preventDefault?.();
+ const b=bounds();
+ if(drag.kind==="move"){
+  const size=b.width<=760?46:49;
+  ui.x=clamp(drag.x+dx,8,Math.max(8,b.width-size-8));
+  ui.y=clamp(drag.y+dy,8,Math.max(8,b.height-size-b.bottom));
+ }else{
+  ui.width=clamp(drag.w+dx,Math.min(230,b.width-20),Math.max(230,b.width-20));
+  ui.height=clamp(drag.h+dy,Math.min(170,b.height-32),Math.max(170,b.height-32));
+ }
+ place();
+}
+function pointerEnd(ev){
+ if(!drag||ev.pointerId!==drag.id)return;
+ if(drag.moved){skipClick=true;C.save();setTimeout(()=>{skipClick=false},80);}
+ drag=null;
+}
+
 const note=id=>notes.find(x=>x.id===id);
 const id=()=>typeof crypto!=="undefined"&&crypto.randomUUID?crypto.randomUUID():"rem-"+Date.now()+"-"+Math.random().toString(36).slice(2);
 function age(created){
@@ -28,13 +94,15 @@ function markup(){
  '<div class="s8-note-pin" aria-hidden="true">●</div><div class="s8-note-top"><span class="s8-note-priority">'+E(labels[n.priority]||"Média")+'</span><small>'+E(age(n.createdAt))+'</small></div>'+
  '<strong>'+E(n.title)+'</strong>'+(n.description?'<p>'+E(n.description)+'</p>':"")+
  '<div class="s8-note-actions"><button type="button" data-s8="edit" data-id="'+A(n.id)+'">Editar</button><button type="button" data-s8="convert" data-id="'+A(n.id)+'">Planejar ↗</button><button type="button" class="s8-danger" data-s8="remove" data-id="'+A(n.id)+'">Excluir</button></div></article>').join("");
- return '<div class="s8-float" aria-label="Lembretes">'+
+ return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes">'+
  '<button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="'+opened+'" aria-controls="s8-panel" title="Mural de lembretes" aria-label="'+(opened?"Fechar":"Abrir")+' lembretes">'+
- '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10l3 3v14H7z"/><path d="M17 3v4h3M10 11h7M10 15h5"/><path d="M5 8H3v12h14"/></svg>'+
+ '<svg width="27" height="27" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 7h18v17H5z" fill="#f4e5ad" stroke="#aa9860" stroke-width="1.5"/><path d="M7 11h14M7 15h14M7 19h10" stroke="#b4a675" stroke-width="1.3" stroke-linecap="round"/><path d="m15 4 4 5" stroke="#a44950" stroke-width="2.5" stroke-linecap="round"/><circle cx="14" cy="5" r="4" fill="#d96874" stroke="#a44950" stroke-width="1"/><circle cx="13" cy="4" r="1.1" fill="#ffe2e5"/></svg>'+
  (notes.length?'<span class="s8-count">'+notes.length+'</span>':"")+'</button>'+
  (opened?'<section id="s8-panel" class="s8-panel" aria-label="Mural de lembretes"><header class="s8-panel-head"><div><strong>📌 Lembretes</strong><small>Ideias para planejar depois</small></div><button type="button" class="s8-close" data-s8="toggle" aria-label="Fechar lembretes">×</button></header>'+
+ '<div class="s8-panel-options"><button type="button" class="s8-option" data-s8="lock" aria-pressed="'+!!ui.locked+'" title="'+(ui.locked?"Destravar tamanho e posição":"Travar tamanho e posição")+'">'+(ui.locked?"🔒 Travado":"🔓 Travar")+'</button><button type="button" class="s8-option" data-s8="reset">Redefinir posição</button></div>'+
  '<div class="s8-note-list">'+(list||'<p class="s8-empty">Seu mural está vazio. Guarde aqui ideias e tarefas ainda não planejadas.</p>')+'</div>'+
- '<button type="button" class="btn small primary s8-add" data-s8="new">+ Novo lembrete</button></section>':"")+'</div>';
+ '<button type="button" class="btn small primary s8-add" data-s8="new">+ Novo lembrete</button>'+
+ (!ui.locked?'<div class="s8-resize-handle" data-s8="resize" role="separator" aria-label="Arraste para ajustar largura e altura do mural" title="Arraste para redimensionar">◢</div>':"")+'</section>':"")+'</div>';
 }
 function redraw(){C.render();}
 function edit(idValue){
@@ -107,13 +175,20 @@ document.addEventListener("click",ev=>{
  ev.preventDefault();
  const action=b.dataset.s8;
  try{
-  if(action==="toggle"){opened=!opened;redraw();}
+  if(action==="toggle"){if(skipClick){ev.stopPropagation?.();return;}opened=!opened;redraw();}
   else if(action==="new")edit();
+  else if(action==="lock")toggleLock();
+  else if(action==="reset")resetLayout();
   else if(action==="edit")edit(b.dataset.id);
   else if(action==="remove")remove(b.dataset.id);
   else if(action==="convert")convert(b.dataset.id);
  }catch(err){C.notify(err.message||"Não foi possível executar a ação.");}
 });
+document.addEventListener("pointerdown",pointerStart);
+document.addEventListener("pointermove",pointerMove,{passive:false});
+document.addEventListener("pointerup",pointerEnd);
+document.addEventListener("pointercancel",pointerEnd);
+window.addEventListener?.("resize",()=>{if($("s8-floating-root"))place();});
 document.addEventListener("submit",ev=>{
  const formId=ev.target?.getAttribute?.("id")||ev.target?.id;
  if(!["s8-note-form","s8-convert-form"].includes(formId))return;
@@ -125,6 +200,11 @@ document.addEventListener("submit",ev=>{
  }catch(err){C.notify(err.message||"Verifique os dados informados.");}
 });
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&opened){opened=false;redraw();}});
-window.OrbitaStage8={decorate(route,base){return route==="inicio"?base+markup():base},inspect:{get notes(){return notes},saveNote,remove,convertSubmit,age,sorted}};
+window.OrbitaStage8={decorate(route,base){return route==="inicio"?base+markup():base},afterRender(route){
+ const previous=$("s8-floating-root");
+ if(route!=="inicio"){previous?.remove?.();return;}
+ if(previous&&document.body?.appendChild&&previous.parentElement!==document.body)document.body.appendChild(previous);
+ place();
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout}};
 C.render();
 })();
