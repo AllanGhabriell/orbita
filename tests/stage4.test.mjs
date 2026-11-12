@@ -112,4 +112,30 @@ assert.equal(V.model.closed[unperformedDay].activities[0].status,"pending","aus�
 assert.equal(V.pendingDates().length,0,"sem pendências depois do lote");
 assert.equal(V.isClosed(emptyDay),false,"dia vazio nunca foi encerrado artificialmente");
 
+// Orientador geral independente dos filtros de estatísticas.
+const mentor=V.mentorAnalysis();
+assert.ok(mentor.items.length>=1,"orientador geral gera parecer mesmo com poucos dados");
+assert.ok(V.mentorPanel().includes("Meu Orientador"),"painel do supervisor disponível");
+assert.match(el("view").innerHTML,/./,"interface permanece operante");
+const oldRead=V.model.mentor.lastReadSignature;
+V.actions.mentorOpen();
+assert.equal(V.model.mentor.lastReadSignature,V.mentorAnalysis().digest,"ler orientação marca análise como vista");
+V.model.mentor.lastReadSignature=oldRead;
+V.model.mentor.lastViewed="2020-01-01T12:00:00.000Z";
+P.model.events.push(...Array.from({length:4},(_,i)=>({kind:"entry_deleted",id:"synthetic-"+i,at:new Date().toISOString()})));
+P.model.events.push(...Array.from({length:4},(_,i)=>({kind:"entry_created",id:"new-"+i,at:new Date().toISOString()})));
+assert.ok(V.mentorAnalysis().items.some(x=>x.key==="deleted"),"exclusões repetidas geram aviso contextual");
+assert.equal(V.mentorNoticeEligible(),true,"alerta importante aparece após ausência prolongada");
+V.actions.mentorSnooze({dataset:{min:"10"}});
+assert.equal(V.mentorNoticeEligible(),false,"adiamento silencia recado");
+V.model.mentor.snoozeUntil="";
+V.actions.mentorDismiss();
+assert.equal(V.mentorNoticeEligible(),false,"dispensar silencia a mesma análise");
+V.model.mentor.dismissedSignature="";
+V.actions.mentorDisableNotices();
+assert.equal(V.mentorNoticeEligible(),false,"avisos podem ser desativados independentemente do orientador");
+assert.ok(V.mentorPanel().includes("Meu Orientador"),"desativar avisos não desativa análise");
+V.model.settings.mentorEnabled=false;
+assert.ok(V.mentorPanel().includes("Orientador desativado"),"orientador também pode ser desativado por inteiro");
+V.model.settings.mentorEnabled=true;
 console.log("Etapa 4: snapshots, irreversibilidade, precedência de fechamento, feedback por amostra, descanso e bloqueio.");
