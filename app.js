@@ -25,11 +25,19 @@ if(!Array.isArray(state.availability.weekly))state.availability.weekly=Array(7).
 if(!state.availability.overrides)state.availability.overrides={};
 if(!state.settings)state.settings={theme:"dark",motion:true,weekStart:0};
 if(!state.firstAccess)state.firstAccess=today();
-if(!state.date||state.date<state.firstAccess)state.date=today();
+// A data escolhida anteriormente serve para consulta, não para definir o dia inicial da próxima abertura.
+state.date=today()>=state.firstAccess?today():state.firstAccess;
 let route=PAGES[location.hash.slice(1)]?location.hash.slice(1):"inicio";
 let modalReturnFocus=null;
 let glowTarget={x:-400,y:-400},glowAt={x:-400,y:-400},glowFrame=0,glowIsActive=false;
 let toastTimer;
+let displayedCalendarDay=today();
+function refreshCalendarDay(){
+ const current=today();if(current===displayedCalendarDay)return;
+ displayedCalendarDay=current;
+ const target=current>=state.firstAccess?current:state.firstAccess;
+ if(state.date!==target){state.date=target;save();render();}
+}
 function save(){try{const json=JSON.stringify(state);localStorage.setItem(STORAGE,json);if(window.OrbitaStorage?.onSave)window.OrbitaStorage.onSave(json);$("storage-indicator").title="Salvo neste navegador";return true;}catch(e){$("storage-indicator").title="Não foi possível salvar";notify("Erro ao salvar. Verifique o armazenamento do navegador.");return false;}}
 function notify(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),3500);}
 function availabilityReady(){return state.availability.weekly.some(Boolean)||Object.keys(state.availability.overrides).length>0;}
@@ -222,11 +230,15 @@ $("theme-switch").addEventListener("click",()=>{state.settings.theme=state.setti
 $("settings-switch").addEventListener("click",()=>go("configuracoes"));
 document.addEventListener("keydown",(e)=>{if(e.key==="Escape"&&$("modal-host").innerHTML)closeModal();});
 window.addEventListener("hashchange",()=>{const next=location.hash.slice(1);if(PAGES[next]){route=next;render();}});
+// Se o app ficou aberto durante a virada do dia, voltar ao calendário atual ao retornar.
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshCalendarDay();});
+window.addEventListener("focus",refreshCalendarDay);
+window.addEventListener("pageshow",refreshCalendarDay);
 function glowLoop(){const el=$("cursor-glow");if(!el)return;glowAt.x+=(glowTarget.x-glowAt.x)*.13;glowAt.y+=(glowTarget.y-glowAt.y)*.13;el.style.transform="translate3d("+glowAt.x+"px,"+glowAt.y+"px,0)";glowFrame=requestAnimationFrame(glowLoop);}
 if(window.matchMedia&&window.matchMedia("(hover:hover) and (pointer:fine)").matches&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
 document.addEventListener("pointermove",(e)=>{if(state.settings.motion===false)return;glowTarget.x=e.clientX-135;glowTarget.y=e.clientY-135;if(!glowIsActive){glowIsActive=true;$("cursor-glow").classList.add("active");if(!glowFrame)glowFrame=requestAnimationFrame(glowLoop);}},{passive:true});
 document.addEventListener("pointerleave",()=>{$("cursor-glow").classList.remove("active");});
 }
-window.OrbitaCore={get state(){return state},save,render,go,openModal,closeModal,notify,dateLabel,iso,parse,addDays,today,esc,attr,tag,btn,hoursLabel,resolveAvailability,availabilityMinutes,availabilityReady,activeGoal,firstDayOfWeek,dateNavigator};
+window.OrbitaCore={get state(){return state},save,render,go,openModal,closeModal,notify,dateLabel,iso,parse,addDays,today,esc,attr,tag,btn,hoursLabel,resolveAvailability,availabilityMinutes,availabilityReady,activeGoal,firstDayOfWeek,dateNavigator,refreshCalendarDay};
 save();render();
 })();
