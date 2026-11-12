@@ -59,6 +59,10 @@ assert.equal(T.summarize({from:previous,to:previous}).actualMin,65,"estatística
 assert.equal(V.model.closed[previous].availableMin,360,"disponibilidade anterior preservada");
 C.state.date=previous;C.go("inicio");
 assert.ok(el("view").innerHTML.includes("Estudar Matemática"),"dia bloqueado exibe snapshot original");
+assert.match(el("view").innerHTML,/data-action="goToday"/,"dia encerrado oferece retorno direto para Hoje");
+assert.match(el("view").innerHTML,/data-action="prevDay"/,"dia encerrado permite navegar ao dia anterior");
+assert.match(el("view").innerHTML,/data-action="nextDay"/,"dia encerrado permite avançar no calendário");
+assert.match(el("view").innerHTML,/data-action="jumpDate"/,"dia encerrado permite escolher data");
 assert.match(el("view").innerHTML,/Sessão 1/,"dia finalizado distingue a sessão da matéria");
 assert.match(el("view").innerHTML,/study-review-context/,"matéria e modalidade aparecem como contexto do histórico");
 C.go("fechamento");
