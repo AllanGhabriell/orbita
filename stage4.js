@@ -463,12 +463,13 @@ function homeDecor(base){
  if(!C.availabilityReady())return base;
  const date=state.date,closed=ev.closed[date],pending=pendingDates();
  if(date<=today()&&!ev.visitedDays[date]){ev.visitedDays[date]=true;C.save();}
- let upper="";
+ let upper='<div class="evo-mentor-access"><button class="btn small ghost" data-s4="mentorOpen" title="Abrir acompanhamento geral">◉ Conversar com Orientador</button></div>';
  if(pending.length&&date===today())upper+='<div class="evo-alert evo-warning"><strong>Fechamento pendente</strong><span> Há '+pending.length+' dia(s) anteriores com planejamento ou registros. Você pode revisar e finalizar tudo de uma vez.</span><button class="btn small" data-s4="batchReview">Revisar e finalizar em lote</button><button class="btn small ghost" data-s4="reviewDate" data-date="'+A(pending[0])+'">Ver primeiro dia</button></div>';
  if(closed){
   const ct=dailyCounts(closed);
   return '<section class="hero-row"><div><div class="overline">REGISTRO DEFINITIVO</div><h1>'+E(fmt(date,true))+'</h1><p class="kicker">Histórico somente leitura; os dados abaixo foram preservados no fechamento.</p></div><div class="row">'+C.dateNavigator()+(date!==today()?'<button class="btn small ghost" data-action="goToday">Hoje</button>':"")+'<button class="btn small" data-s4="reviewDate" data-date="'+A(date)+'">Relatório diário</button></div></section>'+
   '<div class="evo-alert evo-good">✓ Dia finalizado. Os resultados mostrados pertencem ao registro preservado no fechamento.</div>'+
+  '<div class="evo-mentor-access"><button class="btn small ghost" data-s4="mentorOpen">◉ Conversar com Orientador</button></div>'+ 
   '<div class="metrics-grid">'+metric("Focos",ct.doneFocus+"/"+ct.foci)+metric("Sessões",ct.studiesDone+"/"+ct.plannedStudy)+metric("Estudo real",minutes(closed.result.actualStudyMin))+metric("Carga prevista",minutes(closed.plan.totalMin))+'</div>'+
   '<section class="card"><h2 class="section-title">Atividades registradas</h2><div class="review-lines">'+(closed.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")||'<p class="note">Sem atividades.</p>')+'</div></section>'+
   '<section class="card"><h2 class="section-title">Estudos registrados</h2><div class="review-lines">'+(closed.studies.map((x,i)=>reviewStudyLine(x,i)).join("")||'<p class="note">Sem sessões.</p>')+'</div></section>';
