@@ -291,12 +291,27 @@ function finish(done){
  if(timing.alarm)dismissAlarm();
  persist();C.render();tick();C.notify(done?"Sessão concluída e tempo registrado.":"Tempo parcial salvo; a etapa do ciclo não avançou.");
 }
+function correctRestMinutes(minutes,seconds=0){
+ const a=timing.active,r=activeRecord();
+ if(!a||!r||a.phase!=="paused")throw Error("É necessário estar com o cronômetro pausado.");
+ const restMs=Math.round(Number(minutes)*60000+Number(seconds)*1000),at=clock(),elapsed=at-a.since;
+ if(!Number.isFinite(restMs)||restMs<0||!Number.isInteger(Number(minutes))||!Number.isInteger(Number(seconds))||Number(seconds)<0||Number(seconds)>59||restMs>elapsed)throw Error("O descanso real não pode ultrapassar o tempo da pausa.");
+ const studyAdded=elapsed-restMs,p=r.pauses?.at(-1);
+ if(!p||p.endedAt!==null)throw Error("Não foi possível localizar a pausa atual.");
+ r.pauseMs=(Number(r.pauseMs)||0)+restMs;
+ r.studyMs=(Number(r.studyMs)||0)+studyAdded;
+ p.endedAt=a.since+restMs;p.corrected=true;p.actualRestMs=restMs;
+ r.corrections.push({type:"simplified_rest",registeredAt:at,originalPauseMs:elapsed,actualRestMs:restMs,studyAddedMs:studyAdded});
+ timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+ if(timing.alarm?.which==="pause")dismissAlarm();
+ persist();C.closeModal();C.render();tick();C.notify("Pausa corrigida: "+duration(restMs)+" de descanso e "+duration(studyAdded)+" transferidos para estudo.");
+}
 function correctModal(){
  const a=timing.active;if(!a)return;
  const inputTime=new Date(clock()-60000);
  const localIso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
  const message=a.phase==="paused"?"Retomei o estudo antes de clicar no botão":"Parei de estudar antes de clicar em Pausar";
- C.openModal("Corrigir horário do cronômetro",'<form id="s7-correction-form" class="section-stack"><p class="note">'+E(message)+'. Informe quando a mudança realmente aconteceu. A correção fica registrada.</p><div class="field"><label>Horário verdadeiro</label><input name="moment" type="datetime-local" required min="'+A(localIso(new Date(a.since)))+'" max="'+A(localIso(new Date()))+'" value="'+A(localIso(inputTime.getTime()<a.since?new Date(a.since):inputTime))+'"></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Corrigir tempo</button></div></form>');
+ C.openModal("Corrigir horário do cronômetro",'<div class="section-stack">'+(a.phase==="paused"?'<form id="s7-correct-rest" class="section-stack"><p class="note">Pausa registrada até agora: <strong>'+E(duration(clock()-a.since))+'</strong>. Quanto tempo você realmente descansou? O restante será contado como estudo, e o cronômetro voltará a contar.</p><div class="form-grid"><div class="field"><label>Minutos de descanso</label><input name="minutes" type="number" min="0" max="'+Math.floor((clock()-a.since)/60000)+'" step="1" required value="0"></div><div class="field"><label>Segundos</label><input name="seconds" type="number" min="0" max="59" step="1" required value="0"></div></div><button type="submit" class="btn primary">Aplicar correção simples</button></form>':"")+'<details><summary>Correção avançada por data e horário</summary><form id="s7-correction-form" class="section-stack"><p class="note">'+E(message)+'. Informe quando a mudança realmente aconteceu. A correção fica registrada.</p><div class="field"><label>Horário verdadeiro</label><input name="moment" type="datetime-local" required min="'+A(localIso(new Date(a.since)))+'" max="'+A(localIso(new Date()))+'" value="'+A(localIso(inputTime.getTime()<a.since?new Date(a.since):inputTime))+'"></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Corrigir horário</button></div></form></details></div>');
 }
 function askFinish(done){
  const a=timing.active;if(!a)return;
@@ -813,11 +828,12 @@ document.addEventListener("click",e=>{
 document.addEventListener("submit",e=>{
  // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
  const id=e.target?.getAttribute?.("id")||e.target?.id;
- if(!["s7-correction-form","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
+ if(!["s7-correction-form","s7-correct-rest","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
  const data=new FormData(e.target);
  try{
   if(id==="s7-correction-form")correction(new Date(data.get("moment")).getTime());
+  else if(id==="s7-correct-rest")correctRestMinutes(data.get("minutes"),data.get("seconds"));
    else if(id==="s7-timed-pause-form")startTimedPause(data.get("minutes"),data.get("reason"));
   else if(id==="s7-edit-totals")editTotals(String(data.get("id")),Number(data.get("study")),Number(data.get("paused")),String(data.get("reason")||""));
   else if(id==="s7-edit-pause")editPause(String(data.get("id")),Number(data.get("index")),new Date(data.get("start")).getTime(),new Date(data.get("end")).getTime(),String(data.get("kind")));
@@ -849,6 +865,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",tick);
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced)alarmSound(timing.alarm.which);tick();
 })();
