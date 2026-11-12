@@ -1,7 +1,7 @@
 /* Órbita — mural de lembretes: rascunhos sem conclusão nem impacto na carga diária. */
 (function(){
 "use strict";
-const C=window.OrbitaCore,S2=window.OrbitaStage2?.inspect;
+const C=window.OrbitaCore,S2=window.OrbitaStage2?.inspect,S3=window.OrbitaStage3?.inspect;
 if(!C||!S2)throw Error("Órbita: o mural precisa do planejamento inicializado");
 const root=C.state;
 if(!Array.isArray(root.reminders))root.reminders=[];
@@ -10,7 +10,7 @@ const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
 const labels={high:"Alta",medium:"Média",low:"Baixa"};
 const rank={high:0,medium:1,low:2};
-let opened=false,drag=null,skipClickUntil=0;
+let opened=false,drag=null,skipClickUntil=0,highlightIds=[];
 const defaults={x:null,y:null,width:340,height:430,locked:false};
 if(!root.reminderUi||typeof root.reminderUi!=="object")root.reminderUi={...defaults};
 const ui=root.reminderUi;
@@ -88,11 +88,68 @@ function age(created){
  if(days<30){const weeks=Math.floor(days/7);return "Há "+weeks+(weeks===1?" semana":" semanas");}
  const months=Math.floor(days/30);return "Há "+months+(months===1?" mês":" meses");
 }
+const icons={pin:"📌",bookmark:"🔖",alert:"❗",idea:"💡"};
+function encodedTarget(n){const l=n?.link;if(!l)return "none";return [l.scope,encodeURIComponent(l.id||""),encodeURIComponent(l.date||"")].join("|");}
+function targets(selected){
+ const sessions=(S3?.model?.sessions||[]).filter(x=>!x.archived&&x.status!=="done");
+ const entries=(S2?.model?.entries||[]).filter(x=>(x.type==="focus"||x.type==="task")&&!x.archivedAt);
+ const cycles=(S3?.model?.cycles||[]).filter(x=>!x.archived);
+ const disciplines=[...new Set(sessions.map(x=>String(x.discipline||"").trim()).filter(x=>x&&x!=="Próxima matéria do ciclo"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+ const options=[["none","Sem vínculo · apenas no mural"],
+  ...sessions.map(x=>["session|"+encodeURIComponent(x.id)+"|","Sessão · "+(x.discipline||"Estudo")+" · "+x.date+(x.topic?" · "+x.topic:"")]),
+  ...entries.map(x=>["entry|"+encodeURIComponent(x.id)+"|"+encodeURIComponent(x.date),"Atividade · "+x.title+" · "+x.date]),
+  ...disciplines.map(x=>["discipline|"+encodeURIComponent(x)+"|","Matéria · "+x]),
+  ...cycles.map(x=>["cycle|"+encodeURIComponent(x.id)+"|","Ciclo · "+x.title])
+ ];
+ if(selected!=="none"&&!options.some(x=>x[0]===selected))options.push([selected,"Vínculo anterior (consultar)"]);
+ return options.map(([v,label])=>'<option value="'+A(v)+'" '+(selected===v?"selected":"")+'>'+E(label)+'</option>').join("");
+}
+function parseTarget(value){
+ if(!value||value==="none")return null;
+ const [scope,encodedId,encodedDate=""]=String(value).split("|");
+ if(!["session","entry","discipline","cycle"].includes(scope))throw Error("Tipo de vínculo inválido.");
+ const id=decodeURIComponent(encodedId||""),date=decodeURIComponent(encodedDate);
+ if(!id)throw Error("Escolha o vínculo.");
+ return {scope,id,...(scope==="entry"?{date}:{})};
+}
+function complete(link){
+ if(!link)return false;
+ if(link.scope==="session"){
+  const x=S3?.model?.sessions?.find(x=>x.id===link.id);
+  return !x||x.archived||x.status==="done";
+ }
+ if(link.scope==="entry"){
+  const p=S2?.model,entry=p?.entries?.find(x=>x.id===link.id);
+  if(!entry||entry.archivedAt)return true;
+  const actual=p.records?.[link.id+"@"+link.date]?.status||"pending";
+  return actual==="done";
+ }
+ return false;
+}
+function prune(){
+ let touched=false;
+ for(const n of notes)if(n.link&&complete(n.link)){n.link=null;touched=true;}
+ if(touched)C.save();
+}
+function matches(n,ctx){
+ const l=n.link;
+ if(!l||complete(l)||ctx.status==="done")return false;
+ if(l.scope==="session")return ctx.kind==="session"&&ctx.id===l.id;
+ if(l.scope==="entry")return ctx.kind==="entry"&&ctx.id===l.id&&ctx.date===l.date;
+ if(ctx.kind!=="session")return false;
+ return l.scope==="discipline"&&ctx.discipline===l.id||l.scope==="cycle"&&ctx.cycleId===l.id;
+}
+function indicators(ctx){
+ const linked=notes.filter(n=>matches(n,ctx));
+ if(!linked.length)return "";
+ const symbol=linked.length===1?icons[linked[0].icon]||icons.pin:icons.pin;
+ return '<button type="button" class="s8-linked-pin" data-s8="jump" data-note-ids="'+A(linked.map(x=>x.id).join(","))+'" title="'+A(linked.length+" lembrete(s) vinculado(s). Abrir no mural.")+'" aria-label="Abrir '+linked.length+' lembrete(s) vinculado(s)">'+symbol+(linked.length>1?'<span>'+linked.length+'</span>':"")+'</button>';
+}
 function sorted(){return [...notes].sort((a,b)=>(rank[a.priority]??1)-(rank[b.priority]??1)||String(b.createdAt).localeCompare(String(a.createdAt)));}
 function markup(){
- const list=sorted().map(n=>'<article class="s8-note s8-priority-'+A(n.priority)+'">'+
+ const list=sorted().map(n=>'<article id="s8-note-'+A(n.id)+'" class="s8-note s8-priority-'+A(n.priority)+(highlightIds.includes(n.id)?' s8-highlight':'')+'" title="'+A(n.description||n.title)+'">'+
  '<div class="s8-note-pin" aria-hidden="true">●</div><div class="s8-note-top"><span class="s8-note-priority">'+E(labels[n.priority]||"Média")+'</span><small>'+E(age(n.createdAt))+'</small></div>'+
- '<strong>'+E(n.title)+'</strong>'+(n.description?'<p>'+E(n.description)+'</p>':"")+
+ '<strong>'+E(n.title)+'</strong>'+(n.link?'<small class="s8-link-label">⌁ '+E(n.link.scope==="session"?"Sessão específica":n.link.scope==="entry"?"Atividade específica":n.link.scope==="discipline"?"Matéria: "+n.link.id:"Ciclo de estudos")+'</small>':"")+(n.description?'<details class="s8-note-details"><summary>Ver observação</summary><p>'+E(n.description)+'</p></details><div class="s8-note-hover" role="tooltip">'+E(n.description)+'</div>':"")+
  '<div class="s8-note-actions"><button type="button" data-s8="edit" data-id="'+A(n.id)+'">Editar</button><button type="button" data-s8="convert" data-id="'+A(n.id)+'">Planejar ↗</button><button type="button" class="s8-danger" data-s8="remove" data-id="'+A(n.id)+'">Excluir</button></div></article>').join("");
  return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes">'+
  '<button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="'+opened+'" aria-controls="s8-panel" title="Mural de lembretes" aria-label="'+(opened?"Fechar":"Abrir")+' lembretes">'+
@@ -105,6 +162,13 @@ function markup(){
  (!ui.locked?'<div class="s8-resize-handle" data-s8="resize" role="separator" aria-label="Arraste para ajustar largura e altura do mural" title="Arraste para redimensionar">◢</div>':"")+'</section>':"")+'</div>';
 }
 function redraw(){C.render();}
+function jump(raw){
+ highlightIds=String(raw||"").split(",").filter(id=>notes.some(n=>n.id===id));
+ if(!highlightIds.length)return;
+ opened=true;C.render();
+ const element=$("s8-note-"+highlightIds[0]);
+ element?.scrollIntoView?.({behavior:"smooth",block:"nearest"});
+}
 function edit(idValue){
  const n=idValue?note(idValue):null;
  if(idValue&&!n)return C.notify("Lembrete não encontrado.");
@@ -113,6 +177,8 @@ function edit(idValue){
  '<div class="field"><label>Título</label><input name="title" maxlength="140" required value="'+A(n?.title||"")+'" placeholder="O que você quer lembrar?"></div>'+
  '<div class="field"><label>Observações (opcional)</label><textarea name="description" maxlength="1200" rows="3" placeholder="Detalhes para organizar depois">'+E(n?.description||"")+'</textarea></div>'+
  '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
+ '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+value+" "+({pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"}[key])+'</option>').join("")+'</select></div>'+
+ '<div class="field"><label>Vincular a (opcional)</label><select name="target">'+targets(encodedTarget(n))+'</select><small>Vínculos específicos desaparecem ao concluir a atividade. Matérias e ciclos continuam disponíveis.</small></div>'+
  '<p class="note">Lembretes não possuem conclusão ou data obrigatória. Ficam aqui até você excluir ou transformar em uma atividade.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar lembrete</button></div></form>');
 }
@@ -120,11 +186,14 @@ function saveNote(data){
  const title=String(data.get("title")||"").trim().slice(0,140);
  const description=String(data.get("description")||"").trim().slice(0,1200);
  const priority=String(data.get("priority")||"medium");
+ const icon=String(data.get("icon")||"pin"),link=parseTarget(data.get("target"));
+ if(!Object.hasOwn(icons,icon))throw Error("Ícone inválido.");
+ if(link&&complete(link))throw Error("A atividade já foi concluída ou removida. Escolha outra.");
  if(!title)throw Error("Informe o título do lembrete.");
  if(!Object.hasOwn(labels,priority))throw Error("Prioridade inválida.");
  const existing=note(String(data.get("id")||""));
- if(existing)Object.assign(existing,{title,description,priority,updatedAt:new Date().toISOString()});
- else notes.push({id:id(),title,description,priority,createdAt:new Date().toISOString()});
+ if(existing)Object.assign(existing,{title,description,priority,icon,link,updatedAt:new Date().toISOString()});
+ else notes.push({id:id(),title,description,priority,icon,link,createdAt:new Date().toISOString()});
  C.save();C.closeModal();redraw();C.notify(existing?"Lembrete atualizado.":"Lembrete adicionado.");
 }
 function remove(idValue){
@@ -175,13 +244,14 @@ document.addEventListener("click",ev=>{
  ev.preventDefault();
  const action=b.dataset.s8;
  try{
-  if(action==="toggle"){if(Date.now()<skipClickUntil){ev.stopPropagation?.();return;}opened=!opened;redraw();}
+  if(action==="toggle"){if(Date.now()<skipClickUntil){ev.stopPropagation?.();return;}opened=!opened;if(!opened)highlightIds=[];redraw();}
   else if(action==="new")edit();
   else if(action==="lock")toggleLock();
   else if(action==="reset")resetLayout();
   else if(action==="edit")edit(b.dataset.id);
   else if(action==="remove")remove(b.dataset.id);
   else if(action==="convert")convert(b.dataset.id);
+  else if(action==="jump")jump(b.dataset.noteIds);
  }catch(err){C.notify(err.message||"Não foi possível executar a ação.");}
 });
 document.addEventListener("pointerdown",pointerStart);
@@ -200,7 +270,7 @@ document.addEventListener("submit",ev=>{
  }catch(err){C.notify(err.message||"Verifique os dados informados.");}
 });
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&opened){opened=false;redraw();}});
-window.OrbitaStage8={decorate(route,base){return route==="inicio"?base+markup():base},afterRender(route){
+window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return base+markup();}return base},indicatorFor:indicators,afterRender(route){
  const incoming=document.querySelector?.('#view #s8-floating-root');
  const detached=document.querySelectorAll?.('body > #s8-floating-root')||[];
  if(route!=="inicio"){for(const node of detached)node.remove?.();return;}
@@ -209,6 +279,6 @@ window.OrbitaStage8={decorate(route,base){return route==="inicio"?base+markup():
   document.body.appendChild(incoming);
  }
  place();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget}};
 C.render();
 })();
