@@ -63,6 +63,7 @@ R.saveNote(form({title:"Retomar PA",description:"Parte 2 - 07:55",priority:"high
 const specific=R.notes.at(-1);
 assert.match(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/data-s8="jump"/);
 assert.equal(R.indicators({kind:"session",id:"math-2",discipline:"Matemática",cycleId:"enem",status:"pending"}),"","somente sessão selecionada mostra o lembrete específico");
+R.jump(specific.id);
 assert.match(markup,/Ver observação/,"observação acessível sem abrir edição");
 assert.match(markup,/Parte 2 - 07:55/,"texto da observação permanece no mural");
 R.saveNote(form({title:"Dica ENEM",priority:"medium",icon:"idea",target:"cycle|enem|"}));
