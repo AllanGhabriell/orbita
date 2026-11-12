@@ -34,8 +34,13 @@ class MockFormData {
   getAll(k){return Array.isArray(this.fields[k])?this.fields[k]:this.fields[k]==null?[]:[this.fields[k]];}
   has(k){return Object.hasOwn(this.fields,k);}
 }
+const localIso=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+const previousDate=new Date();previousDate.setDate(previousDate.getDate()-3);
+store.set("orbita:stage1:v1",JSON.stringify({schema:1,firstAccess:localIso(previousDate),date:localIso(previousDate),settings:{theme:"dark",motion:true,weekStart:0},availability:{weekly:[null,null,null,null,null,null,null],overrides:{}},goals:[],primaryGoalId:null}));
 vm.runInNewContext(script,{document:doc,localStorage:memory,window,location,history:{replaceState(_a,_b,h){location.hash=h}},FormData:MockFormData,crypto:{randomUUID:()=>String(Date.now())},requestAnimationFrame(){},setTimeout(){return 1},clearTimeout(){},console,Date,Intl,structuredClone}, {filename:"app.js"});
 const html=()=>makeElement("view").innerHTML;
+assert.equal(JSON.parse(store.get("orbita:stage1:v1")).date,localIso(new Date()),"retomar o Órbita abre no dia atual, não na última data visitada");
+assert.ok(script.includes('document.addEventListener("visibilitychange"'),"mudança do dia é observada ao voltar ao aplicativo");
 const clickAction=(action,attributes={})=>{
   const target={dataset:{action,...attributes},closest(selector){return selector==="[data-action]"?this:null;}};
   handlers.click({target});
