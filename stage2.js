@@ -333,12 +333,13 @@ function confirmDeleteEntry(id,date){
 }
 function deleteEntry(id,date,scope){
  const x=find(id);if(!x)return;
- if(scope==="one"&&x.recurrence?.kind!=="none"){if(locked(date))return notify("Dia finalizado: ocorrência protegida.");p.overrides[uidKey(id,date)]={removed:true};return;}
- if(scope==="future"&&x.recurrence?.kind!=="none"){if(locked(date))return notify("Dia finalizado: o modelo passado deve ser preservado.");x.recurrence.end=D(date,-1);return;}
+ if(scope==="one"&&x.recurrence?.kind!=="none"){if(locked(date))return notify("Dia finalizado: ocorrência protegida.");p.overrides[uidKey(id,date)]={removed:true};p.events.push({kind:"entry_deleted",id,date,scope:"one",at:new Date().toISOString()});return;}
+ if(scope==="future"&&x.recurrence?.kind!=="none"){if(locked(date))return notify("Dia finalizado: o modelo passado deve ser preservado.");x.recurrence.end=D(date,-1);p.events.push({kind:"entry_deleted",id,date,scope:"future",at:new Date().toISOString()});return;}
  // Não permite apagar registros em dias já fechados, inclusive na série.
  const hasLocked=Object.keys(p.records).some(k=>k.startsWith(id+"@")&&locked(k.split("@")[1]))||Object.values(s.evolution?.closed||{}).some(snapshot=>snapshot.activities.some(x=>x.id===id));
  if(hasLocked){notify("Esta atividade tem registros em dias finalizados; arquive-a em vez de excluir.");return;}
  p.entries=p.entries.filter(e=>e.id!==id);
+ p.events.push({kind:"entry_deleted",id,date:date||x.date,scope:scope||"all",at:new Date().toISOString()});
  Object.keys(p.records).filter(k=>k.startsWith(id+"@")).forEach(k=>delete p.records[k]);
  Object.keys(p.overrides).filter(k=>k.startsWith(id+"@")).forEach(k=>delete p.overrides[k]);
 }
@@ -385,7 +386,7 @@ function submission(id,data){
   if(payload.recurrence.kind!=="none"&&payload.recurrence.end&&payload.recurrence.end>D(payload.date,3650))throw Error("O período máximo por sequência é de dez anos.");
   const scope=String(data.get("scope")||"single");
   if(origin)updateEntry(payload,origin,date,scope);
-  else p.entries.push(baseEntry(payload));
+  else {const added=baseEntry(payload);p.entries.push(added);p.events.push({kind:"entry_created",id:added.id,date:added.date,at:added.createdAt});}
   save();C.closeModal();render();notify(origin?"Atividade atualizada.":"Atividade cadastrada.");return;
  }
  if(id==="s2-block"){
