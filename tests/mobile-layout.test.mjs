@@ -39,10 +39,10 @@ assert.equal((markup.match(/class="day-meta"/g)||[]).length,7,"texto integral ma
 assert.ok((markup.match(/aria-label="/g)||[]).length>=7,"descrição completa para leitores de tela");
 assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo curto");
 const sw=read("sw.js");
-assert.ok(read("index.html").includes("stage8.css?v=20261111-reminders-layout-v2"),"mural flutuante tem CSS versionado");
+assert.ok(read("index.html").includes("stage8.css?v=20261112-pause-links-v1"),"mural flutuante tem CSS versionado");
 assert.ok(read("boot.js").includes('"stage8.js"'),"mural carregado em todas as inicializacoes");
-assert.match(sw,/orbita-app-20261112-today-nav-v1/,"cache PWA renovado para a versao das rotinas");
-assert.ok(read("boot.js").includes('file==="stage2.js"?"?v=20261106-routines-v2"'),"bootstrap carrega versao especifica do modulo de rotinas");
+assert.match(sw,/orbita-app-20261112-pause-links-v1/,"cache PWA renovado para a versao das rotinas");
+assert.ok(read("boot.js").includes('file==="stage2.js"?"?v=20261112-pause-links-v1"'),"bootstrap carrega versao especifica do modulo de rotinas");
  const html=read("index.html");
 assert.match(html,/boot\.js\?v=20261112-today-nav-v1/,"HTML carrega bootstrap atualizado");
  const cssVersion=html.match(/stage7\.css\?v=([a-zA-Z0-9-]+)/)?.[1];
