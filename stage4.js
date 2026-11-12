@@ -10,6 +10,10 @@ const E=C.esc,A=C.attr,fmt=C.dateLabel,add=C.addDays,iso=C.iso,parse=C.parse,tod
 const $=id=>document.getElementById(id);
 const ev=state.evolution||(state.evolution={version:4,closed:{},visitedDays:{},settings:{reminders:true,strictness:"firm",weekStart:0},lastStatsView:"",lastReminderDismissed:"",milestones:[]});
 ev.closed||={};ev.visitedDays||={};ev.settings||={reminders:true,strictness:"firm"};ev.milestones||=[];
+if(ev.settings.mentorEnabled===undefined)ev.settings.mentorEnabled=true;
+if(ev.settings.mentorNotices===undefined)ev.settings.mentorNotices=true;
+ev.mentor||={lastViewed:"",lastReadSignature:"",dismissedSignature:"",snoozeUntil:"",lastDelivery:""};
+let mentorOptionsOpen=false;
 if(!ev.visitedDays[today()]){ev.visitedDays[today()]=true;C.save();}
 const clone=x=>JSON.parse(JSON.stringify(x));
 const now=()=>new Date().toISOString();
@@ -154,7 +158,7 @@ function finalize(date){
  C.save();return snap;
 }
 function periodData(kind,date,preview=true){
- const start=periodStart(kind,date),end=periodEnd(kind,date);
+ const start=kind==="all"?first():periodStart(kind,date),end=kind==="all"?today():periodEnd(kind,date);
  const from=start<first()?first():start;
  const rows=[];let open=0,unobserved=0,pastDays=0;
  for(let d=from;d<=end;d=add(d,1)){
@@ -246,6 +250,101 @@ function guidance(x){
  if(tone==="gentle")return s.map(o=>({...o,body:o.body.replace("Repetir compromissos sem executá-los não está ajudando seu objetivo.","A execução está abaixo do planejado e merece atenção.")}));
  return s;
 }
+
+/* Supervisor: diagnóstico verificável e contínuo. Dados ausentes não viram falhas inventadas. */
+function mentorAnalysis(){
+ const all=periodData("all",today()),week=periodData("week",today()),previous=periodData("week",add(today(),-7));
+ const c=all.count,w=week.count,b=previous.count;
+ const nowMs=Date.now(),recent=7*86400000;
+ const inRecent=x=>{const t=Date.parse(x||"");return Number.isFinite(t)&&t<=nowMs&&nowMs-t<=recent;};
+ const events=[...(p.events||[]),...(studies.events||[])];
+ const deleted=events.filter(x=>inRecent(x.at)&&["entry_deleted","session_deleted","planner_removed"].includes(x.kind)).reduce((n,x)=>n+(Array.isArray(x.ids)?x.ids.length:1),0);
+ const created=events.filter(x=>inRecent(x.at)&&["entry_created","sessions_created","planner_created"].includes(x.kind)).reduce((n,x)=>n+(Array.isArray(x.ids)?x.ids.length:1),0);
+ const lastMinute=(p.entries||[]).filter(x=>{
+  if(!x.createdAt||x.recurrence?.kind!=="none")return false;
+  const status=p.records?.[x.id+"@"+x.date],start=Date.parse(x.createdAt),end=Date.parse(status?.markedAt||"");
+  return status?.status==="done"&&inRecent(x.createdAt)&&end>=start&&end-start<=15*60000;
+ }).length;
+ const issues=[];
+ const addIssue=(key,score,tone,title,body,action,praise="",evidence="")=>issues.push({key,score,tone,title,body,action,praise,evidence});
+ if(c.missingStudyTimes>=2)addIssue("missing",c.missingStudyTimes>=5?88:62,"warning","Registros incompletos",
+  "Você concluiu sessões sem informar o tempo efetivo em "+c.missingStudyTimes+" registro(s). Sem esses dados, não consigo avaliar sua carga com precisão.",
+  "Ao terminar a próxima sessão, confira a duração antes de concluir.", "Você está registrando suas sessões, e isso já permite acompanhar o planejamento.",
+  c.missingStudyTimes+" sessões sem duração");
+ if(w.workDays>=3&&w.plannedMin>=180&&w.actualMin>0&&w.missingStudyTimes===0&&w.missingActivityTimes===0){
+  const ratio=w.actualMin/w.plannedMin;
+  if(ratio<.7)addIssue("load",ratio<.45?91:71,"warning","Carga planejada e executada",
+   "Nesta semana, foram planejadas "+minutes(w.plannedMin)+" e registradas "+minutes(w.actualMin)+". A diferença merece atenção, mas não significa automaticamente falta de esforço.",
+   "Na próxima semana, ajuste a meta ou tente acrescentar um bloco pequeno e viável à rotina.",
+   "Você já registrou tempo real suficiente para comparar seu plano com a execução.",
+   minutes(w.actualMin)+" de "+minutes(w.plannedMin)+" previstas");
+ }
+ if(w.studyActualMin>=60&&b.studyActualMin>=60){
+  const variation=w.studyActualMin/b.studyActualMin;
+  if(variation>=1.25)addIssue("improvement",76,"good","Avanço na carga de estudos",
+   "Sua carga registrada nesta semana subiu em relação à anterior: "+minutes(b.studyActualMin)+" antes e "+minutes(w.studyActualMin)+" agora.",
+   "Conserve o ritmo e observe se ele permanece sustentável.","Você conseguiu avançar em relação à semana anterior.",
+   minutes(b.studyActualMin)+" → "+minutes(w.studyActualMin));
+  else if(variation<=.65&&w.workDays>=2)addIssue("drop",79,"warning","Queda de ritmo",
+   "Sua duração registrada caiu de "+minutes(b.studyActualMin)+" para "+minutes(w.studyActualMin)+". Pode haver motivos legítimos; precisamos verificar o que mudou.",
+   "Reveja os próximos blocos e escolha uma meta menor que consiga cumprir.","Você já demonstrou um ritmo maior anteriormente.",
+   minutes(b.studyActualMin)+" → "+minutes(w.studyActualMin));
+ }
+ if(deleted>=3&&created>=3&&deleted/created>=.35)addIssue("deleted",80,"warning","Planejamento descartado",
+  "Nos últimos sete dias, encontrei "+deleted+" exclusão(ões) registradas para "+created+" criação(ões). Você está planejando mais do que consegue manter?",
+  "Antes de criar novos compromissos, confira o que realmente cabe na agenda.",
+  "Você está revisando o planejamento; agora precisamos melhorar a precisão.",deleted+" exclusões recentes");
+ if(lastMinute>=3)addIssue("late",69,"neutral","Atividades registradas na última hora",
+  "Pelo menos "+lastMinute+" atividades foram criadas e concluídas em até 15 minutos. Isso pode ser registro retrospectivo, e não necessariamente esquecimento.",
+  "Se pretende usá-las como planejamento, tente cadastrá-las antes de começar.",
+  "Registrar o que fez também é válido; a questão é distinguir histórico de planejamento.",lastMinute+" registros próximos da conclusão");
+ if(c.focus>=5){
+  const rate=focusRate(c);
+  if(rate>=85)addIssue("consistent",72,"good","Focos bem executados",
+   "Você concluiu "+c.doneFocus+" de "+c.focus+" focos ("+rate+"%). É um resultado positivo, sem necessidade de aumentar a carga apenas por aumentar.",
+   "Mantenha a qualidade e observe a regularidade.", "Seu acompanhamento mostra consistência.",rate+"% dos focos");
+  else if(rate<60)addIssue("focus",78,"warning","Focos acumulados",
+   "No histórico completo, "+c.doneFocus+" de "+c.focus+" focos foram concluídos ("+rate+"%). Há distância entre o planejado e o executado.",
+   "Na próxima semana, selecione menos prioridades inegociáveis e acompanhe a execução.",
+   "Você está definindo seus objetivos; agora precisamos ajustar a execução.",rate+"% dos focos");
+ }
+ if(c.unplannedPauses>=3)addIssue("pauses",58,"neutral","Pausas fora do plano",
+  "Há "+c.unplannedPauses+" pausas extraordinárias registradas. Talvez sua disponibilidade precise de ajustes; descansar não é uma falha.",
+  "Revise a disponibilidade informada antes de aumentar as metas.",
+  "Reconhecer imprevistos ajuda a planejar melhor.",c.unplannedPauses+" pausas registradas");
+ issues.sort((a,b)=>b.score-a.score);
+ const picked=issues.slice(0,4);
+ if(!picked.length){
+  if(c.studyActualMin||c.focus||c.study) picked.push({key:"baseline",score:15,tone:"neutral",title:"Acompanhamento em andamento",praise:"Já existem registros que posso acompanhar.",body:"Ainda não identifiquei um padrão suficientemente consistente para uma cobrança específica. Isso não apaga o que você registrou.",action:"Continue informando os resultados reais. Vou comparar as próximas semanas.",evidence:"Histórico disponível"});
+  else picked.push({key:"empty",score:0,tone:"neutral",title:"Vamos começar com dados reais",praise:"O planejamento está pronto para ser usado.",body:"Ainda não há evidências para avaliar desempenho, e não vou inventar críticas.",action:"Registre seus compromissos e suas primeiras sessões.",evidence:"Sem registros suficientes"});
+ }
+ const digest=picked.map(x=>x.key+":"+x.evidence).join("|");
+ return {items:picked,digest,important:picked.some(x=>x.score>=65),closed:c.closed,days:c.days};
+}
+function mentorUnread(){
+ if(ev.settings.mentorEnabled===false)return false;
+ const analysis=mentorAnalysis();
+ return analysis.important&&analysis.digest!==ev.mentor.lastReadSignature&&analysis.digest!==ev.mentor.dismissedSignature;
+}
+function mentorNoticeEligible(){
+ if(ev.settings.mentorEnabled===false||ev.settings.mentorNotices===false||!mentorUnread())return false;
+ if(Date.parse(ev.mentor.snoozeUntil||"")>Date.now())return false;
+ const base=Date.parse(ev.mentor.lastViewed||ev.mentor.lastDelivery||state.firstAccess+"T12:00:00");
+ if(Number.isFinite(base)&&Date.now()-base<3*86400000)return false;
+ return true;
+}
+function mentorNotice(){
+ if(!mentorNoticeEligible())return "";
+ const detail=mentorOptionsOpen?'<div class="evo-mentor-options"><button class="btn small ghost" data-s4="mentorSnooze" data-min="10">Daqui a 10 min</button><button class="btn small ghost" data-s4="mentorSnooze" data-min="15">Daqui a 15 min</button><button class="btn small ghost" data-s4="mentorSnooze" data-min="1440">Não mostrar hoje</button><button class="btn small ghost" data-s4="mentorDismiss">Dispensar mensagem</button><button class="btn small ghost" data-s4="mentorDisableNotices">Desativar avisos</button></div>':"";
+ return '<section class="card evo-mentor-message" aria-label="Nova mensagem do orientador"><div class="evo-mentor-avatar" aria-hidden="true">◉</div><div class="evo-mentor-copy"><strong>O Orientador quer conversar</strong><p>Tenho observações novas sobre seu planejamento. Quando puder, venha conferir o que mudou.</p><div class="row"><button class="btn primary small" data-s4="mentorOpen">Ver feedback</button><button class="btn small ghost" data-s4="mentorOptions">'+(mentorOptionsOpen?"Ocultar opções":"Agora não ▾")+'</button></div>'+detail+'</div></section>';
+}
+function mentorPanel(){
+ if(ev.settings.mentorEnabled===false)return '<section class="card"><h2>Orientador desativado</h2><p class="note">Suas estatísticas continuam disponíveis. Você pode reativar a análise nas preferências abaixo.</p></section>';
+ const a=mentorAnalysis(),tone=ev.settings.strictness||"firm";
+ const intro=a.items.some(x=>x.tone==="warning")?"Tenho alguns pontos para cobrar, mas também quero reconhecer o que você já conseguiu registrar. Vamos aos fatos.":"Vamos examinar sua evolução com base nos registros reais, sem comparações inventadas.";
+ const cards=a.items.map((x,i)=>'<article class="evo-mentor-feedback '+A(x.tone)+'"><div class="evo-mentor-feedback-top"><span>'+E(i+1+" · "+x.title)+'</span><small>'+E(x.evidence)+'</small></div><p>'+E(x.praise)+'</p><p>'+E(tone==="gentle"?x.body:x.body)+'</p><strong>Próximo passo</strong><p>'+E(x.action)+'</p></article>').join("");
+ return '<section class="card evo-mentor-section"><div class="card-head"><div><h2>◉ Meu Orientador</h2><p class="note">Análise de todo o histórico, com atenção às últimas semanas. A seleção de Dia, Semana, Mês ou Ano altera apenas as estatísticas.</p></div></div><p class="evo-mentor-intro">'+E(intro)+'</p><div class="evo-mentor-feedbacks">'+cards+'</div><p class="note">O Orientador usa regras e registros do Órbita, não uma IA externa. Ele não presume motivos pessoais nem inventa tempos. As recomendações são sugestões ajustáveis.</p></section>';
+}
 function metric(label,value,subtitle){return '<div class="metric-card"><span>'+E(label)+'</span><strong>'+E(value)+'</strong>'+(subtitle?'<small>'+E(subtitle)+'</small>':"")+'</div>';}
 function percent(value,total){return total?Math.round(value/total*100)+"%":"—";}
 function dayReview(date){
@@ -313,7 +412,7 @@ function overviewPeriod(x){
  html+='<div class="metrics-grid">'+metric("Compromissos",rate==null?"—":rate+"",n.doneFocus+" de "+n.focus+" focos concluídos")+metric("Horas reais de estudo",minutes(n.studyActualMin),n.missingStudyTimes+" sessões sem tempo")+metric("Horas planejadas",minutes(n.plannedMin),"Tarefas e estudos sem dupla contagem")+metric("Descansos",n.rest+" planejado(s)",n.unplannedPauses+" pausa(s) extraordinária(s)")+'</div>';
  html+=previousComparison(x);
  html+='<section class="card evo-period-chart"><div class="card-head"><h2>Distribuição diária do estudo</h2><span class="note">Minutos realmente informados</span></div>'+chartDays(x)+'</section>';
- html+='<section class="card"><div class="card-head"><h2>Orientador</h2>'+C.tag(sampleLevel(x)==="limited"?"Poucos registros":sampleLevel(x)==="initial"?"Tendências iniciais":"Histórico suficiente")+'</div><div class="evo-insights">'+guidance(x).map(y=>'<div class="evo-insight '+A(y.tone)+'"><strong>'+E(y.title)+'</strong><p>'+E(y.body)+'</p><small>Próximo passo: '+E(y.action)+'</small></div>').join("")+'</div></section>';
+ html+=mentorPanel();
  if(ev.milestones.length)html+='<section class="card"><div class="card-head"><h2>Conquistas reais</h2></div><div class="evo-achievements">'+ev.milestones.slice(-5).reverse().map(m=>'<div class="evo-achievement"><span aria-hidden="true">✦</span><div><strong>'+E(m.title)+'</strong><small>Concedida uma única vez, com base em fechamentos completos de focos.</small></div></div>').join("")+'</div></section>';
 
  html+='<section class="card"><div class="card-head"><h2>Mais indicadores</h2></div><div class="evo-rows">'+
@@ -338,7 +437,7 @@ function viewEvolution(){
  return '<div class="hero-row"><div><div class="overline">SEU HISTÓRICO</div><h1>Minha evolução</h1><p class="kicker">Os resultados vêm de registros reais. Constância conta tanto quanto aumentar a quantidade.</p></div><div class="row"><button class="btn small ghost" data-s4="backProfile">← Perfil</button><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Fechar dia</button></div></div>'+
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
  overviewPeriod(current)+
- '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
+ '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="checkline"><input id="s4-mentor-enabled" type="checkbox" '+(ev.settings.mentorEnabled!==false?"checked":"") +'> Ativar Orientador</label><label class="checkline"><input id="s4-mentor-notices" type="checkbox" '+(ev.settings.mentorNotices!==false?"checked":"")+'> Avisos discretos na tela inicial</label><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
 }
 function yesterday(){return add(today(),-1);}
 function lastStudyDayOfWeek(d){
@@ -378,7 +477,7 @@ function homeDecor(base){
  const closeLink='<div class="evo-footer"><button class="btn primary" data-s4="reviewDate" data-date="'+A(date)+'">Revisar e finalizar o dia</button><button class="btn small ghost" data-s4="viewStats">Ver evolução</button></div>';
  const miniWeek=lastStudyDayOfWeek(date)?'<div class="evo-alert"><span>Último dia de estudos previsto na semana. O balanço semanal já pode ser consultado como prévia; será definitivo após fechar os dias restantes.</span><button class="btn small" data-s4="viewStats">Ver semana</button></div>':"";
  const remind=reminderEligible()?'<div class="evo-alert evo-reminder"><span>Seu desempenho merece uma revisão. Há novos registros para analisar.</span><button class="btn small" data-s4="viewStats">Ver estatísticas</button><button class="btn small ghost" data-s4="dismissReminder">Depois</button><button class="btn small ghost" data-s4="disableReminder">Desativar</button></div>':"";
- return upper+remind+base+miniWeek+closeLink;
+ return mentorNotice()+upper+remind+base+miniWeek+closeLink;
 }
 function profileDecor(base){
  return base+'<section class="card"><div class="card-head"><h2>Evolução e orientador</h2><button class="btn primary small" data-s4="viewStats">Abrir estatísticas</button></div><p class="note">Análises diárias, semanais, mensais e anuais, descanso, consistência, carga e recomendações contextualizadas.</p>'+overviewMini()+'</section>';
@@ -405,7 +504,7 @@ function decorate(route,base){
  if(route==="fechamento")return dayReview(state.date);
  return base;
 }
-function markViewed(){ev.lastStatsView=now();C.save();}
+function markViewed(){ev.lastStatsView=now();ev.mentor.lastViewed=now();ev.mentor.lastReadSignature=mentorAnalysis().digest;ev.mentor.dismissedSignature="";ev.mentor.snoozeUntil="";mentorOptionsOpen=false;C.save();}
 function goView(){period="week";referenceDate=state.date;markViewed();C.go("evolucao");}
 function confirmSubmit(data){
  if(!data.has("reviewed")||String(data.get("phrase")||"").trim()!=="FINALIZAR")throw Error("Marque a revisão e digite FINALIZAR exatamente.");
@@ -421,6 +520,11 @@ const actions={
  backHome(){C.go("inicio")},
  backProfile(){C.go("perfil")},
  viewStats(){goView()},
+ mentorOpen(){goView()},
+ mentorOptions(){mentorOptionsOpen=!mentorOptionsOpen;C.render()},
+ mentorSnooze(b){const min=Number(b.dataset.min);if(![10,15,1440].includes(min))return;const until=min===1440?new Date(new Date().setHours(23,59,59,999)):new Date(Date.now()+min*60000);ev.mentor.snoozeUntil=until.toISOString();ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
+ mentorDismiss(){ev.mentor.dismissedSignature=mentorAnalysis().digest;ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
+ mentorDisableNotices(){ev.settings.mentorNotices=false;mentorOptionsOpen=false;C.save();C.render()},
  period(b){period=b.dataset.period;referenceDate=state.date;C.render()},
  prevPeriod(){referenceDate=period==="day"?add(referenceDate,-1):period==="week"?add(referenceDate,-7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()-1,1,12)):referenceDate.slice(0,4)-1+"-01-01";if(referenceDate<first())referenceDate=first();C.render()},
  nextPeriod(){referenceDate=period==="day"?add(referenceDate,1):period==="week"?add(referenceDate,7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()+1,1,12)):(Number(referenceDate.slice(0,4))+1)+"-01-01";C.render()},
@@ -442,9 +546,18 @@ document.addEventListener("submit",event=>{
  }catch(err){C.notify(err.message||"Confira a confirmação.");}
 });
 document.addEventListener("change",event=>{
+ if(event.target.id==="s4-mentor-enabled"){ev.settings.mentorEnabled=event.target.checked;C.save();C.render();}
+ if(event.target.id==="s4-mentor-notices"){ev.settings.mentorNotices=event.target.checked;C.save();C.render();}
  if(event.target.id==="s4-tone"){ev.settings.strictness=event.target.value;C.save();C.render();}
  if(event.target.id==="s4-reminders"){ev.settings.reminders=event.target.checked;C.save();C.render();}
 });
-window.OrbitaStage4={decorate,inspect:{get model(){return ev},capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,reminderEligible,lastStudyDayOfWeek,actions}};
+window.OrbitaStage4={decorate,afterRender(){
+ const unread=mentorUnread()&&ev.settings.mentorNotices!==false;
+ for(const node of document.querySelectorAll?.('[data-nav="perfil"]')||[]){
+  const previous=node.querySelector?.(".evo-mentor-badge");
+  if(!unread){previous?.remove?.();continue;}
+  if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="Nova análise do Orientador" aria-label="Nova análise do Orientador">1</span>');
+ }
+},inspect:{get model(){return ev},capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
 C.render();
 })();
