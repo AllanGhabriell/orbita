@@ -73,6 +73,32 @@ test("cronômetro conta estudo e pausas separadamente; término não avança aut
  assert.equal(m.preparationMs,6*60000);
  assert.equal(h.state.timing.records["math-1"].pauses.length,1);
 });
+test("correção simples separa descanso real do estudo e mantém auditoria",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(60*60000);h.stage.pause("rest");
+ h.setTime(70*60000);
+ h.stage.correctRestMinutes(2,0);
+ const r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,68*60000);
+ assert.equal(r.pauseMs,2*60000);
+ assert.equal(h.state.timing.active.phase,"running");
+ assert.equal(r.pauses.at(-1).endedAt-r.pauses.at(-1).startedAt,2*60000);
+ assert.equal(r.corrections.at(-1).type,"simplified_rest");
+ assert.equal(r.corrections.at(-1).studyAddedMs,8*60000);
+ h.setTime(75*60000);
+ assert.equal(h.stage.studyMs(r),73*60000,"contagem continua depois do ajuste");
+ h.stage.finish(false);
+ assert.equal(h.item.actualMin,73);
+});
+test("ajuste simples não permite descanso maior que a pausa atual",()=>{
+ const h=harness();
+ h.stage.start("math-1");h.setTime(10*60000);h.stage.pause();
+ h.setTime(13*60000);
+ assert.throws(()=>h.stage.correctRestMinutes(4,0),/não pode ultrapassar/);
+ assert.equal(h.state.timing.active.phase,"paused");
+ assert.equal(h.stage.pauseMs(h.state.timing.records["math-1"]),3*60000);
+});
 test("correção do horário de retomada preserva trilha de auditoria",()=>{
  const h=harness();
  h.stage.start("math-1");
