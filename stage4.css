@@ -55,3 +55,26 @@
  .evo-chart{height:145px}
  .evo-bar-col small{font-size:8px}
 }
+
+/* Orientador: acesso discreto, recados adiáveis e análise geral */
+.evo-mentor-access{display:flex;justify-content:flex-end;margin:5px 0 13px}
+.evo-mentor-message{display:flex;flex-direction:row;align-items:flex-start;gap:14px;border-color:rgba(157,130,225,.38);margin-bottom:14px}
+.evo-mentor-avatar{width:45px;height:45px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,var(--accent),var(--surface3));font-size:24px;flex:0 0 auto}
+.evo-mentor-copy{flex:1;min-width:0}
+.evo-mentor-copy>strong{font-size:14px}
+.evo-mentor-copy p{font-size:12px;line-height:1.6;margin:7px 0 12px;color:var(--muted)}
+.evo-mentor-copy>.row{display:flex;gap:8px;flex-wrap:wrap}
+.evo-mentor-options{margin-top:12px;display:flex;gap:7px;flex-wrap:wrap}
+.evo-mentor-section .card-head{align-items:flex-start}
+.evo-mentor-intro{font-size:13px;line-height:1.6;margin:9px 0 15px}
+.evo-mentor-feedbacks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:12px}
+.evo-mentor-feedback{border:1px solid var(--border);border-left:3px solid var(--borderStrong);border-radius:12px;padding:15px;background:var(--surface2)}
+.evo-mentor-feedback.good{border-left-color:var(--good)}
+.evo-mentor-feedback.warning{border-left-color:var(--warning)}
+.evo-mentor-feedback-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.evo-mentor-feedback-top span{font-size:13px;font-weight:750}
+.evo-mentor-feedback-top small{font-size:10px;color:var(--muted);text-align:right;max-width:40%}
+.evo-mentor-feedback p{font-size:12px;line-height:1.65;margin:9px 0}
+.evo-mentor-feedback>strong{font-size:11px;color:var(--accent2)}
+.evo-mentor-badge{display:inline-grid;place-items:center;width:17px;height:17px;min-width:17px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;margin-left:auto}
+@media(max-width:720px){.evo-mentor-message{padding:12px;gap:10px}.evo-mentor-options .btn{flex:1 1 120px}.evo-mentor-badge{margin:0 0 0 4px;width:15px;height:15px;min-width:15px}}
