@@ -342,8 +342,11 @@ function mentorPanel(){
  if(ev.settings.mentorEnabled===false)return '<section class="card"><h2>Orientador desativado</h2><p class="note">Suas estatísticas continuam disponíveis. Você pode reativar a análise nas preferências abaixo.</p></section>';
  const a=mentorAnalysis(),tone=ev.settings.strictness||"firm";
  const intro=a.items.some(x=>x.tone==="warning")?"Tenho alguns pontos para cobrar, mas também quero reconhecer o que você já conseguiu registrar. Vamos aos fatos.":"Vamos examinar sua evolução com base nos registros reais, sem comparações inventadas.";
- const cards=a.items.map((x,i)=>'<article class="evo-mentor-feedback '+A(x.tone)+'"><div class="evo-mentor-feedback-top"><span>'+E(i+1+" · "+x.title)+'</span><small>'+E(x.evidence)+'</small></div><p>'+E(x.praise)+'</p><p>'+E(tone==="gentle"?x.body:x.body)+'</p><strong>Próximo passo</strong><p>'+E(x.action)+'</p></article>').join("");
- return '<section class="card evo-mentor-section"><div class="card-head"><div><h2>◉ Meu Orientador</h2><p class="note">Análise de todo o histórico, com atenção às últimas semanas. A seleção de Dia, Semana, Mês ou Ano altera apenas as estatísticas.</p></div></div><p class="evo-mentor-intro">'+E(intro)+'</p><div class="evo-mentor-feedbacks">'+cards+'</div><p class="note">O Orientador usa regras e registros do Órbita, não uma IA externa. Ele não presume motivos pessoais nem inventa tempos. As recomendações são sugestões ajustáveis.</p></section>';
+ const old=ev.mentor.previousReview;
+ const recent=periodData("week",today()).count;
+ const followUp=old&&old.studyActualMin!==recent.studyActualMin?'<p class="evo-mentor-intro">Da última vez, sua semana tinha '+E(minutes(old.studyActualMin))+ ' de estudo registrado. Agora constam '+E(minutes(recent.studyActualMin))+'. Vamos acompanhar se essa mudança se mantém.</p>':"";
+ const cards=a.items.map((x,i)=>'<article class="evo-mentor-feedback '+A(x.tone)+'"><div class="evo-mentor-feedback-top"><span>'+E(i+1+" · "+x.title)+'</span><small>'+E(x.evidence)+'</small></div><p>'+E(x.praise)+'</p><p>'+E(tone==="gentle"?x.body.replace("Você está planejando mais do que consegue manter?","Vale rever quantas atividades cabem na sua rotina?").replace("Há distância entre o planejado e o executado.","Há diferença entre planejamento e execução."):x.body)+'</p><strong>Próximo passo</strong><p>'+E(x.action)+'</p></article>').join("");
+ return '<section class="card evo-mentor-section"><div class="card-head"><div><h2>◉ Meu Orientador</h2><p class="note">Análise de todo o histórico, com atenção às últimas semanas. A seleção de Dia, Semana, Mês ou Ano altera apenas as estatísticas.</p></div></div><p class="evo-mentor-intro">'+E(intro)+'</p>'+followUp+'<div class="evo-mentor-feedbacks">'+cards+'</div><p class="note">O Orientador usa regras e registros do Órbita, não uma IA externa. Ele não presume motivos pessoais nem inventa tempos. As recomendações são sugestões ajustáveis.</p></section>';
 }
 function metric(label,value,subtitle){return '<div class="metric-card"><span>'+E(label)+'</span><strong>'+E(value)+'</strong>'+(subtitle?'<small>'+E(subtitle)+'</small>':"")+'</div>';}
 function percent(value,total){return total?Math.round(value/total*100)+"%":"—";}
@@ -412,7 +415,7 @@ function overviewPeriod(x){
  html+='<div class="metrics-grid">'+metric("Compromissos",rate==null?"—":rate+"",n.doneFocus+" de "+n.focus+" focos concluídos")+metric("Horas reais de estudo",minutes(n.studyActualMin),n.missingStudyTimes+" sessões sem tempo")+metric("Horas planejadas",minutes(n.plannedMin),"Tarefas e estudos sem dupla contagem")+metric("Descansos",n.rest+" planejado(s)",n.unplannedPauses+" pausa(s) extraordinária(s)")+'</div>';
  html+=previousComparison(x);
  html+='<section class="card evo-period-chart"><div class="card-head"><h2>Distribuição diária do estudo</h2><span class="note">Minutos realmente informados</span></div>'+chartDays(x)+'</section>';
- html+=mentorPanel();
+ 
  if(ev.milestones.length)html+='<section class="card"><div class="card-head"><h2>Conquistas reais</h2></div><div class="evo-achievements">'+ev.milestones.slice(-5).reverse().map(m=>'<div class="evo-achievement"><span aria-hidden="true">✦</span><div><strong>'+E(m.title)+'</strong><small>Concedida uma única vez, com base em fechamentos completos de focos.</small></div></div>').join("")+'</div></section>';
 
  html+='<section class="card"><div class="card-head"><h2>Mais indicadores</h2></div><div class="evo-rows">'+
@@ -436,7 +439,7 @@ function viewEvolution(){
  const current=periodData(period,referenceDate);
  return '<div class="hero-row"><div><div class="overline">SEU HISTÓRICO</div><h1>Minha evolução</h1><p class="kicker">Os resultados vêm de registros reais. Constância conta tanto quanto aumentar a quantidade.</p></div><div class="row"><button class="btn small ghost" data-s4="backProfile">← Perfil</button><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Fechar dia</button></div></div>'+
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
- overviewPeriod(current)+
+ mentorPanel()+overviewPeriod(current)+
  '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="checkline"><input id="s4-mentor-enabled" type="checkbox" '+(ev.settings.mentorEnabled!==false?"checked":"") +'> Ativar Orientador</label><label class="checkline"><input id="s4-mentor-notices" type="checkbox" '+(ev.settings.mentorNotices!==false?"checked":"")+'> Avisos discretos na tela inicial</label><label class="field">Tom do feedback<select id="s4-tone"><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
 }
 function yesterday(){return add(today(),-1);}
@@ -505,7 +508,7 @@ function decorate(route,base){
  if(route==="fechamento")return dayReview(state.date);
  return base;
 }
-function markViewed(){ev.lastStatsView=now();ev.mentor.lastViewed=now();ev.mentor.lastReadSignature=mentorAnalysis().digest;ev.mentor.dismissedSignature="";ev.mentor.snoozeUntil="";mentorOptionsOpen=false;C.save();}
+function markViewed(){ev.lastStatsView=now();ev.mentor.previousReview=ev.mentor.lastReview||null;ev.mentor.lastReview={studyActualMin:periodData("week",today()).count.studyActualMin,at:now()};ev.mentor.lastViewed=now();ev.mentor.lastReadSignature=mentorAnalysis().digest;ev.mentor.dismissedSignature="";ev.mentor.snoozeUntil="";mentorOptionsOpen=false;C.save();}
 function goView(){period="week";referenceDate=state.date;markViewed();C.go("evolucao");}
 function confirmSubmit(data){
  if(!data.has("reviewed")||String(data.get("phrase")||"").trim()!=="FINALIZAR")throw Error("Marque a revisão e digite FINALIZAR exatamente.");
