@@ -36,3 +36,16 @@ body[data-theme="light"] .s8-panel,body[data-theme="light"] .s8-trigger{backgrou
 @media(hover:hover){.s8-trigger:hover{cursor:grab}.s8-trigger:active{cursor:grabbing}}
 
 @media(max-width:760px){.s8-panel{padding-bottom:max(15px,env(safe-area-inset-bottom,0px))}}
+
+/* Acesso contextual: um alfinete por atividade, com contador quando necessário. */
+.s8-linked-pin{display:inline-flex;align-items:center;justify-content:center;gap:2px;min-width:29px;min-height:29px;border:1px solid var(--border,rgba(130,125,145,.28));background:var(--surface3,rgba(138,128,180,.12));color:inherit;border-radius:9px;font-size:14px;cursor:pointer;flex:0 0 auto}
+.s8-linked-pin:hover,.s8-linked-pin:focus-visible{outline:2px solid rgba(155,119,244,.5);outline-offset:1px}
+.s8-linked-pin span{font-size:10px;font-weight:700}
+.s8-link-label{display:block;font-size:10px;margin-top:6px;opacity:.7}
+.s8-note-details{margin-top:7px;font-size:12px}
+.s8-note-details summary{cursor:pointer;font-size:11px;font-weight:650;text-decoration:underline;text-underline-offset:2px}
+.s8-note-details p{margin:6px 0 0;white-space:pre-wrap;line-height:1.5}
+.s8-note-hover{max-height:0;overflow:hidden;opacity:0;pointer-events:none;font-size:12px;line-height:1.45;white-space:pre-wrap;transition:opacity .2s ease .65s,max-height .2s ease .65s}
+@media(hover:hover) and (pointer:fine){.s8-note:hover .s8-note-hover{max-height:240px;overflow-y:auto;opacity:1;padding-top:7px}}
+.s8-note.s8-highlight{outline:3px solid #8c54e3;outline-offset:-3px;box-shadow:0 0 0 3px rgba(180,137,255,.27),0 8px 19px rgba(0,0,0,.18)}
+@media(hover:none){.s8-note-hover{display:none}}
