@@ -518,7 +518,7 @@ function homePanel(){
     '<div class="study-daily-label"><strong>Sessão '+number+'</strong><span class="study-daily-subject">'+E(label)+'</span>'+
     '<small>'+E(desc)+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
     '<button class="btn small '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button>'+
-    '<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>':
+    '<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>'+(window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||""):
     '<span class="status">Dia fechado</span>')+'</div></div>';
   }).join("");
   const progress=group.items.length?Math.round(100*n/group.items.length):0;
