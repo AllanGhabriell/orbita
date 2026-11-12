@@ -211,6 +211,8 @@ function hydrateInPlace(target,source){
 async function importState(doc,version=0){
  if(!isValidDoc(doc))throw Error("Documento de nuvem inválido. Nenhum dado foi substituído.");
  const normalized=normalizeImportedDoc(doc);
+ // Importações da nuvem e de backups não devem reabrir uma data histórica antiga.
+ normalized.date=C.today()>=normalized.firstAccess?C.today():normalized.firstAccess;
  // Importar na memória e no disco SEM recarregar a aba.
  // Um reload antigo podia iniciar a mesma importação indefinidamente.
  await Storage.replaceDocument(normalized);
