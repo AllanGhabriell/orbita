@@ -137,7 +137,19 @@ function alarmSound(which){
   alarmGain=audioContext.createGain();
   alarmGain.gain.value=Math.max(0,Math.min(1,Number(settings().volume)/100))*.5;
   alarmSource.connect(alarmGain);alarmGain.connect(audioContext.destination);
-  alarmSource.start();
+  const source=alarmSource;
+  source.start();
+  if(alarmIdleLimit()>0){
+   // Prazo de segurança no próprio motor de áudio, inclusive se a aba
+   // suspender os timers JavaScript em segundo plano.
+   source.onended=()=>{
+    if(alarmSource!==source)return;
+    alarmSource=null;
+    if(autoSilenceAlarm())return;
+    if(activeAlarm()?.silenced===false)alarmSound(which);
+   };
+   source.stop(audioContext.currentTime+alarmIdleLimit()/1000);
+  }
   audioContext.resume?.().catch(()=>{if(timing.alarm&&!timing.alarm.silenced)C.notify("Toque em Reproduzir som para autorizar o alarme.");});
  }catch{stopAlarmAudio();tone(selected);}
 }
