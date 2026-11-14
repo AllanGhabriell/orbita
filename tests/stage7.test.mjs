@@ -11,7 +11,7 @@ function harness(){
  const target={id:"physics-2",date:"2026-11-04",plannedMin:90,status:"pending",actualMin:null,kind:"supplement",discipline:"Física",archived:false};
  const items=[item,target];
  const state={settings:{motion:false},date:"2026-11-04",studies:{sessions:items,events:[]},evolution:{closed:{}}};
- let saved=0,notifications=[];
+ let saved=0,notifications=[],lastModal="";
  const callbacks={};
  class ClockDate extends Date{constructor(...args){super(...(args.length?args:[time]));}static now(){return time;}}
  const alarmHost={innerHTML:"",hidden:true};
@@ -28,7 +28,7 @@ function harness(){
    OrbitaCore:{
     state,esc:x=>String(x),attr:x=>String(x),today:()=> "2026-11-04",
     save(){saved++;},render(){},notify:x=>notifications.push(x),
-    openModal(){},closeModal(){},settings:{},confirm:()=>true,
+    openModal(title,html){lastModal=html;},closeModal(){lastModal="";},settings:{},confirm:()=>true,
    },
    OrbitaStage3:{inspect:{
     session:id=>items.find(x=>x.id===id)||null,
@@ -49,8 +49,49 @@ function harness(){
  };
  vm.runInNewContext(source,ctx,{filename:"stage7.js"});
  const stage=ctx.window.OrbitaStage7.inspect;
- return {state,item,target,stage,decorate:ctx.window.OrbitaStage7.decorate,callbacks,notifications,alarmHost,setTime:ms=>time=baseTime+ms, get saved(){return saved}};
+ return {state,item,target,stage,decorate:ctx.window.OrbitaStage7.decorate,callbacks,notifications,alarmHost,setTime:ms=>time=baseTime+ms, get saved(){return saved},get modal(){return lastModal}};
 }
+test("correção principal usa totais da sessão mesmo com pausa atual de dois segundos",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(416*60000+33000);
+ h.stage.pause("rest");
+ h.setTime(417*60000+55000);
+ h.stage.correctModal();
+ assert.match(h.modal,/totais de toda a sessão/);
+ assert.match(h.modal,/name="studyMinutes"/);
+ assert.match(h.modal,/name="restMinutes"/);
+ assert.doesNotMatch(h.modal,/name="studySec"|name="restSec"/,"sem campo de segundos");
+ assert.ok(!h.modal.includes('max="1" step="1"'),"não limitar estudo a apenas um minuto da pausa");
+ h.stage.correctSessionTotals(90,1,"paused");
+ const r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,90*60000);
+ assert.equal(r.pauseMs,60000);
+ assert.ok(r.unaccountedMs>300*60000,"horas excedentes não viram descanso");
+ assert.equal(h.state.timing.active.phase,"paused");
+ assert.equal(r.corrections.at(-1).type,"session_totals_corrected");
+ h.stage.finish(false);
+ assert.equal(h.item.actualMin,90,"tempo total corrigido é salvo na sessão");
+});
+test("correção de totais em estudo ativo preserva tempos e permite desfazer",()=>{
+ const h=harness();h.stage.start("math-1");h.setTime(120*60000);
+ h.stage.correctSessionTotals(90,0,"running");
+ let r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,90*60000);
+ assert.equal(r.unaccountedMs,30*60000);
+ assert.equal(h.stage.studyMs(r),90*60000);
+ h.setTime(125*60000);
+ assert.equal(h.stage.studyMs(r),95*60000,"a contagem prossegue normalmente");
+ h.stage.undo();
+ r=h.state.timing.records["math-1"];
+ assert.equal(h.stage.studyMs(r),120*60000,"desfazer restaura contagem registrada");
+ assert.equal(r.unaccountedMs||0,0);
+});
+test("correção de totais impede inventar tempo superior ao registrado",()=>{
+ const h=harness();h.stage.start("math-1");h.setTime(10*60000);
+ assert.throws(()=>h.stage.correctSessionTotals(90,0,"running"),/ultrapassam/);
+ assert.equal(h.stage.studyMs(h.state.timing.records["math-1"]),10*60000);
+});
 test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
  const h=harness();
  h.stage.start("math-1");
