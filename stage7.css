@@ -157,3 +157,10 @@ body[data-theme=light] .s7-alarm-card{background:#fff;box-shadow:0 16px 46px rgb
 .s7-time-fields span{font-size:11px;color:var(--muted)}
 .s7-allocation-preview{border:1px solid var(--border);border-radius:11px;padding:11px 13px;background:var(--surface2);font-size:12px;display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap}
 .s7-allocation-preview strong{font-variant-numeric:tabular-nums;font-size:15px}
+
+/* Edição de totais da sessão: somente minutos, sem confundir com pausa atual. */
+.s7-total-original{display:flex;flex-wrap:wrap;gap:8px 18px;border:1px solid var(--border);background:var(--surface2);border-radius:12px;padding:12px;font-size:12px}
+.s7-total-original span{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.s7-total-input{display:flex;align-items:center;gap:10px}
+.s7-total-input input{width:100%;min-width:0;max-width:170px;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.s7-total-input span{font-size:12px;color:var(--muted)}
