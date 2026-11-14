@@ -97,7 +97,17 @@ function alarmSound(which){
   if(!data)return;
   try{
    const audio=new Audio(data);
-   audio.loop=!!loop;
+   // Não utilizar loop nativo infinito quando há limite de inatividade:
+   // assim, mesmo que o navegador suspenda temporariamente timers, o áudio
+   // para no fim do ciclo em vez de tocar durante horas.
+   const bounded=alarmIdleLimit()>0;
+   audio.loop=!!loop&&!bounded;
+   if(loop&&bounded)audio.addEventListener("ended",()=>{
+    if(alarmAudio!==audio)return;
+    const active=activeAlarm(),limit=alarmIdleLimit();
+    if(!active||active.silenced||!limit||clock()-Math.max(Number(active.raisedAt)||0,Number(active.lastInteractionAt)||0)>=limit){autoSilenceAlarm();return;}
+    try{audio.currentTime=0;audio.play()?.catch(()=>{});}catch{}
+   });
    audio.volume=Math.max(0,Math.min(1,Number(settings().volume)/100));
    alarmAudio=audio;
    const playing=audio.play();
