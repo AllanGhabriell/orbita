@@ -7,13 +7,13 @@ const root=C.state;
 const timing=root.timing&&typeof root.timing==="object"?root.timing:(root.timing={});
 if(!timing.records||typeof timing.records!=="object"||Array.isArray(timing.records))timing.records={};
 if(!timing.settings||typeof timing.settings!=="object")timing.settings={};
-const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"orbita",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true};
+const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"orbita",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true,alarmIdleMinutes:15,inactivityWarningMinutes:60};
 for(const [k,v] of Object.entries(defaults))if(timing.settings[k]===undefined)timing.settings[k]=v;
 if(!timing.active||typeof timing.active!=="object")timing.active=null;
 const E=C.esc,A=C.attr, $=id=>document.getElementById(id);
 const clock=()=>Date.now();
 const titleBase=document.title;
-let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null,demoAlarm=null;
+let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null,demoAlarm=null,activityAt=clock(),inactivityPrompt=false,alarmTimeout=null;
 const uploadBusy={finish:false,pause:false},presetSound="./assets/orbita-alarm.wav";
 const iconLink=document.querySelector('link[rel="icon"]'),originalIcon=iconLink?.getAttribute("href")||"./assets/orbita.svg";
 const alarmIcon="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#201535"/><path d="M17 45c5-5 6-10 6-19 0-13 18-13 18 0 0 9 1 14 6 19H17zm10 6h10" stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" fill="none"/><circle cx="48" cy="15" r="9" fill="#f05f73"/></svg>');
@@ -62,6 +62,29 @@ function stopAlarmAudio(){
  if(alarmAudio){try{alarmAudio.pause();alarmAudio.currentTime=0;}catch{}alarmAudio=null;}
  if(alarmSource){try{alarmSource.stop();alarmSource.disconnect();}catch{}alarmSource=null;}
  if(alarmGain){try{alarmGain.disconnect();}catch{}alarmGain=null;}
+}
+function alarmIdleLimit(){return Math.max(0,Number(settings().alarmIdleMinutes)||0)*60000;}
+function stopAlarmTimeout(){if(alarmTimeout!==null){clearTimeout(alarmTimeout);alarmTimeout=null;}}
+function autoSilenceAlarm(){
+ const a=activeAlarm(),limit=alarmIdleLimit();
+ if(!a||a.silenced||!limit)return false;
+ const reference=Math.max(Number(a.raisedAt)||0,Number(a.lastInteractionAt)||0);
+ if(clock()-reference<limit)return false;
+ stopAlarmAudio();stopAlarmTimeout();a.silenced=true;a.autoSilenced=true;
+ if(!a.demo)persist();
+ renderAlarm();return true;
+}
+function scheduleAlarmTimeout(){
+ stopAlarmTimeout();
+ const a=activeAlarm(),limit=alarmIdleLimit();
+ if(!a||a.silenced||!limit)return;
+ const reference=Math.max(Number(a.raisedAt)||clock(),Number(a.lastInteractionAt)||0);
+ alarmTimeout=setTimeout(()=>{alarmTimeout=null;if(!autoSilenceAlarm())scheduleAlarmTimeout();},Math.max(0,limit-(clock()-reference))+10);
+}
+function noteActivity(){
+ activityAt=clock();inactivityPrompt=false;
+ const a=activeAlarm();
+ if(a&&!a.silenced){a.lastInteractionAt=activityAt;if(!a.demo)persist();scheduleAlarmTimeout();}
 }
 function alarmSound(which){
  const key=which==="pause"?"pauseSound":"finishSound";
@@ -161,28 +184,28 @@ function renderAlarm(){
  host.innerHTML='<section class="s7-alarm-card '+(isPause?"s7-alarm-pause":"s7-alarm-finish")+'" role="alertdialog" aria-label="'+A(title)+'" aria-describedby="s7-alarm-desc">'+
  '<div class="s7-alarm-header"><span class="s7-alarm-symbol" aria-hidden="true">'+(isPause?"◷":"◉")+'</span><div><small>'+E(name)+'</small><h2>'+E(title)+'</h2></div><button type="button" class="s7-alarm-close" data-s7="alarmDismiss" aria-label="Dispensar aviso">×</button></div>'+
  '<p id="s7-alarm-desc">'+E(a.message)+'</p><div class="s7-alarm-actions">'+silence+actions+'</div>'+
- (a.silenced?'<small class="s7-alarm-note">Som silenciado.</small>':"")+'</section>';
+ (a.silenced?'<small class="s7-alarm-note">'+(a.autoSilenced?"Som desligado automaticamente por inatividade. O cronômetro não foi alterado.":"Som silenciado.")+'</small>':"")+'</section>';
  updateTabIndicator();
 }
 function dismissAlarm(){
- stopAlarmAudio();
+ stopAlarmAudio();stopAlarmTimeout();
  if(demoAlarm)demoAlarm=null;
  else if(timing.alarm){timing.alarm=null;persist();}
  renderAlarm();
 }
 function silenceAlarm(){
  const a=activeAlarm();if(!a)return;
- stopAlarmAudio();a.silenced=true;if(!a.demo)persist();renderAlarm();
+ stopAlarmAudio();stopAlarmTimeout();a.silenced=true;if(!a.demo)persist();renderAlarm();
 }
 function replayAlarm(){
  const a=activeAlarm();if(!a)return;
- audioUnlock();a.silenced=false;if(!a.demo)persist();renderAlarm();alarmSound(a.which);
+ audioUnlock();a.silenced=false;a.autoSilenced=false;a.lastInteractionAt=clock();if(!a.demo)persist();renderAlarm();alarmSound(a.which);scheduleAlarmTimeout();
 }
 function showDemoAlarm(which="test"){
  if(timing.alarm){C.notify("Há um alarme real em andamento. Resolva-o antes de testar.");return;}
  audioUnlock();stopAlarmAudio();
  demoAlarm={demo:true,which:which==="pause"?"pause":"test",message:which==="pause"?"Exemplo de pausa prolongada.":"Teste de som e notificação. Nenhuma sessão será alterada.",silenced:false,raisedAt:clock()};
- renderAlarm();alarmSound(demoAlarm.which);
+ renderAlarm();alarmSound(demoAlarm.which);scheduleAlarmTimeout();
  if(!settings().desktopNotifications||window.Notification?.permission!=="granted"){
   C.notify("Aviso ativado no Órbita. Ative as notificações do dispositivo para receber também no Windows ou Android.");
  }else void systemNotification("test","Teste do alarme do Órbita.").then(ok=>{
@@ -197,10 +220,10 @@ function alertUser(message,which){
  if(!timing.active)return;
  if(timing.alarm&&timing.alarm.sessionId===timing.active.sessionId&&timing.alarm.which===which)return;
  demoAlarm=null;stopAlarmAudio();
- timing.alarm={sessionId:timing.active.sessionId,which,message,raisedAt:clock(),silenced:false};
+ timing.alarm={sessionId:timing.active.sessionId,which,message,raisedAt:clock(),silenced:false,lastInteractionAt:0};
  persist();renderAlarm();
  if(which==="finish")visualAlert();
- alarmSound(which);
+ alarmSound(which);scheduleAlarmTimeout();
  void systemNotification(which,message);
 }
 function makeRecord(x){
@@ -306,13 +329,64 @@ function correctRestMinutes(minutes,seconds=0){
  if(timing.alarm?.which==="pause")dismissAlarm();
  persist();C.closeModal();C.render();tick();C.notify("Pausa corrigida: "+duration(restMs)+" de descanso e "+duration(studyAdded)+" transferidos para estudo.");
 }
+function allocationMs(minutes,seconds,label){
+ const min=Number(minutes),sec=Number(seconds);
+ if(!Number.isInteger(min)||min<0||!Number.isInteger(sec)||sec<0||sec>59)throw Error("Confira minutos e segundos de "+label+".");
+ return min*60000+sec*1000;
+}
+function allocationRemaining(elapsed,study,rest){
+ if(study<0||rest<0||study+rest>elapsed)throw Error("Estudo e descanso não podem ultrapassar o período registrado.");
+ return elapsed-study-rest;
+}
+function reallocateCurrent(studyMinutes,studySeconds,restMinutes,restSeconds,nextPhase){
+ const a=timing.active,r=activeRecord(),at=clock();
+ if(!a||!r)throw Error("Não há cronômetro ativo.");
+ const x=session(a.sessionId);
+ if(!x||V?.isClosed?.(x.date)||root.evolution?.closed?.[x.date])throw Error("O dia já foi finalizado.");
+ if(!["running","paused"].includes(nextPhase))throw Error("Escolha se o cronômetro continuará estudando ou pausado.");
+ const elapsed=Math.max(0,at-a.since),studying=allocationMs(studyMinutes,studySeconds,"estudo"),resting=allocationMs(restMinutes,restSeconds,"descanso");
+ const ignored=allocationRemaining(elapsed,studying,resting);
+ const p=a.phase==="paused"?r.pauses?.at(-1):null;
+ if(a.phase==="paused"&&(!p||p.endedAt!==null))throw Error("A pausa atual não foi encontrada.");
+ snapshotUndo([a.sessionId]);
+ if(a.phase==="paused"){
+  if(resting===0)r.pauses.pop();
+  else{p.endedAt=p.startedAt+resting;p.corrected=true;p.allocationOnly=true;}
+ }else if(resting>0){
+  const start=a.since+studying;
+  r.pauses.push({startedAt:start,endedAt:start+resting,kind:"rest",corrected:true,allocationOnly:true});
+ }
+ r.studyMs=(Number(r.studyMs)||0)+studying;
+ r.pauseMs=(Number(r.pauseMs)||0)+resting;
+ r.unaccountedMs=(Number(r.unaccountedMs)||0)+ignored;
+ r.corrections||(r.corrections=[]);
+ r.corrections.push({type:"time_reallocated",registeredAt:at,phaseBefore:a.phase,phaseAfter:nextPhase,elapsedMs:elapsed,studyMs:studying,restMs:resting,unaccountedMs:ignored});
+ if(nextPhase==="paused")r.pauses.push({startedAt:at,endedAt:null,kind:"rest",corrected:true});
+ timing.active={sessionId:a.sessionId,phase:nextPhase,since:at,alertIndex:0};
+ if(timing.alarm)dismissAlarm();
+ persist();C.closeModal();C.render();tick();
+ C.notify("Período corrigido. Estudo: "+fmtMs(studying)+"; descanso: "+fmtMs(resting)+"; desconsiderado: "+fmtMs(ignored)+".");
+}
 function correctModal(){
  const a=timing.active;if(!a)return;
- const inputTime=new Date(clock()-60000);
+ const elapsed=Math.max(0,clock()-a.since),maxMin=Math.floor(elapsed/60000);
+ const m=ms=>Math.floor(ms/60000),sec=ms=>Math.floor(ms%60000/1000);
+ const studying=a.phase==="running"?elapsed:0,resting=a.phase==="paused"?elapsed:0;
  const localIso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
- const message=a.phase==="paused"?"Retomei o estudo antes de clicar no botão":"Parei de estudar antes de clicar em Pausar";
- C.openModal("Corrigir horário do cronômetro",'<div class="section-stack">'+(a.phase==="paused"?'<form id="s7-correct-rest" class="section-stack"><p class="note">Pausa registrada até agora: <strong>'+E(duration(clock()-a.since))+'</strong>. Quanto tempo você realmente descansou? O restante será contado como estudo, e o cronômetro voltará a contar.</p><div class="form-grid"><div class="field"><label>Minutos de descanso</label><input name="minutes" type="number" min="0" max="'+Math.floor((clock()-a.since)/60000)+'" step="1" required value="0"></div><div class="field"><label>Segundos</label><input name="seconds" type="number" min="0" max="59" step="1" required value="0"></div></div><button type="submit" class="btn primary">Aplicar correção simples</button></form>':"")+'<details><summary>Correção avançada por data e horário</summary><form id="s7-correction-form" class="section-stack"><p class="note">'+E(message)+'. Informe quando a mudança realmente aconteceu. A correção fica registrada.</p><div class="field"><label>Horário verdadeiro</label><input name="moment" type="datetime-local" required min="'+A(localIso(new Date(a.since)))+'" max="'+A(localIso(new Date()))+'" value="'+A(localIso(inputTime.getTime()<a.since?new Date(a.since):inputTime))+'"></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Corrigir horário</button></div></form></details></div>');
+ const inputTime=new Date(clock()-60000),message=a.phase==="paused"?"Retomei o estudo antes de clicar no botão":"Parei de estudar antes de clicar em Pausar";
+ const durationInputs=(key,label,ms)=>'<div class="field"><label>'+label+'</label><div class="s7-time-fields"><input name="'+key+'Min" type="number" inputmode="numeric" min="0" max="'+(maxMin+1)+'" step="1" required value="'+m(ms)+'" aria-label="'+label+' em minutos"><span>min</span><input name="'+key+'Sec" type="number" inputmode="numeric" min="0" max="59" step="1" required value="'+sec(ms)+'" aria-label="'+label+' em segundos"><span>seg</span></div></div>';
+ C.openModal("Corrigir tempo do cronômetro",'<div class="section-stack"><form id="s7-reallocate-form" class="section-stack"><p class="note">Período atual: <strong>'+E(fmtMs(elapsed))+'</strong> marcado como '+(a.phase==="paused"?"pausa":"estudo")+'. Informe o que aconteceu de verdade. O restante ficará desconsiderado, sem virar estudo ou descanso automaticamente.</p><input name="elapsed" type="hidden" value="'+elapsed+'"><div class="form-grid">'+durationInputs("study","Estudo real",studying)+durationInputs("rest","Descanso real",resting)+'</div><div class="s7-allocation-preview" role="status" aria-live="polite">Tempo não contabilizado: <strong data-s7-allocation-left>'+E(fmtMs(0))+'</strong></div><div class="field"><label>Depois da correção, continuar</label><select name="nextPhase"><option value="running" '+(a.phase==="running"?"selected":"")+'>Estudando</option><option value="paused" '+(a.phase==="paused"?"selected":"")+'>Pausado</option></select></div><p class="note">O histórico anterior será preservado. Você poderá desfazer esta correção por 60 segundos.</p><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar correção</button></div></form><details><summary>Correção avançada por data e horário</summary><form id="s7-correction-form" class="section-stack"><p class="note">'+E(message)+'. Informe quando a mudança realmente aconteceu.</p><div class="field"><label>Horário verdadeiro</label><input name="moment" type="datetime-local" required min="'+A(localIso(new Date(a.since)))+'" max="'+A(localIso(new Date()))+'" value="'+A(localIso(inputTime.getTime()<a.since?new Date(a.since):inputTime))+'"></div><button type="submit" class="btn primary">Corrigir horário</button></form></details></div>');
 }
+function updateAllocationPreview(form){
+ if(!form||form.getAttribute?.("id")!=="s7-reallocate-form")return;
+ const d=new FormData(form),label=form.querySelector?.("[data-s7-allocation-left]");
+ if(!label)return;
+ try{
+  const elapsed=Number(d.get("elapsed")),study=allocationMs(d.get("studyMin"),d.get("studySec"),"estudo"),rest=allocationMs(d.get("restMin"),d.get("restSec"),"descanso");
+  label.textContent=fmtMs(allocationRemaining(elapsed,study,rest));
+ }catch{label.textContent="Confira os valores";}
+}
+
 function askFinish(done){
  const a=timing.active;if(!a)return;
  if(!window.confirm(done?"Concluir a sessão e avançar o ciclo, quando aplicável?":"Encerrar e salvar o tempo parcial sem avançar o ciclo?"))return;
