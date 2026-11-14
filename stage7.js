@@ -654,11 +654,11 @@ function ring(){
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span></div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
- (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
+ (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")<button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<button class="btn primary" data-s7="resume">▶ Retomar estudo</button><div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
- '<button class="btn ghost small" data-s7="correct">Corrigir horário esquecido</button><div class="row"><button class="btn small ghost" data-s7="partial">Encerrar parcial</button><button class="btn small" data-s7="finish">Finalizar como concluído</button></div></div></div>'+
+ '<button class="btn ghost small" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")<div class="row"><button class="btn small ghost" data-s7="partial">Encerrar parcial</button><button class="btn small" data-s7="finish">Finalizar como concluído</button></div></div></div>'+
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
- '<p class="note">O estudo só é contado enquanto o cronômetro estiver ativo. Ajuste manualmente se esquecer de pausar ou retomar.</p></section>';
+ '<p class="note">O estudo e as pausas podem ser corrigidos em minutos e segundos. Tempo desconsiderado não conta como estudo.</p></section>';
 }
 function homeButtons(id){
  const x=session(id);
@@ -737,6 +737,7 @@ function settingsPanel(){
  s7SettingRow("Bloco personalizado",number("blockMin",q.blockMin,1,180,"min"))+
  s7SettingRow("Descanso personalizado",number("restMin",q.restMin,1,90,"min"))+
  s7SettingRow("Avisar pausa prolongada",number("pauseMinutes",q.pauseMinutes,0,240,"min"),"0 para desativar")+
+ s7SettingRow("Verificar possível esquecimento",'<select id="s7-setting-inactivityWarningMinutes" aria-label="Aviso de possível esquecimento">'+[["0","Desativado"],["30","30 minutos"],["60","1 hora (padrão)"],["120","2 horas"]].map(([v,t])=>option(v,t,String(q.inactivityWarningMinutes))).join("")+'</select>',"Aviso discreto: não pausa nem encerra o estudo")+
  s7SettingRow("Repetir lembrete",s7Switch("s7-setting-repeatPause",q.repeatPause,"Repetir lembrete de pausa"))+
  '</section>'+
  '<section class="s7-setting-group" aria-labelledby="s7-sound-heading">'+
@@ -745,6 +746,7 @@ function settingsPanel(){
  s7SettingRow("Som de pausa",'<select id="s7-setting-pauseSound" aria-label="Som de pausa">'+soundOptions(q.pauseSound)+'</select>')+
  s7SettingRow("Repetir som de conclusão",s7Switch("s7-setting-loopFinish",q.loopFinish,"Repetir som de conclusão"))+
  s7SettingRow("Repetir som de pausa",s7Switch("s7-setting-loopPause",q.loopPause,"Repetir som de pausa"))+
+ s7SettingRow("Desligar som por inatividade",'<select id="s7-setting-alarmIdleMinutes" aria-label="Tempo até desligar alarme">'+[["0","Não desligar automaticamente"],["5","5 minutos"],["10","10 minutos"],["15","15 minutos (padrão)"],["30","30 minutos"]].map(([v,t])=>option(v,t,String(q.alarmIdleMinutes))).join("")+'</select>',"O som é silenciado; a sessão e a pausa continuam")+
  s7SettingRow("Áudio próprio · conclusão",s7AudioPicker("finish","áudio de conclusão"),"Recorte e compressão automáticos","s7-setting-row-file")+
  s7SettingRow("Áudio próprio · pausa",s7AudioPicker("pause","áudio de pausa"),"Até 5 segundos de áudio salvo","s7-setting-row-file")+
  s7SettingRow("Volume",'<div class="s7-volume"><span aria-hidden="true">♪</span><input id="s7-setting-volume" aria-label="Volume do alarme" type="range" min="0" max="100" value="'+Number(q.volume)+'"></div>')+
@@ -759,6 +761,7 @@ function settingsPanel(){
  '</div></section>';
 }
 function tick(){
+ autoSilenceAlarm();
  const a=timing.active,r=activeRecord();
  if(!a||!r){updateTabIndicator();return;}
  const x=session(a.sessionId),studied=studyMs(r),paused=pauseMs(r),goal=Math.max(1,Number(r.goalMin)||90)*60000;
@@ -773,6 +776,9 @@ function tick(){
  const pauseLeft=document.querySelector('[data-s7-el="pauseLeft"]'),currentPause=r.pauses.at(-1);
  if(pauseLeft&&a.phase==="paused"&&currentPause?.plannedMinutes)pauseLeft.textContent=fmtMs(Math.max(0,currentPause.plannedMinutes*60000-(clock()-a.since)));
  if(!r.goalNotified&&studied>=goal){r.goalNotified=true;persist();alertUser("Você alcançou a meta de estudo. Pode continuar ou finalizar a sessão.","finish");}
+ if(a.phase==="running"&&!inactivityPrompt&&Number(settings().inactivityWarningMinutes)>0&&clock()-activityAt>=Number(settings().inactivityWarningMinutes)*60000){
+  inactivityPrompt=true;C.notify("O cronômetro continua estudando. Se esqueceu de pausar, use Corrigir tempo do cronômetro. Nenhum tempo foi alterado.");
+ }
  if(a.phase==="running"&&!r.overtimeWarned&&studied>=goal+120*60000){r.overtimeWarned=true;persist();C.notify("O cronômetro está ativo há muito tempo. Se esqueceu de pausar, utilize Corrigir horário.");}
  if(a.phase==="paused"){
   const pp=r.pauses.at(-1);
@@ -847,7 +853,7 @@ async function upload(which,file){
   if(current&&current.textContent==="Preparando áudio...")current.textContent="Selecione outro arquivo para tentar novamente.";
  }
 }
-const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100]};
+const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100],alarmIdleMinutes:[0,30],inactivityWarningMinutes:[0,120]};
 const strings={mode:["continuous","pomodoro","custom"],finishSound:["orbita","bell","digital","soft","custom","none"],pauseSound:["orbita","bell","digital","soft","custom","none"]};
 // Evita dupla contabilização se a pessoa tentar concluir/registrar a sessão com o timer ainda aberto.
 document.addEventListener("click",e=>{
@@ -902,18 +908,21 @@ document.addEventListener("click",e=>{
 document.addEventListener("submit",e=>{
  // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
  const id=e.target?.getAttribute?.("id")||e.target?.id;
- if(!["s7-correction-form","s7-correct-rest","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
+ if(!["s7-correction-form","s7-correct-rest","s7-reallocate-form","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
  const data=new FormData(e.target);
  try{
   if(id==="s7-correction-form")correction(new Date(data.get("moment")).getTime());
   else if(id==="s7-correct-rest")correctRestMinutes(data.get("minutes"),data.get("seconds"));
+  else if(id==="s7-reallocate-form")reallocateCurrent(data.get("studyMin"),data.get("studySec"),data.get("restMin"),data.get("restSec"),String(data.get("nextPhase")||"running"));
    else if(id==="s7-timed-pause-form")startTimedPause(data.get("minutes"),data.get("reason"));
   else if(id==="s7-edit-totals")editTotals(String(data.get("id")),Number(data.get("study")),Number(data.get("paused")),String(data.get("reason")||""));
   else if(id==="s7-edit-pause")editPause(String(data.get("id")),Number(data.get("index")),new Date(data.get("start")).getTime(),new Date(data.get("end")).getTime(),String(data.get("kind")));
   else if(id==="s7-move-record")moveRecord(String(data.get("id")),String(data.get("target")),data.get("operation")==="split",Number(data.get("minutes")));
  }catch(err){C.notify(err.message||"Confira os valores informados.");}
 });
+document.addEventListener("input",e=>{if(e.target?.closest?.("#s7-reallocate-form"))updateAllocationPreview(e.target.closest("#s7-reallocate-form"));});
+for(const type of ["pointerdown","keydown","touchstart"]){document.addEventListener(type,noteActivity,{passive:true});}
 document.addEventListener("change",e=>{
  const el=e.target;if(!el)return;
  if(el.id==="s7-current-kind"){changePause(el.value);return;}
@@ -928,7 +937,10 @@ document.addEventListener("change",e=>{
  if(key in numeric){
   const n=Number(el.value),[min,max]=numeric[key];
   if(!Number.isFinite(n)||n<min||n>max)return C.notify("Valor inválido.");
+  if(key==="alarmIdleMinutes"&&![0,5,10,15,30].includes(n)||key==="inactivityWarningMinutes"&&![0,30,60,120].includes(n))return C.notify("Escolha um dos intervalos disponíveis.");
   settings()[key]=n;
+  if(key==="alarmIdleMinutes"){if(!autoSilenceAlarm())scheduleAlarmTimeout();}
+  if(key==="inactivityWarningMinutes")inactivityPrompt=false;
  }else if(key in strings){
   if(!strings[key].includes(el.value))return;
   settings()[key]=el.value;
@@ -936,9 +948,9 @@ document.addEventListener("change",e=>{
  else return;
  persist();C.render();
 });
-document.addEventListener("visibilitychange",tick);
+document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
-C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced)alarmSound(timing.alarm.which);tick();
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
