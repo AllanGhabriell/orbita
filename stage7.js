@@ -389,24 +389,66 @@ function reallocateCurrent(studyMinutes,studySeconds,restMinutes,restSeconds,nex
  persist();C.closeModal();C.render();tick();
  C.notify("Período corrigido. Estudo: "+fmtMs(studying)+"; descanso: "+fmtMs(resting)+"; desconsiderado: "+fmtMs(ignored)+".");
 }
-function correctModal(){
- const a=timing.active;if(!a)return;
- const elapsed=Math.max(0,clock()-a.since),maxMin=Math.floor(elapsed/60000);
- const m=ms=>Math.floor(ms/60000),sec=ms=>Math.floor(ms%60000/1000);
- const studying=a.phase==="running"?elapsed:0,resting=a.phase==="paused"?elapsed:0;
- const localIso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
- const inputTime=new Date(clock()-60000),message=a.phase==="paused"?"Retomei o estudo antes de clicar no botão":"Parei de estudar antes de clicar em Pausar";
- const durationInputs=(key,label,ms)=>'<div class="field"><label>'+label+'</label><div class="s7-time-fields"><input name="'+key+'Min" type="number" inputmode="numeric" min="0" max="'+(maxMin+1)+'" step="1" required value="'+m(ms)+'" aria-label="'+label+' em minutos"><span>min</span><input name="'+key+'Sec" type="number" inputmode="numeric" min="0" max="59" step="1" required value="'+sec(ms)+'" aria-label="'+label+' em segundos"><span>seg</span></div></div>';
- C.openModal("Corrigir tempo do cronômetro",'<div class="section-stack"><form id="s7-reallocate-form" class="section-stack"><p class="note">Período atual: <strong>'+E(fmtMs(elapsed))+'</strong> marcado como '+(a.phase==="paused"?"pausa":"estudo")+'. Informe o que aconteceu de verdade. O restante ficará desconsiderado, sem virar estudo ou descanso automaticamente.</p><input name="elapsed" type="hidden" value="'+elapsed+'"><div class="form-grid">'+durationInputs("study","Estudo real",studying)+durationInputs("rest","Descanso real",resting)+'</div><div class="s7-allocation-preview" role="status" aria-live="polite">Tempo não contabilizado: <strong data-s7-allocation-left>'+E(fmtMs(0))+'</strong></div><div class="field"><label>Depois da correção, continuar</label><select name="nextPhase"><option value="running" '+(a.phase==="running"?"selected":"")+'>Estudando</option><option value="paused" '+(a.phase==="paused"?"selected":"")+'>Pausado</option></select></div><p class="note">O histórico anterior será preservado. Você poderá desfazer esta correção por 60 segundos.</p><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar correção</button></div></form><details><summary>Correção avançada por data e horário</summary><form id="s7-correction-form" class="section-stack"><p class="note">'+E(message)+'. Informe quando a mudança realmente aconteceu.</p><div class="field"><label>Horário verdadeiro</label><input name="moment" type="datetime-local" required min="'+A(localIso(new Date(a.since)))+'" max="'+A(localIso(new Date()))+'" value="'+A(localIso(inputTime.getTime()<a.since?new Date(a.since):inputTime))+'"></div><button type="submit" class="btn primary">Corrigir horário</button></form></details></div>');
+// Corrige os totais de toda a sessão, não apenas o último segmento.
+function correctSessionTotals(studyMinutes,restMinutes,nextPhase){
+ const a=timing.active,r=activeRecord(),at=clock();
+ if(!a||!r)throw Error("Não há cronômetro ativo.");
+ const x=session(a.sessionId);
+ if(!x||V?.isClosed?.(x.date)||root.evolution?.closed?.[x.date])throw Error("Este dia já está finalizado.");
+ if(!["running","paused"].includes(nextPhase))throw Error("Escolha como continuar o cronômetro.");
+ const study=Number(studyMinutes),rest=Number(restMinutes);
+ if(!Number.isInteger(study)||study<0||!Number.isInteger(rest)||rest<0)throw Error("Informe apenas minutos inteiros, sem valores negativos.");
+ const beforeStudy=studyMs(r,at),beforeRest=pauseMs(r,at),beforeIgnored=Math.max(0,Number(r.unaccountedMs)||0);
+ const beforeTotal=beforeStudy+beforeRest+beforeIgnored;
+ const newTotal=(study+rest)*60000;
+ // A interface arredonda os minutos: até 59s de diferença são tolerados.
+ if(newTotal>beforeTotal+59999)throw Error("Os minutos informados ultrapassam o tempo total desta sessão.");
+ if(study>10080||rest>10080)throw Error("O máximo permitido é 10.080 minutos por categoria.");
+ const latest=a.phase==="paused"?r.pauses?.at(-1):null;
+ if(a.phase==="paused"&&(!latest||latest.endedAt!==null))throw Error("Não foi possível localizar a pausa atual.");
+ snapshotUndo([a.sessionId]);
+ // Conserva os registros originais das pausas para auditoria; a correção manual
+ // altera os totais oficiais, sem inventar intervalos retrospectivos.
+ if(latest){latest.endedAt=at;latest.closedByTotalCorrection=true;}
+ r.studyMs=study*60000;
+ r.pauseMs=rest*60000;
+ r.unaccountedMs=Math.max(0,beforeTotal-newTotal);
+ r.corrections||(r.corrections=[]);
+ r.corrections.push({type:"session_totals_corrected",registeredAt:at,before:{studyMs:beforeStudy,pauseMs:beforeRest,unaccountedMs:beforeIgnored},after:{studyMs:r.studyMs,pauseMs:r.pauseMs,unaccountedMs:r.unaccountedMs},phaseBefore:a.phase,phaseAfter:nextPhase});
+ if(nextPhase==="paused")r.pauses.push({startedAt:at,endedAt:null,kind:latest?.kind||"rest",corrected:true});
+ timing.active={sessionId:a.sessionId,phase:nextPhase,since:at,alertIndex:0};
+ if(timing.alarm)dismissAlarm();
+ persist();C.closeModal();C.render();tick();
+ C.notify("Totais corrigidos: "+study+" min estudados, "+rest+" min de descanso. O restante foi desconsiderado.");
 }
-function updateAllocationPreview(form){
- if(!form||form.getAttribute?.("id")!=="s7-reallocate-form")return;
- const d=new FormData(form),label=form.querySelector?.("[data-s7-allocation-left]");
- if(!label)return;
- try{
-  const elapsed=Number(d.get("elapsed")),study=allocationMs(d.get("studyMin"),d.get("studySec"),"estudo"),rest=allocationMs(d.get("restMin"),d.get("restSec"),"descanso");
-  label.textContent=fmtMs(allocationRemaining(elapsed,study,rest));
- }catch{label.textContent="Confira os valores";}
+function correctModal(){
+ const a=timing.active,r=activeRecord();if(!a||!r)return;
+ const at=clock(),totalStudy=studyMs(r,at),totalRest=pauseMs(r,at),ignored=Math.max(0,Number(r.unaccountedMs)||0);
+ const tracked=totalStudy+totalRest+ignored;
+ const maxMinutes=Math.max(1,Math.ceil(tracked/60000));
+ const localIso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ const inputTime=new Date(at-60000),message=a.phase==="paused"?"Retomei o estudo antes de clicar no botão":"Parei de estudar antes de clicar em Pausar";
+ C.openModal("Corrigir tempo do cronômetro",'<div class="section-stack">'+
+ '<form id="s7-correct-totals" class="section-stack">'+
+ '<p class="note">Corrija os <strong>totais de toda a sessão</strong>, não apenas a pausa atual. Mesmo que você tenha acabado de pausar, pode corrigir horas de estudo acumuladas.</p>'+
+ '<div class="s7-total-original"><span>Estudo contado: <strong>'+E(duration(totalStudy))+'</strong></span><span>Descanso contado: <strong>'+E(duration(totalRest))+'</strong></span></div>'+
+ '<input type="hidden" name="trackedMinutes" value="'+(tracked/60000)+'">'+
+ '<div class="form-grid">'+
+ '<div class="field"><label>Quanto você realmente estudou?</label><div class="s7-total-input"><input name="studyMinutes" type="number" inputmode="numeric" min="0" max="'+maxMinutes+'" step="1" value="'+Math.round(totalStudy/60000)+'" required><span>minutos</span></div></div>'+
+ '<div class="field"><label>Quanto tempo descansou?</label><div class="s7-total-input"><input name="restMinutes" type="number" inputmode="numeric" min="0" max="'+maxMinutes+'" step="1" value="'+Math.round(totalRest/60000)+'" required><span>minutos</span></div></div></div>'+
+ '<div class="s7-allocation-preview" role="status" aria-live="polite">Tempo desconsiderado: <strong data-s7-total-left>'+Math.max(0,Math.round((tracked-totalStudy-totalRest)/60000))+' min</strong></div>'+
+ '<div class="field"><label>Após salvar, continuar</label><select name="nextPhase"><option value="running" '+(a.phase==="running"?"selected":"")+'>Estudando</option><option value="paused" '+(a.phase==="paused"?"selected":"")+'>Pausado</option></select></div>'+
+ '<p class="note">Os totais corrigidos serão usados no estudo e no histórico. A correção fica registrada e pode ser desfeita em até 60 segundos.</p>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar correção</button></div></form>'+
+ '<details><summary>Correção avançada por data e horário</summary><form id="s7-correction-form" class="section-stack"><p class="note">'+E(message)+'. Informe quando a mudança realmente aconteceu.</p><div class="field"><label>Horário verdadeiro</label><input name="moment" type="datetime-local" required min="'+A(localIso(new Date(a.since)))+'" max="'+A(localIso(new Date(at)))+'" value="'+A(localIso(inputTime.getTime()<a.since?new Date(a.since):inputTime))+'"></div><button type="submit" class="btn primary">Corrigir horário</button></form></details></div>');
+}
+function updateTotalsPreview(form){
+ if(!form||form.getAttribute?.("id")!=="s7-correct-totals")return;
+ const data=new FormData(form),target=form.querySelector?.("[data-s7-total-left]");
+ if(!target)return;
+ const study=Number(data.get("studyMinutes")),rest=Number(data.get("restMinutes")),tracked=Number(data.get("trackedMinutes"));
+ if(!Number.isInteger(study)||!Number.isInteger(rest)||study<0||rest<0||study+rest>tracked+0.9999833){target.textContent="Confira os valores";return;}
+ target.textContent=Math.max(0,Math.round(tracked-study-rest))+" min";
 }
 
 function askFinish(done){
@@ -930,20 +972,21 @@ document.addEventListener("click",e=>{
 document.addEventListener("submit",e=>{
  // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
  const id=e.target?.getAttribute?.("id")||e.target?.id;
- if(!["s7-correction-form","s7-correct-rest","s7-reallocate-form","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
+ if(!["s7-correction-form","s7-correct-rest","s7-reallocate-form","s7-correct-totals","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
  const data=new FormData(e.target);
  try{
   if(id==="s7-correction-form")correction(new Date(data.get("moment")).getTime());
   else if(id==="s7-correct-rest")correctRestMinutes(data.get("minutes"),data.get("seconds"));
   else if(id==="s7-reallocate-form")reallocateCurrent(data.get("studyMin"),data.get("studySec"),data.get("restMin"),data.get("restSec"),String(data.get("nextPhase")||"running"));
+  else if(id==="s7-correct-totals")correctSessionTotals(data.get("studyMinutes"),data.get("restMinutes"),String(data.get("nextPhase")||"running"));
    else if(id==="s7-timed-pause-form")startTimedPause(data.get("minutes"),data.get("reason"));
   else if(id==="s7-edit-totals")editTotals(String(data.get("id")),Number(data.get("study")),Number(data.get("paused")),String(data.get("reason")||""));
   else if(id==="s7-edit-pause")editPause(String(data.get("id")),Number(data.get("index")),new Date(data.get("start")).getTime(),new Date(data.get("end")).getTime(),String(data.get("kind")));
   else if(id==="s7-move-record")moveRecord(String(data.get("id")),String(data.get("target")),data.get("operation")==="split",Number(data.get("minutes")));
  }catch(err){C.notify(err.message||"Confira os valores informados.");}
 });
-document.addEventListener("input",e=>{if(e.target?.closest?.("#s7-reallocate-form"))updateAllocationPreview(e.target.closest("#s7-reallocate-form"));});
+document.addEventListener("input",e=>{if(e.target?.closest?.("#s7-correct-totals"))updateTotalsPreview(e.target.closest("#s7-correct-totals"));});
 for(const type of ["pointerdown","keydown","touchstart"]){document.addEventListener(type,noteActivity,{passive:true});}
 document.addEventListener("change",e=>{
  const el=e.target;if(!el)return;
@@ -973,6 +1016,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
