@@ -80,8 +80,8 @@ test("correção de totais em estudo ativo preserva tempos e permite desfazer",(
  assert.equal(r.studyMs,90*60000);
  assert.equal(r.unaccountedMs,30*60000);
  assert.equal(h.stage.studyMs(r),90*60000);
- h.setTime(125*60000);
- assert.equal(h.stage.studyMs(r),95*60000,"a contagem prossegue normalmente");
+ h.setTime(120*60000+30000);
+ assert.equal(h.stage.studyMs(r),90*60000+30000,"a contagem prossegue normalmente");
  h.stage.undo();
  r=h.state.timing.records["math-1"];
  assert.equal(h.stage.studyMs(r),120*60000,"desfazer restaura contagem registrada");
