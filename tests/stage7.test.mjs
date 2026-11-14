@@ -99,6 +99,68 @@ test("ajuste simples não permite descanso maior que a pausa atual",()=>{
  assert.equal(h.state.timing.active.phase,"paused");
  assert.equal(h.stage.pauseMs(h.state.timing.records["math-1"]),3*60000);
 });
+test("redistribuir estudo ativo entre estudo descanso e tempo desconsiderado",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.setTime(40*60000);
+ h.stage.reallocateCurrent(15,0,10,0,"running");
+ const r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,15*60000);
+ assert.equal(r.pauseMs,10*60000);
+ assert.equal(r.unaccountedMs,15*60000);
+ assert.equal(h.state.timing.active.phase,"running");
+ assert.equal(r.corrections.at(-1).type,"time_reallocated");
+ h.setTime(50*60000);
+ assert.equal(h.stage.studyMs(r),25*60000);
+ h.stage.finish(false);
+ assert.equal(h.item.actualMin,25,"registro final considera somente estudo real");
+});
+test("redistribuir pausa preserva histórico e estado pausado",()=>{
+ const h=harness();h.stage.start("math-1");h.setTime(20*60000);
+ h.stage.pause("rest");h.setTime(30*60000);
+ h.stage.reallocateCurrent(6,0,2,0,"paused");
+ const r=h.state.timing.records["math-1"];
+ assert.equal(r.studyMs,26*60000);
+ assert.equal(r.pauseMs,2*60000);
+ assert.equal(r.unaccountedMs,2*60000);
+ assert.equal(h.state.timing.active.phase,"paused");
+ assert.equal(r.pauses.length,2,"pausa original corrigida e nova pausa aberta");
+ h.setTime(32*60000);
+ assert.equal(h.stage.pauseMs(r),4*60000);
+});
+test("não aceita redistribuir mais tempo que o registrado e permite desfazer",()=>{
+ const h=harness();h.stage.start("math-1");h.setTime(10*60000);
+ assert.throws(()=>h.stage.reallocateCurrent(11,0,0,0,"running"),/ultrapassar/);
+ assert.equal(h.stage.model.records["math-1"].studyMs,0);
+ h.stage.reallocateCurrent(5,0,2,0,"running");
+ assert.equal(h.stage.model.records["math-1"].unaccountedMs,3*60000);
+ h.stage.undo();
+ assert.equal(h.stage.model.records["math-1"].unaccountedMs||0,0);
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),10*60000);
+});
+test("alarme silencia após 15 minutos sem ação sem alterar sessão",()=>{
+ const h=harness();
+ h.stage.start("math-1");
+ h.stage.alertUser("Alarme prolongado","finish");
+ assert.equal(h.stage.model.alarm.silenced,false);
+ h.setTime(14*60000);
+ assert.equal(h.stage.autoSilenceAlarm(),false);
+ h.setTime(16*60000);
+ assert.equal(h.stage.autoSilenceAlarm(),true);
+ assert.equal(h.stage.model.alarm.silenced,true);
+ assert.equal(h.stage.model.active.phase,"running");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),16*60000);
+});
+test("interação adia desligamento do som e opção configurável modifica prazo",()=>{
+ const h=harness();h.stage.start("math-1");h.stage.alertUser("Alarme","finish");
+ h.setTime(12*60000);h.stage.noteActivity();
+ h.setTime(20*60000);assert.equal(h.stage.autoSilenceAlarm(),false);
+ h.setTime(28*60000);assert.equal(h.stage.autoSilenceAlarm(),true);
+ const second=harness();second.stage.model.settings.alarmIdleMinutes=5;
+ second.stage.start("math-1");second.stage.alertUser("Alarme","finish");
+ second.setTime(6*60000);
+ assert.equal(second.stage.autoSilenceAlarm(),true);
+});
 test("correção do horário de retomada preserva trilha de auditoria",()=>{
  const h=harness();
  h.stage.start("math-1");
