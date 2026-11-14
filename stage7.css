@@ -150,3 +150,10 @@ body[data-theme=light] .s7-alarm-card{background:#fff;box-shadow:0 16px 46px rgb
  .s7-settings .s7-notification-grid .s7-setting-row:last-child .s7-test-actions{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.s7-switch-track,.s7-switch-track:after,.s7-file-action{transition:none}}
+
+/* Correção universal de período (estudo, descanso e tempo ignorado). */
+.s7-time-fields{display:grid;grid-template-columns:minmax(48px,1fr)auto minmax(48px,1fr) auto;gap:6px;align-items:center}
+.s7-time-fields input{min-width:0;width:100%;box-sizing:border-box}
+.s7-time-fields span{font-size:11px;color:var(--muted)}
+.s7-allocation-preview{border:1px solid var(--border);border-radius:11px;padding:11px 13px;background:var(--surface2);font-size:12px;display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.s7-allocation-preview strong{font-variant-numeric:tabular-nums;font-size:15px}
