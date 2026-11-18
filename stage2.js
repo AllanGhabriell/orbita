@@ -353,7 +353,7 @@ function quickRecord(id,date,status){
  p.events.push({kind:"status_change",id,date,from:rec.status||"pending",to:status,at:new Date().toISOString()});
  save();render();notify(status==="done"?"Concluída. Você pode informar a duração real nos detalhes.":"Situação atualizada.");
 }
-let holdTimer=null,heldUntil=0;
+let holdTimer=null,heldUntil=0,holdPointer=null;
 function closeStatusMenu(){const panel=$("s2-status-menu");panel?.remove?.();}
 function quickStatusMenu(id,date,x=0,y=0){
  if(locked(date))return notify("Dia finalizado: não é possível alterar.");
@@ -456,10 +456,22 @@ document.addEventListener("pointerdown",ev=>{
  if(!b||ev.pointerType==="mouse")return;
  clearTimeout(holdTimer);
  const id=b.dataset.id,date=b.dataset.date,x=ev.clientX,y=ev.clientY;
- holdTimer=setTimeout(()=>{heldUntil=Date.now()+850;quickStatusMenu(id,date,x,y);},550);
+ holdPointer={x,y,id:ev.pointerId};
+ holdTimer=setTimeout(()=>{heldUntil=Date.now()+850;quickStatusMenu(id,date,x,y);holdTimer=null;},550);
 });
-for(const type of ["pointerup","pointercancel","pointermove"]){document.addEventListener(type,()=>{if(holdTimer!==null)clearTimeout(holdTimer);holdTimer=null;});}
+document.addEventListener("pointermove",ev=>{
+ if(!holdPointer||ev.pointerId!==holdPointer.id)return;
+ if(Math.hypot(ev.clientX-holdPointer.x,ev.clientY-holdPointer.y)>12){clearTimeout(holdTimer);holdTimer=null;holdPointer=null;}
+});
+for(const type of ["pointerup","pointercancel"]){document.addEventListener(type,()=>{if(holdTimer!==null)clearTimeout(holdTimer);holdTimer=null;holdPointer=null;});}
+document.addEventListener("keydown",ev=>{
+ if(ev.key==="Escape")closeStatusMenu();
+ if((ev.key==="F10"&&ev.shiftKey||ev.key==="ContextMenu")&&ev.target.closest?.(".s2-quick-status")){
+  ev.preventDefault();const b=ev.target.closest(".s2-quick-status");quickStatusMenu(b.dataset.id,b.dataset.date);
+ }
+});
 document.addEventListener("click",(ev)=>{
+ if($("s2-status-menu")&&!ev.target.closest?.("#s2-status-menu,.s2-quick-status"))closeStatusMenu();
  const el=ev.target.closest("[data-s2]");if(!el)return;
  ev.preventDefault();if(el.classList?.contains("s2-quick-status")&&Date.now()<heldUntil)return;const fn=actions[el.dataset.s2];if(fn){try{fn(el)}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}}
 });
