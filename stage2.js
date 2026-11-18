@@ -105,7 +105,7 @@ function itemRow(o,date,compact=false){
  const priority=o.type==="task"?(["high","medium","low"].includes(o.priority)?o.priority:"medium"):null;
  const priorityText={high:"Alta",medium:"Média",low:"Baixa"};
  const priorityBadge=priority?'<span class="task-priority task-priority-'+priority+'" title="Prioridade '+priorityText[priority]+'" aria-label="Prioridade '+priorityText[priority]+'"><span class="task-priority-dot" aria-hidden="true"></span>'+priorityText[priority]+'</span>':"";
- const controls=(locked(date)?"":'<button class="btn small ghost" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="'+(st==="done"?"pending":"done")+'" title="'+(st==="done"?"Desmarcar":"Concluir")+'">'+(st==="done"?"↶":"✓")+'</button><button class="btn small ghost" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="progress" title="Em andamento">◷</button>');
+ const controls=(locked(date)?"":'<button class="btn small ghost s2-quick-status" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="'+(st==="done"?"pending":"done")+'" title="'+(st==="done"?"Desmarcar":"Concluir")+'">'+(st==="done"?"↶":"✓")+'</button><button class="btn small ghost" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="progress" title="Em andamento">◷</button>');
  return '<div class="task-row '+(st==="done"?"task-done":"")+'" style="--task-color:'+a(color)+'"><div class="task-mark">'+(st==="done"?"✓":st==="progress"?"◷":st==="notdone"?"×":st==="moved"?"↷":"·")+'</div><div class="task-main"><div class="task-title">'+e(entryTitle(o))+' '+taskAge+'</div><div class="task-meta">'+priorityBadge+blockLabel(o.blockId)+(desc?'<span>'+e(desc)+'</span>':"")+'<span>'+e(statusText(st))+'</span></div></div><div class="task-actions">'+controls+(window.OrbitaStage8?.indicatorFor?.({kind:"entry",id:o.id,date,status:st})||"")+'<button class="btn small ghost" data-s2="editEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Editar">✎</button><button class="btn small ghost" data-s2="moreEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Mais ações">⋯</button></div></div>';
 }
 function emptyList(message){return '<p class="note empty-inline">'+e(message)+'</p>';}
@@ -261,7 +261,7 @@ function statusModal(id,date){if(locked(date))return notify("Dia finalizado: reg
  C.openModal("Registrar execução",'<form id="s2-record" class="section-stack"><input type="hidden" name="id" value="'+a(id)+'"><input type="hidden" name="date" value="'+a(date)+'"><div class="field"><label>Situação</label><select name="status">'+[["pending","Pendente"],["progress","Em andamento"],["done","Concluída"],["notdone","Não realizada"]].map(([key,label])=>'<option value="'+key+'" '+(r.status===key?"selected":"")+'>'+label+'</option>').join("")+'</select></div>'+formField("Duração real (minutos, opcional)","actualMin",r.actualMin||"","number",'min="1" max="1440"')+(x.type==="habit"?formField("Horário real (opcional)","actualTime",r.actualTime||"","time"):"")+'<p class="note">A duração real não será preenchida automaticamente com a previsão.</p><div class="modal-footer"><button type="button" data-action="closeModal" class="btn ghost">Cancelar</button><button type="submit" class="btn primary">Salvar registro</button></div></form>',"");}
 function moreModal(id,date){
  const x=find(id);if(!x)return;
- C.openModal("Gerenciar atividade",'<p class="note">'+e(x.title)+' · '+e(fmt(date,false))+'</p><div class="action-cards"><button class="btn" data-s2="recordDetail" data-id="'+a(id)+'" data-date="'+date+'">Registro de execução</button><button class="btn" data-s2="editEntry" data-id="'+a(id)+'" data-date="'+date+'">Editar</button><button class="btn" data-s2="duplicateEntry" data-id="'+a(id)+'">Copiar</button>'+(x.type==="focus"?'<button class="btn" data-s2="moveFocus" data-id="'+a(id)+'" data-date="'+date+'">Remanejar foco</button>':"")+'<button class="btn" data-s2="archiveEntry" data-id="'+a(id)+'">'+(x.archivedAt?"Reativar":"Arquivar")+'</button><button class="btn danger" data-s2="deleteEntry" data-id="'+a(id)+'" data-date="'+date+'">Excluir</button></div>',"");
+ C.openModal("Gerenciar atividade",'<p class="note">'+e(x.title)+' · '+e(fmt(date,false))+'</p><div class="action-cards"><button class="btn" data-s2="recordDetail" data-id="'+a(id)+'" data-date="'+date+'">Registro de execução</button><button class="btn" data-s8="linkFromEntry" data-id="'+a(id)+'" data-date="'+date+'">Vincular lembrete</button><button class="btn" data-s2="editEntry" data-id="'+a(id)+'" data-date="'+date+'">Editar</button><button class="btn" data-s2="duplicateEntry" data-id="'+a(id)+'">Copiar</button>'+(x.type==="focus"?'<button class="btn" data-s2="moveFocus" data-id="'+a(id)+'" data-date="'+date+'">Remanejar foco</button>':"")+'<button class="btn" data-s2="archiveEntry" data-id="'+a(id)+'">'+(x.archivedAt?"Reativar":"Arquivar")+'</button><button class="btn danger" data-s2="deleteEntry" data-id="'+a(id)+'" data-date="'+date+'">Excluir</button></div>',"");
 }
 function moveModal(id,date){
  const o=find(id);if(!o)return;
@@ -353,7 +353,22 @@ function quickRecord(id,date,status){
  p.events.push({kind:"status_change",id,date,from:rec.status||"pending",to:status,at:new Date().toISOString()});
  save();render();notify(status==="done"?"Concluída. Você pode informar a duração real nos detalhes.":"Situação atualizada.");
 }
+let holdTimer=null,heldUntil=0;
+function closeStatusMenu(){const panel=$("s2-status-menu");panel?.remove?.();}
+function quickStatusMenu(id,date,x=0,y=0){
+ if(locked(date))return notify("Dia finalizado: não é possível alterar.");
+ const entry=find(id);if(!entry)return;
+ closeStatusMenu();
+ const content='<div class="s2-status-menu-content"><strong>Situação · '+e(entry.title)+'</strong>'+
+ [["done","✓","Concluída"],["pending","◷","Pendente"],["notdone","×","Não realizada"]].map(([status,icon,label])=>'<button type="button" data-s2="quickStatus" data-id="'+a(id)+'" data-date="'+a(date)+'" data-value="'+status+'">'+icon+' '+label+'</button>').join("")+
+ '<button type="button" data-s2="closeStatusMenu">Cancelar</button></div>';
+ if(document.body?.insertAdjacentHTML){
+  document.body.insertAdjacentHTML("beforeend",'<div id="s2-status-menu" class="s2-status-menu" role="dialog" aria-label="Situação rápida" style="--s2-menu-x:'+Math.max(8,Math.floor(x))+'px;--s2-menu-y:'+Math.max(8,Math.floor(y))+'px">'+content+'</div>');
+ }else C.openModal("Situação rápida",content);
+}
 const actions={
+ quickStatus(b){quickRecord(b.dataset.id,b.dataset.date,b.dataset.value);closeStatusMenu();C.closeModal?.();},
+ closeStatusMenu(){closeStatusMenu()},
  newEntry(b){entryModal(b.dataset.type||"focus")},editEntry(b){const x=find(b.dataset.id);if(x)entryModal(x.type,x.id,b.dataset.date||x.date)},
  moreEntry(b){moreModal(b.dataset.id,b.dataset.date||s.date)},
  recordDetail(b){statusModal(b.dataset.id,b.dataset.date||s.date)},
@@ -431,9 +446,22 @@ function submission(id,data){
   const preview=copyPlanDraft(data);showCopyPreview(preview);return;
  }
 }
+document.addEventListener("contextmenu",ev=>{
+ const b=ev.target.closest?.(".s2-quick-status");
+ if(!b)return;
+ ev.preventDefault();quickStatusMenu(b.dataset.id,b.dataset.date,ev.clientX,ev.clientY);
+});
+document.addEventListener("pointerdown",ev=>{
+ const b=ev.target.closest?.(".s2-quick-status");
+ if(!b||ev.pointerType==="mouse")return;
+ clearTimeout(holdTimer);
+ const id=b.dataset.id,date=b.dataset.date,x=ev.clientX,y=ev.clientY;
+ holdTimer=setTimeout(()=>{heldUntil=Date.now()+850;quickStatusMenu(id,date,x,y);},550);
+});
+for(const type of ["pointerup","pointercancel","pointermove"]){document.addEventListener(type,()=>{if(holdTimer!==null)clearTimeout(holdTimer);holdTimer=null;});}
 document.addEventListener("click",(ev)=>{
  const el=ev.target.closest("[data-s2]");if(!el)return;
- ev.preventDefault();const fn=actions[el.dataset.s2];if(fn){try{fn(el)}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}}
+ ev.preventDefault();if(el.classList?.contains("s2-quick-status")&&Date.now()<heldUntil)return;const fn=actions[el.dataset.s2];if(fn){try{fn(el)}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}}
 });
 document.addEventListener("submit",(ev)=>{
  const id=ev.target?.getAttribute?.("id")||ev.target?.id;
@@ -452,6 +480,6 @@ window.OrbitaStage2={decorate(route,base){
  if(route==="planejamento")return decoratePlan();
  if(route==="organizar")return decorateOrganize();
  return base;
-},inspect:{get model(){return p},occurrence,allOn,kindOn,hoursFor,copyPlanDraft,performCopy,quickRecord,updateEntry,deleteEntry,submission}};
+},inspect:{get model(){return p},occurrence,allOn,kindOn,hoursFor,copyPlanDraft,performCopy,quickRecord,quickStatusMenu,updateEntry,deleteEntry,submission}};
 render();
 })();
