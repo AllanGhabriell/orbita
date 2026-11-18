@@ -56,6 +56,15 @@ assert.equal(S.hoursFor(today),90);
 S.quickRecord(focus.id,today,"done");
 assert.equal(S.model.records[focus.id+"@"+today].status,"done");
 assert.equal(S.model.records[focus.id+"@"+today].actualMin,undefined);
+assert.match(html(),/s2-quick-status/,"concluir possui atalho para menu de situações");
+S.quickStatusMenu(focus.id,today,120,120);
+assert.match(element("modal-host").innerHTML,/Não realizada/,"menu rápido permite registrar atividade não realizada");
+C.closeModal();
+S.quickRecord(focus.id,today,"notdone");
+assert.equal(S.model.records[focus.id+"@"+today].status,"notdone","foco pode ser marcado como não realizado sem abrir formulário");
+S.quickRecord(focus.id,today,"pending");
+assert.equal(S.model.records[focus.id+"@"+today],undefined,"situação pendente recupera estado aberto");
+
 
 submit("s2-entry",{type:"task",title:"Comprar caderno",date:today,blockId:"",estimatedMin:"15",priority:"high",repeat:"none"});
 assert.equal(S.kindOn(C.addDays(today,1),"task").length,1,"tarefa pendente continua acessível no dia seguinte");
