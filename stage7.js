@@ -13,7 +13,7 @@ if(!timing.active||typeof timing.active!=="object")timing.active=null;
 const E=C.esc,A=C.attr, $=id=>document.getElementById(id);
 const clock=()=>Date.now();
 const titleBase=document.title;
-let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null,demoAlarm=null,activityAt=clock(),inactivityPrompt=false,alarmTimeout=null;
+let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null,demoAlarm=null,activityAt=clock(),inactivityPrompt=false,alarmTimeout=null,lastActivityPersist=0;
 const uploadBusy={finish:false,pause:false},presetSound="./assets/orbita-alarm.wav";
 const iconLink=document.querySelector('link[rel="icon"]'),originalIcon=iconLink?.getAttribute("href")||"./assets/orbita.svg";
 const alarmIcon="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#201535"/><path d="M17 45c5-5 6-10 6-19 0-13 18-13 18 0 0 9 1 14 6 19H17zm10 6h10" stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" fill="none"/><circle cx="48" cy="15" r="9" fill="#f05f73"/></svg>');
@@ -107,6 +107,12 @@ function resumeIdle(){
 function noteActivity(){
  autoPauseForInactivity();
  activityAt=clock();inactivityPrompt=false;
+ const active=timing.active;
+ if(active?.phase==="running"){
+  active.lastInteractionAt=activityAt;
+  // Preservar o limite após recarga, sem salvar a cada tecla.
+  if(activityAt-lastActivityPersist>=15000){lastActivityPersist=activityAt;persist();}
+ }
  const a=activeAlarm();
  if(a&&!a.silenced){a.lastInteractionAt=activityAt;if(!a.demo)persist();scheduleAlarmTimeout();}
 }
