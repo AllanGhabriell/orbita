@@ -49,3 +49,9 @@ body[data-theme="light"] .s8-panel,body[data-theme="light"] .s8-trigger{backgrou
 @media(hover:hover) and (pointer:fine){.s8-note:hover .s8-note-hover{max-height:240px;overflow-y:auto;opacity:1;padding-top:7px}}
 .s8-note.s8-highlight{outline:3px solid #8c54e3;outline-offset:-3px;box-shadow:0 0 0 3px rgba(180,137,255,.27),0 8px 19px rgba(0,0,0,.18)}
 @media(hover:none){.s8-note-hover{display:none}}
+
+/* Indicadores de lembretes sempre visíveis nas atividades, inclusive no celular. */
+.task-actions .s8-linked-pin,.study-daily-controls .s8-linked-pin{display:inline-flex!important;visibility:visible;opacity:1;flex:none;position:relative;z-index:1}
+#s8-target-wrap[hidden]{display:none!important}
+#s8-link-scope,#s8-link-target{width:100%;min-height:42px;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:720px){.s8-linked-pin{min-width:35px;min-height:35px}.study-daily-controls{flex-wrap:wrap}}
