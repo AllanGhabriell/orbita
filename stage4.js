@@ -321,11 +321,13 @@ function mentorAnalysis(){
  const digest=picked.map(x=>x.key+":"+x.evidence).join("|");
  return {items:picked,digest,important:picked.some(x=>x.score>=65),closed:c.closed,days:c.days};
 }
-function mentorUnread(){
- if(ev.settings.mentorEnabled===false)return false;
+function mentorUnreadCount(){
+ if(ev.settings.mentorEnabled===false)return 0;
  const analysis=mentorAnalysis();
- return analysis.important&&analysis.digest!==ev.mentor.lastReadSignature&&analysis.digest!==ev.mentor.dismissedSignature;
+ if(!analysis.important||analysis.digest===ev.mentor.lastReadSignature||analysis.digest===ev.mentor.dismissedSignature)return 0;
+ return analysis.items.filter(x=>x.score>=65).length;
 }
+function mentorUnread(){return mentorUnreadCount()>0;}
 function mentorNoticeEligible(){
  if(ev.settings.mentorEnabled===false||ev.settings.mentorNotices===false||!mentorUnread())return false;
  if(Date.parse(ev.mentor.snoozeUntil||"")>Date.now())return false;
@@ -336,7 +338,7 @@ function mentorNoticeEligible(){
 function mentorNotice(){
  if(!mentorNoticeEligible())return "";
  const detail=mentorOptionsOpen?'<div class="evo-mentor-options"><button class="btn small ghost" data-s4="mentorSnooze" data-min="10">Daqui a 10 min</button><button class="btn small ghost" data-s4="mentorSnooze" data-min="15">Daqui a 15 min</button><button class="btn small ghost" data-s4="mentorSnooze" data-min="1440">Não mostrar hoje</button><button class="btn small ghost" data-s4="mentorDismiss">Dispensar mensagem</button><button class="btn small ghost" data-s4="mentorDisableNotices">Desativar avisos</button></div>':"";
- return '<section class="card evo-mentor-message" aria-label="Nova mensagem do orientador"><div class="evo-mentor-avatar" aria-hidden="true">◉</div><div class="evo-mentor-copy"><strong>O Orientador quer conversar</strong><p>Tenho observações novas sobre seu planejamento. Quando puder, venha conferir o que mudou.</p><div class="row"><button class="btn primary small" data-s4="mentorOpen">Ver feedback</button><button class="btn small ghost" data-s4="mentorOptions">'+(mentorOptionsOpen?"Ocultar opções":"Agora não ▾")+'</button></div>'+detail+'</div></section>';
+ return '<aside class="card evo-mentor-message evo-mentor-note" aria-label="Nova mensagem do orientador"><div class="evo-mentor-avatar" aria-hidden="true">◉</div><div class="evo-mentor-copy"><strong>O Orientador tem '+mentorUnreadCount()+' observação(ões) nova(s)</strong><p>Há dados recentes do seu planejamento para analisar, quando for conveniente.</p><div class="row"><button class="btn primary small" data-s4="mentorOpen">Ver feedback</button><button class="btn small ghost" data-s4="mentorOptions" aria-expanded="'+!!mentorOptionsOpen+'">'+(mentorOptionsOpen?"Ocultar opções":"Agora não ▾")+'</button></div>'+detail+'</div></aside>';
 }
 function mentorPanel(){
  if(ev.settings.mentorEnabled===false)return '<section class="card"><h2>Orientador desativado</h2><p class="note">Suas estatísticas continuam disponíveis. Você pode reativar a análise nas preferências abaixo.</p></section>';
@@ -556,12 +558,14 @@ document.addEventListener("change",event=>{
  if(event.target.id==="s4-reminders"){ev.settings.reminders=event.target.checked;C.save();C.render();}
 });
 window.OrbitaStage4={decorate,afterRender(){
- const unread=mentorUnread()&&ev.settings.mentorNotices!==false;
+ const unread=mentorUnreadCount();
+ const showBadge=unread>0&&ev.settings.mentorNotices!==false;
  for(const node of document.querySelectorAll?.('[data-nav="perfil"]')||[]){
   const previous=node.querySelector?.(".evo-mentor-badge");
-  if(!unread){previous?.remove?.();continue;}
-  if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="Nova análise do Orientador" aria-label="Nova análise do Orientador">1</span>');
+  if(!showBadge){previous?.remove?.();continue;}
+  if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="'+unread+' análise(s) do Orientador" aria-label="'+unread+' análise(s) do Orientador">'+unread+'</span>');
+  else if(previous){previous.textContent=String(unread);previous.title=unread+" análise(s) do Orientador";}
  }
-},inspect:{get model(){return ev},capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
+},inspect:{get model(){return ev},capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
 C.render();
 })();
