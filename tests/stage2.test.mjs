@@ -64,6 +64,7 @@ S.quickRecord(focus.id,today,"notdone");
 assert.equal(S.model.records[focus.id+"@"+today].status,"notdone","foco pode ser marcado como não realizado sem abrir formulário");
 S.quickRecord(focus.id,today,"pending");
 assert.equal(S.model.records[focus.id+"@"+today],undefined,"situação pendente recupera estado aberto");
+S.quickRecord(focus.id,today,"done"); // preserva cenário de foco concluído dos testes seguintes
 
 
 submit("s2-entry",{type:"task",title:"Comprar caderno",date:today,blockId:"",estimatedMin:"15",priority:"high",repeat:"none"});
