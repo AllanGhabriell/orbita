@@ -7,7 +7,7 @@ const root=C.state;
 const timing=root.timing&&typeof root.timing==="object"?root.timing:(root.timing={});
 if(!timing.records||typeof timing.records!=="object"||Array.isArray(timing.records))timing.records={};
 if(!timing.settings||typeof timing.settings!=="object")timing.settings={};
-const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"orbita",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true,alarmIdleMinutes:15,inactivityWarningMinutes:60};
+const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"orbita",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true,alarmIdleMinutes:15,inactivityWarningMinutes:60,autoPauseMinutes:10};
 for(const [k,v] of Object.entries(defaults))if(timing.settings[k]===undefined)timing.settings[k]=v;
 if(!timing.active||typeof timing.active!=="object")timing.active=null;
 const E=C.esc,A=C.attr, $=id=>document.getElementById(id);
@@ -81,7 +81,31 @@ function scheduleAlarmTimeout(){
  const reference=Math.max(Number(a.raisedAt)||clock(),Number(a.lastInteractionAt)||0);
  alarmTimeout=setTimeout(()=>{alarmTimeout=null;if(!autoSilenceAlarm())scheduleAlarmTimeout();},Math.max(0,limit-(clock()-reference))+10);
 }
+function autoPauseForInactivity(){
+ const a=timing.active,r=activeRecord(),limit=Number(settings().autoPauseMinutes)*60000;
+ if(!a||!r||a.phase!=="running"||!limit||!Number.isFinite(limit))return false;
+ const last=Number(a.lastInteractionAt)||Number(a.since)||clock(),cutoff=Math.max(Number(a.since)||0,last+limit);
+ if(clock()<cutoff)return false;
+ r.studyMs=studyMs(r,cutoff);
+ r.corrections||(r.corrections=[]);
+ r.corrections.push({type:"auto_idle_pause",registeredAt:clock(),effectiveAt:cutoff});
+ timing.active={sessionId:a.sessionId,phase:"idle",since:cutoff,lastInteractionAt:last,alertIndex:0};
+ if(timing.alarm)silenceAlarm();
+ persist();C.render();C.notify("Estudo interrompido por inatividade. Tempo após o limite não será contado até você continuar.");
+ return true;
+}
+function resumeIdle(){
+ const a=timing.active,r=activeRecord();
+ if(!a||!r||a.phase!=="idle")throw Error("Não existe interrupção automática para retomar.");
+ const at=clock(),excluded=Math.max(0,at-a.since);
+ r.unaccountedMs=(Number(r.unaccountedMs)||0)+excluded;
+ r.corrections||(r.corrections=[]);r.corrections.push({type:"auto_idle_resumed",registeredAt:at,excludedMs:excluded});
+ timing.active={sessionId:a.sessionId,phase:"running",since:at,lastInteractionAt:at,alertIndex:0};
+ if(timing.alarm)dismissAlarm();
+ persist();C.render();tick();
+}
 function noteActivity(){
+ autoPauseForInactivity();
  activityAt=clock();inactivityPrompt=false;
  const a=activeAlarm();
  if(a&&!a.silenced){a.lastInteractionAt=activityAt;if(!a.demo)persist();scheduleAlarmTimeout();}
@@ -263,7 +287,7 @@ function start(id){
  const r=makeRecord(x);
  if(r.originalStatus===undefined)r.originalStatus=beforeStatus;
  r.finishedAt=null;
- timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
+ timing.active={sessionId:id,phase:"running",since:clock(),lastInteractionAt:clock(),alertIndex:0};
  persist();C.render();tick();
 }
 function timedPauseModal(){
@@ -294,7 +318,7 @@ function resume(){
  audioUnlock();
  const at=clock();r.pauseMs=pauseMs(r,at);
  if(r.pauses.length&&r.pauses.at(-1).endedAt===null)r.pauses.at(-1).endedAt=at;
- timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+ timing.active={sessionId:a.sessionId,phase:"running",since:at,lastInteractionAt:at,alertIndex:0};
  if(timing.alarm?.which==="pause")dismissAlarm();
  persist();C.render();tick();
 }
@@ -311,7 +335,7 @@ function correction(timestamp){
   const p=r.pauses.at(-1);
   if(p&&p.endedAt===null){p.endedAt=at;p.corrected=true;}
   r.corrections.push({type:"resume",registeredAt:now,effectiveAt:at,previousExpectedAt:now});
-  timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+  timing.active={sessionId:a.sessionId,phase:"running",since:at,lastInteractionAt:at,alertIndex:0};
  }else{
   r.studyMs+=at-a.since;
   r.pauses.push({startedAt:at,endedAt:null,kind:"other",corrected:true});
@@ -325,11 +349,14 @@ function finish(done){
  const a=timing.active,r=activeRecord(),x=a&&session(a.sessionId);
  if(!a||!r||!x)throw Error("Sessão ativa não encontrada.");
  if(V?.isClosed?.(x.date))throw Error("O dia já está fechado.");
+ autoPauseForInactivity();
+ const current=timing.active;
  const at=clock(),studied=studyMs(r,at),paused=pauseMs(r,at);
  if(studied<1000&&!window.confirm("Menos de um segundo de estudo registrado. Encerrar mesmo assim?"))return;
  // A etapa do ciclo somente avança após conclusão confirmada.
  T.setSessionStatus(x.id,done?"done":"progress",studied?Math.max(1,Math.round(studied/60000)):null,x.actualTime||"");
  r.studyMs=studied;r.pauseMs=paused;
+ if(current.phase==="idle")r.unaccountedMs=(Number(r.unaccountedMs)||0)+Math.max(0,at-current.since);
  if(a.phase==="paused"&&r.pauses.at(-1)?.endedAt===null)r.pauses.at(-1).endedAt=at;
  r.finishedAt=new Date(at).toISOString();r.status=done?"done":"partial";r.recordedActualMin=x.actualMin;
  timing.active=null;
@@ -347,7 +374,7 @@ function correctRestMinutes(minutes,seconds=0){
  r.studyMs=(Number(r.studyMs)||0)+studyAdded;
  p.endedAt=a.since+restMs;p.corrected=true;p.actualRestMs=restMs;
  r.corrections.push({type:"simplified_rest",registeredAt:at,originalPauseMs:elapsed,actualRestMs:restMs,studyAddedMs:studyAdded});
- timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+ timing.active={sessionId:a.sessionId,phase:"running",since:at,lastInteractionAt:at,alertIndex:0};
  if(timing.alarm?.which==="pause")dismissAlarm();
  persist();C.closeModal();C.render();tick();C.notify("Pausa corrigida: "+duration(restMs)+" de descanso e "+duration(studyAdded)+" transferidos para estudo.");
 }
@@ -398,7 +425,9 @@ function correctSessionTotals(studyMinutes,restMinutes,nextPhase){
  if(!["running","paused"].includes(nextPhase))throw Error("Escolha como continuar o cronômetro.");
  const study=Number(studyMinutes),rest=Number(restMinutes);
  if(!Number.isInteger(study)||study<0||!Number.isInteger(rest)||rest<0)throw Error("Informe apenas minutos inteiros, sem valores negativos.");
- const beforeStudy=studyMs(r,at),beforeRest=pauseMs(r,at),beforeIgnored=Math.max(0,Number(r.unaccountedMs)||0);
+ autoPauseForInactivity();
+ const current=timing.active;
+ const beforeStudy=studyMs(r,at),beforeRest=pauseMs(r,at),beforeIgnored=Math.max(0,Number(r.unaccountedMs)||0)+(current.phase==="idle"?Math.max(0,at-current.since):0);
  const beforeTotal=beforeStudy+beforeRest+beforeIgnored;
  const newTotal=(study+rest)*60000;
  // A interface arredonda os minutos: até 59s de diferença são tolerados.
@@ -423,7 +452,9 @@ function correctSessionTotals(studyMinutes,restMinutes,nextPhase){
 }
 function correctModal(){
  const a=timing.active,r=activeRecord();if(!a||!r)return;
- const at=clock(),totalStudy=studyMs(r,at),totalRest=pauseMs(r,at),ignored=Math.max(0,Number(r.unaccountedMs)||0);
+ autoPauseForInactivity();
+ const current=timing.active;
+ const at=clock(),totalStudy=studyMs(r,at),totalRest=pauseMs(r,at),ignored=Math.max(0,Number(r.unaccountedMs)||0)+(current.phase==="idle"?Math.max(0,at-current.since):0);
  const tracked=totalStudy+totalRest+ignored;
  const maxMinutes=Math.max(1,Math.ceil(tracked/60000));
  const localIso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
@@ -487,7 +518,7 @@ function undo(){
  }
  if(lastUndo.active){
   const a=lastUndo.active;
-  timing.active={...a,since:clock(),alertIndex:0};
+  timing.active={...a,since:clock(),lastInteractionAt:clock(),alertIndex:0};
   if(a.phase==="paused")timing.records[a.sessionId]?.pauses?.push({startedAt:clock(),endedAt:null,kind:"other",corrected:true});
  }else if(timing.active&&lastUndo.ids.includes(timing.active.sessionId))timing.active=null;
  lastUndo=null;
@@ -509,7 +540,7 @@ function cancelAccidentalPause(){
  r.studyMs+=time;
  if(r.pauses.at(-1)?.endedAt===null)r.pauses.pop();
  noteEdit(r,"accidental_pause_cancelled",{durationMs:time});
- timing.active={sessionId:a.sessionId,phase:"running",since:at,alertIndex:0};
+ timing.active={sessionId:a.sessionId,phase:"running",since:at,lastInteractionAt:at,alertIndex:0};
  persist();C.closeModal();C.render();tick();C.notify("Pausa acidental desfeita; intervalo contado como estudo conforme sua confirmação.");
 }
 function resetCurrentPause(){
@@ -713,12 +744,12 @@ function ring(){
  if(!a||!r)return "";
  const goal=Math.max(1,Number(r.goalMin)||90)*60000;
  const studied=studyMs(r),paused=pauseMs(r),percent=Math.min(100,Math.max(0,studied/goal*100));
- const stateLabel=a.phase==="paused"?"Pausado":"Em estudo";
- const subtitle=a.phase==="paused"?"Contagem de estudo interrompida.":"Tempo efetivo em andamento.";
+ const stateLabel=a.phase==="idle"?"Interrompido por inatividade":a.phase==="paused"?"Pausado":"Em estudo";
+ const subtitle=a.phase==="idle"?"A contagem só volta quando você confirmar; o tempo posterior não conta como estudo.":a.phase==="paused"?"Contagem de estudo interrompida.":"Tempo efetivo em andamento.";
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
- '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
+ '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="idle"?"ESTUDO INTERROMPIDO":a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span>'+(Number(r.unaccountedMs)>0?'<span>Desconsiderado: <strong>'+fmtMs(r.unaccountedMs)+'</strong></span>':"")+'</div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
- (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+'<button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
+ (a.phase==="idle"?'<div class="s7-idle-alert"><strong>O cronômetro parou automaticamente.</strong><p>Nenhum tempo adicional será contado até você continuar. Se estudou durante a ausência, use Corrigir tempo do cronômetro.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button></div>':a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+'<button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<button class="btn primary" data-s7="resume">▶ Retomar estudo</button><div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
  '<button class="btn ghost small" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+'<div class="row"><button class="btn small ghost" data-s7="partial">Encerrar parcial</button><button class="btn small" data-s7="finish">Finalizar como concluído</button></div></div></div>'+
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
@@ -801,6 +832,7 @@ function settingsPanel(){
  s7SettingRow("Bloco personalizado",number("blockMin",q.blockMin,1,180,"min"))+
  s7SettingRow("Descanso personalizado",number("restMin",q.restMin,1,90,"min"))+
  s7SettingRow("Avisar pausa prolongada",number("pauseMinutes",q.pauseMinutes,0,240,"min"),"0 para desativar")+
+ s7SettingRow("Pausa automática por inatividade",'<select id="s7-setting-autoPauseMinutes" aria-label="Interromper estudo por inatividade">'+[["0","Desativada"],["5","5 minutos"],["10","10 minutos (padrão)"],["15","15 minutos"],["30","30 minutos"]].map(([v,t])=>option(v,t,String(q.autoPauseMinutes))).join("")+'</select>',"Só volta a contar após confirmar; tempo posterior não entra no estudo")+
  s7SettingRow("Verificar possível esquecimento",'<select id="s7-setting-inactivityWarningMinutes" aria-label="Aviso de possível esquecimento">'+[["0","Desativado"],["30","30 minutos"],["60","1 hora (padrão)"],["120","2 horas"]].map(([v,t])=>option(v,t,String(q.inactivityWarningMinutes))).join("")+'</select>',"Aviso discreto: não pausa nem encerra o estudo")+
  s7SettingRow("Repetir lembrete",s7Switch("s7-setting-repeatPause",q.repeatPause,"Repetir lembrete de pausa"))+
  '</section>'+
@@ -825,6 +857,7 @@ function settingsPanel(){
  '</div></section>';
 }
 function tick(){
+ autoPauseForInactivity();
  autoSilenceAlarm();
  const a=timing.active,r=activeRecord();
  if(!a||!r){updateTabIndicator();return;}
@@ -839,6 +872,7 @@ function tick(){
  if(pEl)pEl.textContent=fmtMs(paused);
  const pauseLeft=document.querySelector('[data-s7-el="pauseLeft"]'),currentPause=r.pauses.at(-1);
  if(pauseLeft&&a.phase==="paused"&&currentPause?.plannedMinutes)pauseLeft.textContent=fmtMs(Math.max(0,currentPause.plannedMinutes*60000-(clock()-a.since)));
+ if(a.phase==="idle")return;
  if(!r.goalNotified&&studied>=goal){r.goalNotified=true;persist();alertUser("Você alcançou a meta de estudo. Pode continuar ou finalizar a sessão.","finish");}
  if(a.phase==="running"&&!inactivityPrompt&&Number(settings().inactivityWarningMinutes)>0&&clock()-activityAt>=Number(settings().inactivityWarningMinutes)*60000){
   inactivityPrompt=true;C.notify("O cronômetro continua estudando. Se esqueceu de pausar, use Corrigir tempo do cronômetro. Nenhum tempo foi alterado.");
@@ -917,7 +951,7 @@ async function upload(which,file){
   if(current&&current.textContent==="Preparando áudio...")current.textContent="Selecione outro arquivo para tentar novamente.";
  }
 }
-const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100],alarmIdleMinutes:[0,30],inactivityWarningMinutes:[0,120]};
+const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100],alarmIdleMinutes:[0,30],inactivityWarningMinutes:[0,120],autoPauseMinutes:[0,30]};
 const strings={mode:["continuous","pomodoro","custom"],finishSound:["orbita","bell","digital","soft","custom","none"],pauseSound:["orbita","bell","digital","soft","custom","none"]};
 // Evita dupla contabilização se a pessoa tentar concluir/registrar a sessão com o timer ainda aberto.
 document.addEventListener("click",e=>{
@@ -935,6 +969,7 @@ document.addEventListener("click",e=>{
   else if(act==="timedPause")timedPauseModal();
   else if(act==="pause")pause(b.dataset.kind||"rest");
   else if(act==="resume")resume();
+  else if(act==="resumeIdle")resumeIdle();
   else if(act==="finish")askFinish(true);
   else if(act==="partial")askFinish(false);
   else if(act==="correct")correctModal();
@@ -1002,10 +1037,11 @@ document.addEventListener("change",e=>{
  if(key in numeric){
   const n=Number(el.value),[min,max]=numeric[key];
   if(!Number.isFinite(n)||n<min||n>max)return C.notify("Valor inválido.");
-  if(key==="alarmIdleMinutes"&&![0,5,10,15,30].includes(n)||key==="inactivityWarningMinutes"&&![0,30,60,120].includes(n))return C.notify("Escolha um dos intervalos disponíveis.");
+  if(key==="alarmIdleMinutes"&&![0,5,10,15,30].includes(n)||key==="inactivityWarningMinutes"&&![0,30,60,120].includes(n)||key==="autoPauseMinutes"&&![0,5,10,15,30].includes(n))return C.notify("Escolha um dos intervalos disponíveis.");
   settings()[key]=n;
   if(key==="alarmIdleMinutes"){if(!autoSilenceAlarm())scheduleAlarmTimeout();}
   if(key==="inactivityWarningMinutes")inactivityPrompt=false;
+  if(key==="autoPauseMinutes"&&n>0)autoPauseForInactivity();
  }else if(key in strings){
   if(!strings[key].includes(el.value))return;
   settings()[key]=el.value;
@@ -1016,6 +1052,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
