@@ -90,7 +90,7 @@ assert.equal(waiting.link.boundSessionId,undefined,"matéria ainda sem sessão f
 sessions.push({id:"chem-future",discipline:"Química",cycleId:"enem",date:"2026-11-13",status:"pending",archived:false});
 R.bindNextNotes();
 assert.equal(waiting.link.boundSessionId,"chem-future","primeira sessão futura recebe o vínculo");
-assert.match(R.indicators({kind:"session",id:"chem-future",discipline:"Química",cycleId:"enem",status:"pending"}),/🔖/);
+assert.match(R.indicators({kind:"session",id:"chem-future",discipline:"Química",cycleId:"enem",status:"pending"}),/data-s8="jump"/,"próxima sessão mostra indicador mesmo com outros lembretes do ciclo");
 assert.equal(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}).includes("🔖"),false,"não espalha pela matéria errada");
 sessions.at(-1).status="done";R.prune();
 assert.equal(waiting.link,null,"vínculo termina após concluir sessão mas lembrete permanece");
