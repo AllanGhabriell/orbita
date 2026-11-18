@@ -353,21 +353,29 @@ function quickRecord(id,date,status){
  p.events.push({kind:"status_change",id,date,from:rec.status||"pending",to:status,at:new Date().toISOString()});
  save();render();notify(status==="done"?"Concluída. Você pode informar a duração real nos detalhes.":"Situação atualizada.");
 }
-let holdTimer=null,heldUntil=0,holdPointer=null;
-function closeStatusMenu(){const panel=$("s2-status-menu");panel?.remove?.();}
-function quickStatusMenu(id,date,x=0,y=0){
+let holdTimer=null,heldUntil=0,holdPointer=null,statusReturnFocus=null;
+function closeStatusMenu(){
+ const panel=$("s2-status-menu");
+ panel?.remove?.();
+ if(panel&&statusReturnFocus?.isConnected)statusReturnFocus.focus?.();
+ statusReturnFocus=null;
+}
+function quickStatusMenu(id,date,x=0,y=0,trigger=null){
  if(locked(date))return notify("Dia finalizado: não é possível alterar.");
  const entry=find(id);if(!entry)return;
  closeStatusMenu();
+ statusReturnFocus=trigger||document.activeElement||null;
  const content='<div class="s2-status-menu-content"><strong>Situação · '+e(entry.title)+'</strong>'+
  [["done","✓","Concluída"],["pending","◷","Pendente"],["notdone","×","Não realizada"]].map(([status,icon,label])=>'<button type="button" data-s2="quickStatus" data-id="'+a(id)+'" data-date="'+a(date)+'" data-value="'+status+'">'+icon+' '+label+'</button>').join("")+
  '<button type="button" data-s2="closeStatusMenu">Cancelar</button></div>';
  if(document.body?.insertAdjacentHTML){
-  document.body.insertAdjacentHTML("beforeend",'<div id="s2-status-menu" class="s2-status-menu" role="dialog" aria-label="Situação rápida" style="--s2-menu-x:'+Math.max(8,Math.floor(x))+'px;--s2-menu-y:'+Math.max(8,Math.floor(y))+'px">'+content+'</div>');
+  document.body.insertAdjacentHTML("beforeend",'<div id="s2-status-menu" class="s2-status-menu" role="dialog" aria-modal="false" aria-label="Situação rápida" style="--s2-menu-x:'+Math.max(8,Math.floor(x))+'px;--s2-menu-y:'+Math.max(8,Math.floor(y))+'px">'+content+'</div>');
+  const button=$("s2-status-menu")?.querySelector?.("button");
+  button?.focus?.();
  }else C.openModal("Situação rápida",content);
 }
 const actions={
- quickStatus(b){quickRecord(b.dataset.id,b.dataset.date,b.dataset.value);closeStatusMenu();C.closeModal?.();},
+ quickStatus(b){quickRecord(b.dataset.id,b.dataset.date,b.dataset.value);closeStatusMenu();},
  closeStatusMenu(){closeStatusMenu()},
  newEntry(b){entryModal(b.dataset.type||"focus")},editEntry(b){const x=find(b.dataset.id);if(x)entryModal(x.type,x.id,b.dataset.date||x.date)},
  moreEntry(b){moreModal(b.dataset.id,b.dataset.date||s.date)},
@@ -449,7 +457,7 @@ function submission(id,data){
 document.addEventListener("contextmenu",ev=>{
  const b=ev.target.closest?.(".s2-quick-status");
  if(!b)return;
- ev.preventDefault();quickStatusMenu(b.dataset.id,b.dataset.date,ev.clientX,ev.clientY);
+ ev.preventDefault();quickStatusMenu(b.dataset.id,b.dataset.date,ev.clientX,ev.clientY,b);
 });
 document.addEventListener("pointerdown",ev=>{
  const b=ev.target.closest?.(".s2-quick-status");
@@ -457,7 +465,7 @@ document.addEventListener("pointerdown",ev=>{
  clearTimeout(holdTimer);
  const id=b.dataset.id,date=b.dataset.date,x=ev.clientX,y=ev.clientY;
  holdPointer={x,y,id:ev.pointerId};
- holdTimer=setTimeout(()=>{heldUntil=Date.now()+850;quickStatusMenu(id,date,x,y);holdTimer=null;},550);
+ holdTimer=setTimeout(()=>{heldUntil=Date.now()+850;quickStatusMenu(id,date,x,y,b);holdTimer=null;},550);
 });
 document.addEventListener("pointermove",ev=>{
  if(!holdPointer||ev.pointerId!==holdPointer.id)return;
@@ -467,13 +475,13 @@ for(const type of ["pointerup","pointercancel"]){document.addEventListener(type,
 document.addEventListener("keydown",ev=>{
  if(ev.key==="Escape")closeStatusMenu();
  if((ev.key==="F10"&&ev.shiftKey||ev.key==="ContextMenu")&&ev.target.closest?.(".s2-quick-status")){
-  ev.preventDefault();const b=ev.target.closest(".s2-quick-status");quickStatusMenu(b.dataset.id,b.dataset.date);
+  ev.preventDefault();const b=ev.target.closest(".s2-quick-status");quickStatusMenu(b.dataset.id,b.dataset.date,0,0,b);
  }
 });
 document.addEventListener("click",(ev)=>{
  if($("s2-status-menu")&&!ev.target.closest?.("#s2-status-menu,.s2-quick-status"))closeStatusMenu();
  const el=ev.target.closest("[data-s2]");if(!el)return;
- ev.preventDefault();if(el.classList?.contains("s2-quick-status")&&Date.now()<heldUntil)return;const fn=actions[el.dataset.s2];if(fn){try{fn(el)}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}}
+ ev.preventDefault();if(el.classList?.contains("s2-quick-status")&&Date.now()<heldUntil){ev.stopPropagation?.();return;}const fn=actions[el.dataset.s2];if(fn){try{fn(el)}catch(err){notify(err.message||"Não foi possível realizar a operação.");console.error(err);}}
 });
 document.addEventListener("submit",(ev)=>{
  const id=ev.target?.getAttribute?.("id")||ev.target?.id;
