@@ -1,6 +1,7 @@
 /* Órbita: bootstrap offline-first, sem dependência de servidor no primeiro uso. */
 (async function(){
 "use strict";
+window.ORBITA_VERSION="1.3.0";
 const KEY="orbita:stage1:v1",DB="orbita-offline-v1",STORE="documents";
 let database=null;
 function openDb(){
