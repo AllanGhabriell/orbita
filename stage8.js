@@ -153,7 +153,7 @@ function nextCandidate(link){
  const current=C.today();
  const eligible=sessions.map((x,i)=>({x,i})).filter(({x})=>
   !x.archived&&x.status!=="done"&&x.date>=current&&
-  (subject?x.subjectId===subject.id&&(!link.cycleId||x.cycleId===link.cycleId):
+  (subject?(x.subjectId===subject.id||(!x.subjectId&&String(x.discipline||"").toLocaleLowerCase("pt-BR")===String(subject.title).toLocaleLowerCase("pt-BR")))&&(!link.cycleId||x.cycleId===link.cycleId):
   String(x.discipline||"").trim().toLocaleLowerCase("pt-BR")===String(link.id).trim().toLocaleLowerCase("pt-BR"))
  );
  eligible.sort((a,b)=>a.x.date.localeCompare(b.x.date)||a.i-b.i);
@@ -203,6 +203,7 @@ function matches(n,ctx){
  return l.scope==="discipline"&&ctx.discipline===l.id||l.scope==="cycle"&&ctx.cycleId===l.id;
 }
 function indicators(ctx){
+ bindNextNotes();
  const linked=notes.filter(n=>matches(n,ctx));
  if(!linked.length)return "";
  const symbol=linked.length===1?icons[linked[0].icon]||icons.pin:icons.pin;
@@ -232,7 +233,7 @@ function jump(raw){
  const element=$("s8-note-"+highlightIds[0]);
  element?.scrollIntoView?.({behavior:"smooth",block:"nearest"});
 }
-function edit(idValue){
+function edit(idValue,preselected){
  const n=idValue?note(idValue):null;
  if(idValue&&!n)return C.notify("Lembrete não encontrado.");
  C.openModal(n?"Editar lembrete":"Novo lembrete",'<form id="s8-note-form" class="section-stack">'+
@@ -241,10 +242,21 @@ function edit(idValue){
  '<div class="field"><label>Observações (opcional)</label><textarea name="description" maxlength="1200" rows="3" placeholder="Detalhes para organizar depois">'+E(n?.description||"")+'</textarea></div>'+
  '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+value+" "+({pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"}[key])+'</option>').join("")+'</select></div>'+
- '<div class="field"><label>Onde este lembrete deve aparecer?</label><select name="linkScope" id="s8-link-scope">'+Object.entries(scopeLabel).filter(([k])=>k!=="legacy").map(([k,v])=>'<option value="'+k+'" '+(initialScope(n)===k?"selected":"")+'>'+E(v)+'</option>').join("")+(initialScope(n)==="legacy"?'<option value="legacy" selected>Vínculo anterior</option>':"")+'</select></div>'+
- '<div class="field" id="s8-target-wrap" '+(initialScope(n)==="none"?"hidden":"")+'><label id="s8-target-label">Escolher vínculo</label><select name="target" id="s8-link-target">'+targets(encodedTarget(n),initialScope(n))+'</select><small id="s8-link-help">Escolha apenas uma atividade, matéria ou ciclo. Vínculos específicos terminam quando a sessão é concluída; lembretes permanecem no mural.</small></div>'+
+ '<div class="field"><label>Onde este lembrete deve aparecer?</label><select name="linkScope" id="s8-link-scope">'+Object.entries(scopeLabel).filter(([k])=>k!=="legacy").map(([k,v])=>'<option value="'+k+'" '+((preselected? (preselected.scope===k) : initialScope(n)===k)?"selected":"")+'>'+E(v)+'</option>').join("")+(initialScope(n)==="legacy"?'<option value="legacy" selected>Vínculo anterior</option>':"")+'</select></div>'+
+ '<div class="field" id="s8-target-wrap" '+((preselected?preselected.scope:initialScope(n))==="none"?"hidden":"")+'><label id="s8-target-label">Escolher vínculo</label><select name="target" id="s8-link-target">'+targets(preselected?.target||encodedTarget(n),preselected?.scope||initialScope(n))+'</select><small id="s8-link-help">Escolha apenas uma atividade, matéria ou ciclo. Vínculos específicos terminam quando a sessão é concluída; lembretes permanecem no mural.</small></div>'+
  '<p class="note">Lembretes não possuem conclusão ou data obrigatória. Ficam aqui até você excluir ou transformar em uma atividade.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar lembrete</button></div></form>');
+}
+function linkFromEntry(entryId,date){
+ const entries=S2?.allOn?.(date)||[];
+ const found=entries.find(x=>x.id===entryId);
+ if(!found)return C.notify("Atividade não encontrada para vincular.");
+ edit(null,{scope:"today",target:"entry|"+encodeURIComponent(entryId)+"|"+encodeURIComponent(date)});
+}
+function linkFromSession(sessionId){
+ const found=S3?.model?.sessions?.find(x=>x.id===sessionId&&!x.archived);
+ if(!found)return C.notify("Sessão não encontrada para vincular.");
+ edit(null,{scope:found.date===C.state.date?"today":"future",target:"session|"+encodeURIComponent(sessionId)+"|"});
 }
 function saveNote(data){
  const title=String(data.get("title")||"").trim().slice(0,140);
@@ -261,7 +273,7 @@ function saveNote(data){
  const existing=note(String(data.get("id")||""));
  if(existing)Object.assign(existing,{title,description,priority,icon,link,updatedAt:new Date().toISOString()});
  else notes.push({id:id(),title,description,priority,icon,link,createdAt:new Date().toISOString()});
- C.save();C.closeModal();redraw();C.notify(existing?"Lembrete atualizado.":"Lembrete adicionado.");
+ bindNextNotes();C.save();C.closeModal();redraw();C.notify(existing?"Lembrete atualizado.":"Lembrete adicionado.");
 }
 function updateTargetSelect(scope){
  const target=$("s8-link-target"),wrapper=$("s8-target-wrap");
@@ -328,6 +340,8 @@ document.addEventListener("click",ev=>{
   else if(action==="remove")remove(b.dataset.id);
   else if(action==="convert")convert(b.dataset.id);
   else if(action==="jump")jump(b.dataset.noteIds);
+  else if(action==="linkFromEntry")linkFromEntry(b.dataset.id,b.dataset.date);
+  else if(action==="linkFromSession")linkFromSession(b.dataset.id);
  }catch(err){C.notify(err.message||"Não foi possível executar a ação.");}
 });
 document.addEventListener("change",event=>{if(event.target?.id==="s8-link-scope")updateTargetSelect(event.target.value);});
@@ -356,6 +370,6 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
   document.body.appendChild(incoming);
  }
  place();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkFromEntry,linkFromSession}};
 C.render();
 })();
