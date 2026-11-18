@@ -50,8 +50,8 @@ assert.match(html,/boot\.js\?v=20261118-orbita-v1-3-0/,"HTML carrega bootstrap a
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v="+cssVersion),"o Service Worker contém a versão de CSS realmente usada no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
 assert.ok(html.includes("styles.css?v=20261104-profile-goals-mobile"),"CSS do perfil no celular tem versão nova");
-assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"Organizar recebe CSS atualizado");
-assert.ok(html.includes("stage2.css?v=20261104-organize-light-mobile"),"CSS das prioridades de tarefas com versão atualizada");
+assert.ok(html.includes("stage2.css?v=20261118-orbita-v1-3-0"),"Organizar recebe CSS atualizado");
+assert.ok(html.includes("stage2.css?v=20261118-orbita-v1-3-0"),"CSS das prioridades de tarefas com versão atualizada");
 assert.ok(html.includes("stage3.css?v=20261103-session-focus"),"stylesheet recebe versão para superar cache antigo");
 assert.ok(sw.includes("const isAppCode="),"CSS, JS e HTML tratados como recursos atualizáveis");
 assert.ok(sw.includes("return isAppCode?online:(cached||online)"),"prioriza rede para estilo atualizado e preserva fallback offline");
