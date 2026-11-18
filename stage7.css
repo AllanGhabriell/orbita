@@ -164,3 +164,8 @@ body[data-theme=light] .s7-alarm-card{background:#fff;box-shadow:0 16px 46px rgb
 .s7-total-input{display:flex;align-items:center;gap:10px}
 .s7-total-input input{width:100%;min-width:0;max-width:170px;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
 .s7-total-input span{font-size:12px;color:var(--muted)}
+
+/* Interrupção automática de estudo não é descanso. */
+.s7-idle-alert{display:flex;flex-direction:column;gap:9px;border:1px solid var(--warning);border-radius:12px;padding:13px;background:var(--surface2);margin:8px 0}
+.s7-idle-alert strong{font-size:13px}.s7-idle-alert p{font-size:12px;line-height:1.55;margin:0;color:var(--muted)}
+.s7-idle-alert .btn{align-self:flex-start}
