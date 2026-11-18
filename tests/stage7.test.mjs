@@ -111,6 +111,16 @@ test("inatividade interrompe estudo no limite e não conta horas extras",()=>{
  h.setTime(9*3600000+2*60000);
  assert.equal(h.stage.studyMs(r),12*60000,"contagem só recomeça após clicar em continuar");
 });
+test("interação durante estudo reinicia limite de inatividade",()=>{
+ const h=harness();h.stage.model.settings.autoPauseMinutes=10;
+ h.stage.start("math-1");
+ h.setTime(8*60000);h.stage.noteActivity();
+ h.setTime(15*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running","a interação recente mantém o estudo em andamento");
+ h.setTime(20*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"idle");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),18*60000,"limite vale a partir da última interação, não do início");
+});
 test("clique após ausência não apaga sinal de inatividade",()=>{
  const h=harness();h.stage.model.settings.autoPauseMinutes=5;
  h.stage.start("math-1");
