@@ -72,6 +72,7 @@ assert.match(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",c
 sessions[0].status="done";
 R.prune();
 assert.equal(specific.link,null,"vínculo da sessão concluída é retirado");
+assert.match(specific.lastLinkLabel,/Matemática/,"o mural registra qual vínculo terminou");
 assert.equal(R.notes.some(n=>n.id===specific.id),true,"lembrete é preservado");
 assert.equal(R.notes.find(n=>n.title==="Dica ENEM").link.scope,"cycle","vínculo de ciclo sobrevive à conclusão de uma sessão");
 assert.equal(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"done"}),"","sessão concluída não recebe alfinete");
@@ -90,6 +91,14 @@ assert.equal(waiting.link.boundSessionId,undefined,"matéria ainda sem sessão f
 sessions.push({id:"chem-future",discipline:"Química",cycleId:"enem",date:"2026-11-13",status:"pending",archived:false});
 R.bindNextNotes();
 assert.equal(waiting.link.boundSessionId,"chem-future","primeira sessão futura recebe o vínculo");
+const reserved=waiting.link.boundSessionId;
+R.saveNote(form({id:waiting.id,title:"Resumo de Química atualizado",priority:"high",icon:"bookmark",linkScope:"next",target:"next|Qu%C3%ADmica|"}));
+assert.equal(waiting.link.boundSessionId,reserved,"editar lembrete preserva a sessão futura já reservada");
+assert.match(R.linkLabel(waiting.link),/Química/,"mural informa a matéria vinculada");
+assert.match(R.linkLabel(waiting.link),/2026-11-13/,"mural identifica data da sessão selecionada");
+assert.equal(R.targetRows("future","2026-11-13").filter(x=>x.label.includes("Química")).length,1,"lista futura só mostra sessões daquela data");
+assert.equal(R.targetRows("future","2026-11-11").filter(x=>x.label.includes("Química")).length,0,"não mistura sessões de outros dias");
+
 assert.match(R.indicators({kind:"session",id:"chem-future",discipline:"Química",cycleId:"enem",status:"pending"}),/data-s8="jump"/,"próxima sessão mostra indicador mesmo com outros lembretes do ciclo");
 assert.equal(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}).includes("🔖"),false,"não espalha pela matéria errada");
 sessions.at(-1).status="done";R.prune();
