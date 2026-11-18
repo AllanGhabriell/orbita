@@ -78,3 +78,11 @@
 .evo-mentor-feedback>strong{font-size:11px;color:var(--accent2)}
 .evo-mentor-badge{display:inline-grid;place-items:center;width:17px;height:17px;min-width:17px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;margin-left:auto}
 @media(max-width:720px){.evo-mentor-message{padding:12px;gap:10px}.evo-mentor-options .btn{flex:1 1 120px}.evo-mentor-badge{margin:0 0 0 4px;width:15px;height:15px;min-width:15px}}
+
+/* Terceira atualização: bilhete do Orientador, discreto e não intrusivo. */
+.evo-mentor-note{padding:11px 13px;gap:10px;border-style:dashed;border-color:var(--borderStrong)}
+.evo-mentor-note .evo-mentor-avatar{width:31px;height:31px;font-size:17px;border-radius:9px}
+.evo-mentor-note .evo-mentor-copy>strong{font-size:12px}
+.evo-mentor-note .evo-mentor-copy p{margin:3px 0 7px;font-size:11px}
+.evo-mentor-note .evo-mentor-copy>.row{gap:5px}
+.evo-mentor-note .evo-mentor-copy>.row .btn{min-height:30px;padding:6px 9px}
