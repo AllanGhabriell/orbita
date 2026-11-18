@@ -126,6 +126,8 @@ P.model.events.push(...Array.from({length:4},(_,i)=>({kind:"entry_deleted",id:"s
 P.model.events.push(...Array.from({length:4},(_,i)=>({kind:"entry_created",id:"new-"+i,at:new Date().toISOString()})));
 assert.ok(V.mentorAnalysis().items.some(x=>x.key==="deleted"),"exclusões repetidas geram aviso contextual");
 assert.equal(V.mentorNoticeEligible(),true,"alerta importante aparece após ausência prolongada");
+assert.ok(V.mentorUnreadCount()>=1,"contador de observações indica análises importantes");
+assert.match(V.mentorPanel(),/Meu Orientador/,"painel permanece disponível");
 V.actions.mentorSnooze({dataset:{min:"10"}});
 assert.equal(V.mentorNoticeEligible(),false,"adiamento silencia recado");
 V.model.mentor.snoozeUntil="";
