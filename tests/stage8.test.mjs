@@ -82,6 +82,21 @@ assert.match(R.indicators({kind:"entry",id:"task-1",date:"2026-11-11",status:"pe
 S2.model.records["task-1@2026-11-11"]={status:"done"};
 R.prune();
 assert.equal(R.notes.at(-1).link,null,"foco ou tarefa concluída perde vínculo sem remover bilhete");
+// Vínculo inteligente: aguarda próxima sessão da matéria e escolhe somente uma.
+R.saveNote(form({title:"Resumo de Química",priority:"high",icon:"bookmark",linkScope:"next",target:"next|Qu%C3%ADmica|"}));
+const waiting=R.notes.at(-1);
+assert.equal(waiting.link.scope,"next");
+assert.equal(waiting.link.boundSessionId,undefined,"matéria ainda sem sessão fica aguardando");
+sessions.push({id:"chem-future",discipline:"Química",cycleId:"enem",date:"2026-11-13",status:"pending",archived:false});
+R.bindNextNotes();
+assert.equal(waiting.link.boundSessionId,"chem-future","primeira sessão futura recebe o vínculo");
+assert.match(R.indicators({kind:"session",id:"chem-future",discipline:"Química",cycleId:"enem",status:"pending"}),/🔖/);
+assert.equal(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}).includes("🔖"),false,"não espalha pela matéria errada");
+sessions.at(-1).status="done";R.prune();
+assert.equal(waiting.link,null,"vínculo termina após concluir sessão mas lembrete permanece");
+assert.ok(R.notes.includes(waiting));
+assert.ok(R.targetRows("next").some(x=>x.label.includes("Matemática")),"matérias são opções únicas");
+assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).length,1,"somente sessões do dia ainda pendentes");
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
