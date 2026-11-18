@@ -49,6 +49,7 @@ function harness(){
  };
  vm.runInNewContext(source,ctx,{filename:"stage7.js"});
  const stage=ctx.window.OrbitaStage7.inspect;
+ stage.model.settings.autoPauseMinutes=0; // Histórico legado: testes anteriores não simulam ações a cada bloco.
  return {state,item,target,stage,decorate:ctx.window.OrbitaStage7.decorate,callbacks,notifications,alarmHost,setTime:ms=>time=baseTime+ms, get saved(){return saved},get modal(){return lastModal}};
 }
 test("correção principal usa totais da sessão mesmo com pausa atual de dois segundos",()=>{
@@ -91,6 +92,32 @@ test("correção de totais impede inventar tempo superior ao registrado",()=>{
  const h=harness();h.stage.start("math-1");h.setTime(10*60000);
  assert.throws(()=>h.stage.correctSessionTotals(90,0,"running"),/ultrapassam/);
  assert.equal(h.stage.studyMs(h.state.timing.records["math-1"]),10*60000);
+});
+test("inatividade interrompe estudo no limite e não conta horas extras",()=>{
+ const h=harness();h.stage.model.settings.autoPauseMinutes=10;
+ h.stage.start("math-1");
+ h.setTime(8*3600000);
+ h.stage.tick();
+ const r=h.stage.model.records["math-1"];
+ assert.equal(h.stage.model.active.phase,"idle");
+ assert.equal(h.stage.studyMs(r),10*60000);
+ assert.equal(h.stage.pauseMs(r),0,"inatividade não é descanso");
+ h.setTime(9*3600000);
+ h.stage.tick();
+ assert.equal(h.stage.studyMs(r),10*60000,"horas seguintes não contam como estudo");
+ h.stage.resumeIdle();
+ assert.equal(r.unaccountedMs,9*3600000-10*60000);
+ assert.equal(h.stage.model.active.phase,"running");
+ h.setTime(9*3600000+2*60000);
+ assert.equal(h.stage.studyMs(r),12*60000,"contagem só recomeça após clicar em continuar");
+});
+test("clique após ausência não apaga sinal de inatividade",()=>{
+ const h=harness();h.stage.model.settings.autoPauseMinutes=5;
+ h.stage.start("math-1");
+ h.setTime(30*60000);
+ h.stage.noteActivity();
+ assert.equal(h.stage.model.active.phase,"idle","a pausa é aplicada antes de registrar nova interação");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),5*60000);
 });
 test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
  const h=harness();
