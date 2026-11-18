@@ -124,7 +124,7 @@ function targetRows(scope,dateFilter){
   const sessions=allSessions.filter(x=>x.date===date);
   // Usar as ocorrências do planejamento, inclusive recorrentes, sem listar
   // cada "Matemática 1, Matemática 2" de todos os dias de uma vez.
-  const entries=(S2?.allOn?.(date)||[]).filter(validEntry);
+  const entries=(S2?.allOn?.(date)||(S2?.model?.entries||[]).filter(x=>x.date===date)).filter(validEntry);
   return [...sessions.map(x=>({value:"session|"+encodeURIComponent(x.id)+"|",label:"Sessão · "+(x.discipline||"Estudo")+(x.topic?" · "+x.topic:"")})),...entries.map(x=>({value:"entry|"+encodeURIComponent(x.id)+"|"+encodeURIComponent(date),label:(x.type==="focus"?"Foco":x.type==="habit"?"Rotina":"Tarefa")+" · "+x.title}))].sort((a,b)=>a.label.localeCompare(b.label,"pt-BR"));
  }
  if(scope==="next")return subjectChoices();
@@ -149,7 +149,7 @@ function describeEncodedLink(value){
 function linkLabel(link){
  if(!link)return "";
  if(link.scope==="session"){const x=S3?.model?.sessions?.find(x=>x.id===link.id);return x?"Sessão · "+(x.discipline||"Estudo")+" · "+x.date+(x.topic?" · "+x.topic:""):"Sessão indisponível";}
- if(link.scope==="entry"){const x=(S2?.allOn?.(link.date)||[]).find(x=>x.id===link.id);return x?(x.type==="focus"?"Foco":x.type==="habit"?"Rotina":"Tarefa")+" · "+x.title+" · "+link.date:"Atividade indisponível";}
+ if(link.scope==="entry"){const x=(S2?.allOn?.(link.date)||(S2?.model?.entries||[]).filter(x=>x.date===link.date)).find(x=>x.id===link.id);return x?(x.type==="focus"?"Foco":x.type==="habit"?"Rotina":"Tarefa")+" · "+x.title+" · "+link.date:"Atividade indisponível";}
  if(link.scope==="next"){const x=S3?.model?.sessions?.find(x=>x.id===link.boundSessionId),subject=(S3?.model?.subjects||[]).find(x=>x.id===link.id);return "Próxima sessão · "+(subject?.title||link.id)+(x?" · "+x.date:" · aguardando planejamento");}
  if(link.scope==="discipline")return "Todas as sessões · "+link.id;
  if(link.scope==="cycle")return "Ciclo · "+((S3?.model?.cycles||[]).find(x=>x.id===link.id)?.title||"não encontrado");
