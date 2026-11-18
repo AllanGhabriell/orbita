@@ -1,7 +1,7 @@
 /* Órbita: bootstrap offline-first, sem dependência de servidor no primeiro uso. */
 (async function(){
 "use strict";
-window.ORBITA_VERSION="1.3.0";
+window.ORBITA_VERSION="1.3.1";
 const KEY="orbita:stage1:v1",DB="orbita-offline-v1",STORE="documents";
 let database=null;
 function openDb(){
@@ -70,7 +70,7 @@ function load(src){
  });
 }
 for(const file of ["config.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js","stage6.js","stage7.js","stage8.js"]){
- try{await load("./"+file+(file==="stage2.js"?"?v=20261118-orbita-v1-3-0":file==="stage3.js"?"?v=20261118-orbita-v1-3-0":file==="stage4.js"?"?v=20261112-mentor-v1":file==="stage7.js"?"?v=20261118-orbita-v1-3-0":file==="stage8.js"?"?v=20261118-orbita-v1-3-0":file==="app.js"?"?v=20261118-orbita-v1-3-0":file==="stage5.js"?"?v=20261112-today-nav-v1":""));}catch(err){
+ try{await load("./"+file+(file==="stage2.js"?"?v=20261118-orbita-v1-3-1":file==="stage3.js"?"?v=20261118-orbita-v1-3-1":file==="stage4.js"?"?v=20261112-mentor-v1":file==="stage7.js"?"?v=20261118-orbita-v1-3-1":file==="stage8.js"?"?v=20261118-orbita-v1-3-1":file==="app.js"?"?v=20261118-orbita-v1-3-1":file==="stage5.js"?"?v=20261112-today-nav-v1":""));}catch(err){
   console.error(err);
   const view=document.getElementById("view");if(view)view.textContent="Não foi possível carregar o aplicativo. Verifique a conexão e atualize a página.";
   return;
