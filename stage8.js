@@ -89,31 +89,92 @@ function age(created){
  const months=Math.floor(days/30);return "Há "+months+(months===1?" mês":" meses");
 }
 const icons={pin:"📌",bookmark:"🔖",alert:"❗",idea:"💡"};
-function encodedTarget(n){const l=n?.link;if(!l)return "none";return [l.scope,encodeURIComponent(l.id||""),encodeURIComponent(l.date||"")].join("|");}
-function targets(selected){
- const sessions=(S3?.model?.sessions||[]).filter(x=>!x.archived&&x.status!=="done");
- const entries=(S2?.model?.entries||[]).filter(x=>(x.type==="focus"||x.type==="task")&&!x.archivedAt);
- const cycles=(S3?.model?.cycles||[]).filter(x=>!x.archived);
- const disciplines=[...new Set(sessions.map(x=>String(x.discipline||"").trim()).filter(x=>x&&x!=="Próxima matéria do ciclo"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
- const options=[["none","Sem vínculo · apenas no mural"],
-  ...sessions.map(x=>["session|"+encodeURIComponent(x.id)+"|","Sessão · "+(x.discipline||"Estudo")+" · "+x.date+(x.topic?" · "+x.topic:"")]),
-  ...entries.map(x=>["entry|"+encodeURIComponent(x.id)+"|"+encodeURIComponent(x.date),"Atividade · "+x.title+" · "+x.date]),
-  ...disciplines.map(x=>["discipline|"+encodeURIComponent(x)+"|","Matéria · "+x]),
-  ...cycles.map(x=>["cycle|"+encodeURIComponent(x.id)+"|","Ciclo · "+x.title])
- ];
- if(selected!=="none"&&!options.some(x=>x[0]===selected))options.push([selected,"Vínculo anterior (consultar)"]);
- return options.map(([v,label])=>'<option value="'+A(v)+'" '+(selected===v?"selected":"")+'>'+E(label)+'</option>').join("");
+function encodedTarget(n){
+ const l=n?.link;if(!l)return "none";
+ return [l.scope,encodeURIComponent(l.id||""),encodeURIComponent(l.scope==="next"?l.cycleId||"":l.date||"")].join("|");
+}
+const scopeLabel={none:"Somente no mural",today:"Atividade do dia exibido",future:"Sessão ou atividade futura",next:"Próxima sessão de uma matéria",discipline:"Todas as sessões de uma matéria",cycle:"Todas as sessões de um ciclo",legacy:"Vínculo já existente"};
+function initialScope(n){
+ const l=n?.link;
+ if(!l)return "none";
+ if(l.scope==="next")return "next";
+ if(l.scope==="discipline")return "discipline";
+ if(l.scope==="cycle")return "cycle";
+ if(l.scope==="session"){const x=S3?.model?.sessions?.find(x=>x.id===l.id);return x?.date===C.state.date?"today":"future";}
+ if(l.scope==="entry")return l.date===C.state.date?"today":"future";
+ return "legacy";
+}
+function subjectChoices(){
+ const cycles=S3?.model?.cycles||[],subjects=(S3?.model?.subjects||[]).filter(x=>!x.archived);
+ const available=subjects.map(x=>({value:"next|"+encodeURIComponent(x.id)+"|"+encodeURIComponent(x.cycleId||""),label:x.title+" · "+(cycles.find(c=>c.id===x.cycleId)?.title||"Sem ciclo")}));
+ const known=new Set(subjects.map(x=>String(x.title||"").toLocaleLowerCase("pt-BR")));
+ for(const x of S3?.model?.sessions||[]){
+  const title=String(x.discipline||"").trim();
+  if(!title||known.has(title.toLocaleLowerCase("pt-BR")))continue;
+  known.add(title.toLocaleLowerCase("pt-BR"));
+  available.push({value:"next|"+encodeURIComponent(title)+"|",label:title+" · sessão independente"});
+ }
+ return available.sort((a,b)=>a.label.localeCompare(b.label,"pt-BR"));
+}
+function targetRows(scope){
+ const date=C.state.date,allSessions=(S3?.model?.sessions||[]).filter(x=>!x.archived&&x.status!=="done");
+ const validEntry=x=>(x.type==="focus"||x.type==="task"||x.type==="habit")&&!x.archivedAt&&x.status!=="done";
+ const today=(S2?.allOn?.(date)||[]).filter(validEntry);
+ const later=(S2?.model?.entries||[]).filter(x=>validEntry(x)&&x.date>date);
+ const sessions=scope==="today"?allSessions.filter(x=>x.date===date):allSessions.filter(x=>x.date>date);
+ const entries=scope==="today"?today:later;
+ if(scope==="today"||scope==="future")
+  return [...sessions.map(x=>({value:"session|"+encodeURIComponent(x.id)+"|",label:"Sessão · "+(x.discipline||"Estudo")+" · "+x.date+(x.topic?" · "+x.topic:"")})),...entries.map(x=>({value:"entry|"+encodeURIComponent(x.id)+"|"+encodeURIComponent(x.occurrenceDate||x.date),label:(x.type==="focus"?"Foco":x.type==="habit"?"Rotina":"Tarefa")+" · "+x.title+" · "+(x.occurrenceDate||x.date)}))].sort((a,b)=>a.label.localeCompare(b.label,"pt-BR"));
+ if(scope==="next")return subjectChoices();
+ if(scope==="discipline"){
+  const values=new Set([...(S3?.model?.subjects||[]).map(x=>x.title),...allSessions.map(x=>x.discipline)].filter(Boolean));
+  return [...values].sort((a,b)=>a.localeCompare(b,"pt-BR")).map(x=>({value:"discipline|"+encodeURIComponent(x)+"|",label:x}));
+ }
+ if(scope==="cycle")return (S3?.model?.cycles||[]).filter(x=>!x.archived).map(x=>({value:"cycle|"+encodeURIComponent(x.id)+"|",label:x.title}));
+ return [];
+}
+function targets(selected,scope){
+ const rows=targetRows(scope);
+ if(selected!=="none"&&!rows.some(x=>x.value===selected))rows.unshift({value:selected,label:"Vínculo atual (preservado)"});
+ if(!rows.length)return '<option value="">Nenhuma atividade disponível neste grupo</option>';
+ return '<option value="">Escolha uma opção</option>'+rows.map(x=>'<option value="'+A(x.value)+'" '+(x.value===selected?"selected":"")+'>'+E(x.label)+'</option>').join("");
 }
 function parseTarget(value){
  if(!value||value==="none")return null;
  const [scope,encodedId,encodedDate=""]=String(value).split("|");
- if(!["session","entry","discipline","cycle"].includes(scope))throw Error("Tipo de vínculo inválido.");
+ if(!["session","entry","discipline","cycle","next"].includes(scope))throw Error("Tipo de vínculo inválido.");
  const id=decodeURIComponent(encodedId||""),date=decodeURIComponent(encodedDate);
  if(!id)throw Error("Escolha o vínculo.");
- return {scope,id,...(scope==="entry"?{date}:{})};
+ return {scope,id,...(scope==="entry"?{date}:scope==="next"?{cycleId:date}:{})};
+}
+function nextCandidate(link){
+ const subject=(S3?.model?.subjects||[]).find(x=>x.id===link.id);
+ const sessions=S3?.model?.sessions||[];
+ const current=C.today();
+ const eligible=sessions.map((x,i)=>({x,i})).filter(({x})=>
+  !x.archived&&x.status!=="done"&&x.date>=current&&
+  (subject?x.subjectId===subject.id&&(!link.cycleId||x.cycleId===link.cycleId):
+  String(x.discipline||"").trim().toLocaleLowerCase("pt-BR")===String(link.id).trim().toLocaleLowerCase("pt-BR"))
+ );
+ eligible.sort((a,b)=>a.x.date.localeCompare(b.x.date)||a.i-b.i);
+ return eligible[0]?.x||null;
+}
+function bindNextNotes(){
+ let changed=false;
+ for(const n of notes){
+  if(n.link?.scope!=="next"||n.link.boundSessionId)continue;
+  const x=nextCandidate(n.link);
+  if(x){n.link.boundSessionId=x.id;changed=true;}
+ }
+ if(changed)C.save();
 }
 function complete(link){
  if(!link)return false;
+ if(link.scope==="next"){
+  if(!link.boundSessionId)return false;
+  const x=S3?.model?.sessions?.find(x=>x.id===link.boundSessionId);
+  return !x||x.archived||x.status==="done";
+ }
  if(link.scope==="session"){
   const x=S3?.model?.sessions?.find(x=>x.id===link.id);
   return !x||x.archived||x.status==="done";
@@ -127,6 +188,7 @@ function complete(link){
  return false;
 }
 function prune(){
+ bindNextNotes();
  let touched=false;
  for(const n of notes)if(n.link&&complete(n.link)){n.link=null;touched=true;}
  if(touched)C.save();
@@ -134,6 +196,7 @@ function prune(){
 function matches(n,ctx){
  const l=n.link;
  if(!l||complete(l)||ctx.status==="done")return false;
+ if(l.scope==="next")return ctx.kind==="session"&&ctx.id===l.boundSessionId;
  if(l.scope==="session")return ctx.kind==="session"&&ctx.id===l.id;
  if(l.scope==="entry")return ctx.kind==="entry"&&ctx.id===l.id&&ctx.date===l.date;
  if(ctx.kind!=="session")return false;
@@ -149,7 +212,7 @@ function sorted(){return [...notes].sort((a,b)=>(rank[a.priority]??1)-(rank[b.pr
 function markup(){
  const list=sorted().map(n=>'<article id="s8-note-'+A(n.id)+'" class="s8-note s8-priority-'+A(n.priority)+(highlightIds.includes(n.id)?' s8-highlight':'')+'" title="'+A(n.description||n.title)+'">'+
  '<div class="s8-note-pin" aria-hidden="true">●</div><div class="s8-note-top"><span class="s8-note-priority">'+E(labels[n.priority]||"Média")+'</span><small>'+E(age(n.createdAt))+'</small></div>'+
- '<strong>'+E(n.title)+'</strong>'+(n.link?'<small class="s8-link-label">⌁ '+E(n.link.scope==="session"?"Sessão específica":n.link.scope==="entry"?"Atividade específica":n.link.scope==="discipline"?"Matéria: "+n.link.id:"Ciclo de estudos")+'</small>':"")+(n.description?'<details class="s8-note-details"><summary>Ver observação</summary><p>'+E(n.description)+'</p></details><div class="s8-note-hover" role="tooltip">'+E(n.description)+'</div>':"")+
+ '<strong>'+E(n.title)+'</strong>'+(n.link?'<small class="s8-link-label">⌁ '+E(n.link.scope==="session"?"Sessão específica":n.link.scope==="entry"?"Atividade específica":n.link.scope==="next"?"Próxima sessão de matéria":n.link.scope==="discipline"?"Matéria: "+n.link.id:"Ciclo de estudos")+'</small>':"")+(n.description?'<details class="s8-note-details"><summary>Ver observação</summary><p>'+E(n.description)+'</p></details><div class="s8-note-hover" role="tooltip">'+E(n.description)+'</div>':"")+
  '<div class="s8-note-actions"><button type="button" data-s8="edit" data-id="'+A(n.id)+'">Editar</button><button type="button" data-s8="convert" data-id="'+A(n.id)+'">Planejar ↗</button><button type="button" class="s8-danger" data-s8="remove" data-id="'+A(n.id)+'">Excluir</button></div></article>').join("");
  return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes">'+
  '<button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="'+opened+'" aria-controls="s8-panel" title="Mural de lembretes" aria-label="'+(opened?"Fechar":"Abrir")+' lembretes">'+
@@ -178,7 +241,8 @@ function edit(idValue){
  '<div class="field"><label>Observações (opcional)</label><textarea name="description" maxlength="1200" rows="3" placeholder="Detalhes para organizar depois">'+E(n?.description||"")+'</textarea></div>'+
  '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+value+" "+({pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"}[key])+'</option>').join("")+'</select></div>'+
- '<div class="field"><label>Vincular a (opcional)</label><select name="target">'+targets(encodedTarget(n))+'</select><small>Vínculos específicos desaparecem ao concluir a atividade. Matérias e ciclos continuam disponíveis.</small></div>'+
+ '<div class="field"><label>Onde este lembrete deve aparecer?</label><select name="linkScope" id="s8-link-scope">'+Object.entries(scopeLabel).filter(([k])=>k!=="legacy").map(([k,v])=>'<option value="'+k+'" '+(initialScope(n)===k?"selected":"")+'>'+E(v)+'</option>').join("")+(initialScope(n)==="legacy"?'<option value="legacy" selected>Vínculo anterior</option>':"")+'</select></div>'+
+ '<div class="field" id="s8-target-wrap" '+(initialScope(n)==="none"?"hidden":"")+'><label id="s8-target-label">Escolher vínculo</label><select name="target" id="s8-link-target">'+targets(encodedTarget(n),initialScope(n))+'</select><small id="s8-link-help">Escolha apenas uma atividade, matéria ou ciclo. Vínculos específicos terminam quando a sessão é concluída; lembretes permanecem no mural.</small></div>'+
  '<p class="note">Lembretes não possuem conclusão ou data obrigatória. Ficam aqui até você excluir ou transformar em uma atividade.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar lembrete</button></div></form>');
 }
@@ -186,7 +250,10 @@ function saveNote(data){
  const title=String(data.get("title")||"").trim().slice(0,140);
  const description=String(data.get("description")||"").trim().slice(0,1200);
  const priority=String(data.get("priority")||"medium");
- const icon=String(data.get("icon")||"pin"),link=parseTarget(data.get("target"));
+ const icon=String(data.get("icon")||"pin"),scope=String(data.get("linkScope")||"");
+ const link=parseTarget(scope==="none"?"none":data.get("target"));
+ if(scope&&scope!=="legacy"&&scope!=="none"&&!link)throw Error("Escolha a atividade, matéria ou ciclo para vincular.");
+ if(scope==="next"&&link?.scope!=="next")throw Error("Escolha uma matéria válida para a próxima sessão.");
  if(!Object.hasOwn(icons,icon))throw Error("Ícone inválido.");
  if(link&&complete(link))throw Error("A atividade já foi concluída ou removida. Escolha outra.");
  if(!title)throw Error("Informe o título do lembrete.");
@@ -195,6 +262,15 @@ function saveNote(data){
  if(existing)Object.assign(existing,{title,description,priority,icon,link,updatedAt:new Date().toISOString()});
  else notes.push({id:id(),title,description,priority,icon,link,createdAt:new Date().toISOString()});
  C.save();C.closeModal();redraw();C.notify(existing?"Lembrete atualizado.":"Lembrete adicionado.");
+}
+function updateTargetSelect(scope){
+ const target=$("s8-link-target"),wrapper=$("s8-target-wrap");
+ if(!target||!wrapper)return;
+ wrapper.hidden=scope==="none";
+ if(scope==="none")return;
+ target.innerHTML=targets("none",scope);
+ const label=$("s8-target-label");
+ if(label)label.textContent=scope==="next"?"Qual matéria deve receber o lembrete?":scope==="today"?"Atividade visível no dia":scope==="future"?"Atividade futura":scope==="discipline"?"Matéria":scope==="cycle"?"Ciclo":"Escolher vínculo";
 }
 function remove(idValue){
  const n=note(idValue);if(!n)return;
@@ -254,6 +330,7 @@ document.addEventListener("click",ev=>{
   else if(action==="jump")jump(b.dataset.noteIds);
  }catch(err){C.notify(err.message||"Não foi possível executar a ação.");}
 });
+document.addEventListener("change",event=>{if(event.target?.id==="s8-link-scope")updateTargetSelect(event.target.value);});
 document.addEventListener("pointerdown",pointerStart);
 document.addEventListener("pointermove",pointerMove,{passive:false});
 document.addEventListener("pointerup",pointerEnd);
@@ -279,6 +356,6 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
   document.body.appendChild(incoming);
  }
  place();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect}};
 C.render();
 })();
