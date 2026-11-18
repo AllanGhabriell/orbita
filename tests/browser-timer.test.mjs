@@ -191,6 +191,8 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   // Mesmo objetivo longo mostrado nas capturas: a largura do texto não pode cair
   // para uma coluna de letras quando os botões coexistem no cartão.
   await page.setViewport({width:390,height:850,deviceScaleFactor:1,isMobile:true,hasTouch:true});
+  // Alternar isMobile pode recarregar a página; aguarde o bootstrap terminar.
+  await page.waitForFunction(()=>!!window.OrbitaCore?.state&&!!window.OrbitaStage7?.inspect,{timeout:15000});
   await page.evaluate(()=>{
    const c=window.OrbitaCore;
    c.state.goals=[
