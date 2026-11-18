@@ -55,3 +55,11 @@ body[data-theme="light"] .s8-panel,body[data-theme="light"] .s8-trigger{backgrou
 #s8-target-wrap[hidden]{display:none!important}
 #s8-link-scope,#s8-link-target{width:100%;min-height:42px;max-width:100%;overflow-wrap:anywhere}
 @media(max-width:720px){.s8-linked-pin{min-width:35px;min-height:35px}.study-daily-controls{flex-wrap:wrap}}
+
+/* Vinculação orientada: uma data por vez, com filtro e seleção legível. */
+#s8-target-wrap{display:flex;flex-direction:column;gap:8px}
+#s8-target-wrap[hidden],#s8-future-date-wrap[hidden]{display:none!important}
+#s8-future-date-wrap{display:flex;flex-direction:column;gap:6px}
+#s8-future-date-wrap input,#s8-target-search{width:100%;max-width:100%;min-height:41px;box-sizing:border-box}
+.s8-search-label{font-size:11px;color:var(--muted)}
+.s8-link-complete{color:#74663c;opacity:.8}
