@@ -426,3 +426,21 @@
  .study-daily-controls .btn{flex:1}
 }
 @media(prefers-reduced-motion:reduce){.study-session-progress-fill{transition:none}}
+
+/* Órbita 5.05: marco temporal do planejamento de estudos. */
+.study-plan-day.is-today{
+ border:2px solid #bc913c;
+ background:linear-gradient(165deg,rgba(213,168,66,.12),rgba(160,112,35,.025) 60%),var(--surface);
+ box-shadow:inset 0 0 0 1px rgba(240,190,77,.16),0 5px 16px rgba(0,0,0,.065);
+}
+.study-plan-day.is-today .study-plan-day-title strong{color:#d6ab55}
+.study-plan-day.is-today .study-plan-day-total{border-color:rgba(197,149,65,.45)}
+.study-plan-day.is-past{background:var(--surface2);border-color:var(--border);filter:saturate(.55)}
+.study-plan-day.is-past .study-plan-day-title{opacity:.72}
+.study-plan-day.is-past .study-plan-item{opacity:.85}
+.study-plan-day.is-past .study-plan-grip,.study-plan-day.is-past .study-plan-item{cursor:copy}
+.study-plan-item.is-history .study-plan-status{opacity:.7}
+.study-plan-history-actions{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding-top:8px;border-top:1px solid var(--border)}
+.study-plan-history-actions .btn{font-size:10.5px;padding:8px 9px;white-space:normal}
+.study-plan-day.is-today.is-drop-target,.study-plan-day.is-future.is-drop-target{border-color:#cb9a4e;box-shadow:0 0 0 2px rgba(199,159,76,.2)}
+@media(max-width:760px){.study-plan-history-actions .btn{width:100%}}
