@@ -509,12 +509,26 @@ function updateTotalsPreview(form){
  target.textContent=Math.max(0,Math.round(tracked-study-rest))+" min";
 }
 
+function finishAsNotDone(){
+ const a=timing.active,r=activeRecord(),x=a&&session(a.sessionId);
+ if(!a||!r||!x)throw Error("Sessão ativa não encontrada.");
+ if(V?.isClosed?.(x.date))throw Error("Dia finalizado.");
+ autoPauseForInactivity();
+ if(studyMs(r)>=1000||x.actualMin!=null)throw Error("A sessão já possui estudo registrado. Encerre como parcial, não como não realizada.");
+ if(!window.confirm("Registrar esta sessão como não realizada? Nenhum tempo de estudo será contabilizado e o ciclo não avançará."))return;
+ if(timing.alarm)dismissAlarm();
+ timing.active=null;delete timing.records[x.id];
+ T.setSessionStatus(x.id,"pending",null,"");
+ T.setSessionStatus(x.id,"notdone",null,"");
+ persist();C.closeModal();C.render();C.notify("Sessão marcada como não realizada. O ciclo não avançou.");
+}
 function finishChoices(){
  const a=timing.active;if(!a)return;
  const r=activeRecord(),x=session(a.sessionId);
  C.openModal("Finalizar sessão",'<div class="section-stack"><p class="note">'+E(x?.discipline||"Estudo")+' · '+E(duration(r?studyMs(r):0))+' de estudo registrado.</p>'+
  '<p class="note">Concluir avança o ciclo quando aplicável; encerrar parcial registra somente o tempo realizado.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button>'+
+ (r&&studyMs(r)<1000?'<button type="button" class="btn ghost" data-s7="finishNotDone">Não realizada</button>':"")+
  '<button type="button" class="btn ghost" data-s7="partial">Encerrar parcial</button>'+
  '<button type="button" class="btn primary" data-s7="finish">Concluir sessão</button></div></div>');
 }
@@ -1015,6 +1029,7 @@ document.addEventListener("click",e=>{
   else if(act==="pause")pause(b.dataset.kind||"rest");
   else if(act==="resume")resume();
   else if(act==="resumeIdle")resumeIdle();
+  else if(act==="finishNotDone")finishAsNotDone();
   else if(act==="finishChoices")finishChoices();
   else if(act==="finish")askFinish(true);
   else if(act==="partial")askFinish(false);
@@ -1099,6 +1114,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,finishChoices,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,finishChoices,finishAsNotDone,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
