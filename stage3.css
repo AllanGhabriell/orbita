@@ -454,3 +454,9 @@
 .study-daily-entry.is-notdone .study-daily-label>small,.study-plan-item.is-notdone .study-plan-status{color:#e4777e}
 .study-plan-item.is-notdone .study-plan-status{border-color:rgba(218,89,91,.46);background:rgba(209,65,70,.12)}
 .study-missed-count{color:#e4777e;font-weight:650}
+
+/* Registro de sessões por toque longo ou menu contextual. */
+.s3-quick-status{touch-action:manipulation;-webkit-touch-callout:none;user-select:none}
+.s3-quick-status-menu{display:flex;flex-direction:column;gap:8px}
+.s3-quick-status-menu>.btn{text-align:left;justify-content:flex-start;width:100%;min-height:40px}
+.s3-quick-status-menu>.s3-notdone-option{border-color:rgba(214,82,88,.55);color:#dc757c}
