@@ -64,10 +64,16 @@ const specific=R.notes.at(-1);
 assert.match(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/data-s8="jump"/);
 assert.equal(R.indicators({kind:"session",id:"math-2",discipline:"Matemática",cycleId:"enem",status:"pending"}),"","somente sessão selecionada mostra o lembrete específico");
 R.jump(specific.id);
+assert.match(markup,/s8-highlight/,"clicar no alfinete localiza e destaca o papel vinculado");
+assert.match(markup,/data-s8="new"/,"apenas o mural oferece criar lembrete");
+assert.doesNotMatch(read("stage3.js"),/data-s8="linkFromSession"/,"sessões não permitem adicionar lembretes");
+assert.doesNotMatch(read("stage2.js"),/data-s8="linkFromEntry"/,"atividades não oferecem criação fora do mural");
+assert.doesNotMatch(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/linkFrom|new|📌\+/,"indicador é exclusivamente de leitura");
+
 assert.match(markup,/Ver observação/,"observação acessível sem abrir edição");
 assert.match(markup,/Parte 2 - 07:55/,"texto da observação permanece no mural");
 R.saveNote(form({title:"Dica ENEM",priority:"medium",icon:"idea",target:"cycle|enem|"}));
-assert.match(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}),/💡/,"lembrete do ciclo aparece em outra matéria");
+assert.match(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}),/📌/,"um alfinete discreto abre o lembrete do ciclo");
 assert.match(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/<span>2<\/span>/,"dois lembretes compartilham um só indicador");
 sessions[0].status="done";
 R.prune();
