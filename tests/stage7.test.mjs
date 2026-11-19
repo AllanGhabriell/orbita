@@ -93,41 +93,75 @@ test("correção de totais impede inventar tempo superior ao registrado",()=>{
  assert.throws(()=>h.stage.correctSessionTotals(90,0,"running"),/ultrapassam/);
  assert.equal(h.stage.studyMs(h.state.timing.records["math-1"]),10*60000);
 });
-test("inatividade interrompe estudo no limite e não conta horas extras",()=>{
+test("sem cliques durante a meta de 90 minutos jamais interrompe o estudo",()=>{
  const h=harness();h.stage.model.settings.autoPauseMinutes=10;
  h.stage.start("math-1");
- h.setTime(8*3600000);
- h.stage.tick();
+ h.setTime(30*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running");
+ h.setTime(89*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running","estudar no caderno não exige clicar no aplicativo");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),89*60000);
+ h.setTime(90*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running","atingir a meta não pausa automaticamente");
+ assert.equal(h.stage.model.records["math-1"].goalNotified,true,"atingir a meta aciona o aviso");
+});
+test("após a meta há dez minutos de tolerância antes de interromper o excedente",()=>{
+ const h=harness();h.stage.model.settings.autoPauseMinutes=10;
+ h.stage.start("math-1");
+ h.setTime(99*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running");
+ h.setTime(101*60000);h.stage.tick();
  const r=h.stage.model.records["math-1"];
  assert.equal(h.stage.model.active.phase,"idle");
- assert.equal(h.stage.studyMs(r),10*60000);
- assert.equal(h.stage.pauseMs(r),0,"inatividade não é descanso");
- h.setTime(9*3600000);
- h.stage.tick();
- assert.equal(h.stage.studyMs(r),10*60000,"horas seguintes não contam como estudo");
+ assert.equal(h.stage.studyMs(r),100*60000,"90 minutos protegidos mais dez de tolerância");
+ assert.equal(h.stage.pauseMs(r),0,"tempo ausente não é descanso");
+ h.setTime(8*3600000);h.stage.tick();
+ assert.equal(h.stage.studyMs(r),100*60000,"o restante das oito horas não é contado");
  h.stage.resumeIdle();
- assert.equal(r.unaccountedMs,9*3600000-10*60000);
+ assert.equal(r.unaccountedMs,8*3600000-100*60000);
  assert.equal(h.stage.model.active.phase,"running");
- h.setTime(9*3600000+2*60000);
- assert.equal(h.stage.studyMs(r),12*60000,"contagem só recomeça após clicar em continuar");
+ assert.equal(r.overtimeConfirmed,true,"retomar indica escolha consciente de continuar");
+ h.setTime(8*3600000+40*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running","não interrompe novamente a continuação confirmada");
 });
-test("interação durante estudo reinicia limite de inatividade",()=>{
+test("Continuar estudando após alarme libera extensão sem exigir novos cliques",()=>{
  const h=harness();h.stage.model.settings.autoPauseMinutes=10;
  h.stage.start("math-1");
- h.setTime(8*60000);h.stage.noteActivity();
- h.setTime(15*60000);h.stage.tick();
- assert.equal(h.stage.model.active.phase,"running","a interação recente mantém o estudo em andamento");
- h.setTime(20*60000);h.stage.tick();
- assert.equal(h.stage.model.active.phase,"idle");
- assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),18*60000,"limite vale a partir da última interação, não do início");
+ h.setTime(90*60000);h.stage.tick();
+ h.stage.confirmOvertime();
+ assert.equal(h.stage.model.records["math-1"].overtimeConfirmed,true);
+ h.setTime(4*3600000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),4*3600000);
 });
-test("clique após ausência não apaga sinal de inatividade",()=>{
+test("a interação depois da meta renova tolerância, sem vigiar o período protegido",()=>{
+ const h=harness();h.stage.model.settings.autoPauseMinutes=10;
+ h.stage.start("math-1");
+ h.setTime(92*60000);h.stage.tick();
+ h.stage.noteActivity();
+ h.setTime(101*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running","interação após meta renova tolerância");
+ h.setTime(103*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"idle");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),102*60000);
+});
+test("clique após muitas horas não valida retroativamente o tempo excedente",()=>{
  const h=harness();h.stage.model.settings.autoPauseMinutes=5;
  h.stage.start("math-1");
- h.setTime(30*60000);
- h.stage.noteActivity();
- assert.equal(h.stage.model.active.phase,"idle","a pausa é aplicada antes de registrar nova interação");
- assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),5*60000);
+ h.setTime(8*3600000);h.stage.noteActivity();
+ assert.equal(h.stage.model.active.phase,"idle");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),95*60000);
+});
+test("pausa manual durante a meta continua funcionando sem proteção indevida",()=>{
+ const h=harness();h.stage.model.settings.autoPauseMinutes=10;
+ h.stage.start("math-1");
+ h.setTime(40*60000);h.stage.pause();
+ h.setTime(120*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"paused","descanso manual não é interrupção automática");
+ assert.equal(h.stage.studyMs(h.stage.model.records["math-1"]),40*60000);
+ h.stage.resume();
+ h.setTime(170*60000);h.stage.tick();
+ assert.equal(h.stage.model.active.phase,"running","restam 50 min de estudo protegido");
 });
 test("cronômetro conta estudo e pausas separadamente; término não avança automaticamente",()=>{
  const h=harness();
