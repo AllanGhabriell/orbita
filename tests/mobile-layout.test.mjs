@@ -47,15 +47,15 @@ assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo cu
 const sw=read("sw.js");
 assert.ok(read("index.html").includes("stage8.css?v=20261119-reminder-readonly-v5-02"),"mural flutuante tem CSS versionado");
 assert.ok(read("boot.js").includes('"stage8.js"'),"mural carregado em todas as inicializacoes");
-assert.match(sw,/orbita-app-20261119-orbita-v5-07/,"cache PWA renovado para a versao das rotinas");
+assert.match(sw,/orbita-app-20261119-orbita-v5-07-final/,"cache PWA renovado para a versao das rotinas");
 assert.ok(read("boot.js").includes('file==="stage2.js"?"?v=20261119-reminder-readonly-v5-02"'),"bootstrap carrega versao especifica do modulo de rotinas");
  const html=read("index.html");
-assert.match(html,/boot\.js\?v=20261119-orbita-v5-07/,"HTML carrega bootstrap atualizado");
+assert.match(html,/boot\.js\?v=20261119-orbita-v5-07-final/,"HTML carrega bootstrap atualizado");
  const cssVersion=html.match(/stage7\.css\?v=([a-zA-Z0-9-]+)/)?.[1];
  assert.ok(cssVersion,"CSS do cronômetro tem versão explícita no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v="+cssVersion),"o Service Worker contém a versão de CSS realmente usada no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
-assert.ok(html.includes("styles.css?v=20261119-orbita-v5-07"),"CSS do perfil no celular tem versão nova");
+assert.ok(html.includes("styles.css?v=20261119-orbita-v5-07-final"),"CSS do perfil no celular tem versão nova");
 assert.ok(html.includes("stage2.css?v=20261118-orbita-v5-0-1"),"Organizar recebe CSS atualizado");
 assert.ok(html.includes("stage2.css?v=20261118-orbita-v5-0-1"),"CSS das prioridades de tarefas com versão atualizada");
 assert.ok(html.includes("stage3.css?v=20261119-study-final-v5-06"),"stylesheet recebe versão para superar cache antigo");
