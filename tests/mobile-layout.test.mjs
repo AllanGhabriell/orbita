@@ -41,7 +41,7 @@ assert.ok(markup.includes("6h"),"tempo real disponível convertido em rótulo cu
 const sw=read("sw.js");
 assert.ok(read("index.html").includes("stage8.css?v=20261118-orbita-v5-0-1"),"mural flutuante tem CSS versionado");
 assert.ok(read("boot.js").includes('"stage8.js"'),"mural carregado em todas as inicializacoes");
-assert.match(sw,/orbita-app-20261118-orbita-v5-0-1/,"cache PWA renovado para a versao das rotinas");
+assert.match(sw,/orbita-app-20261119-timer-protection-v5-0-1/,"cache PWA renovado para a versao das rotinas");
 assert.ok(read("boot.js").includes('file==="stage2.js"?"?v=20261118-orbita-v5-0-1"'),"bootstrap carrega versao especifica do modulo de rotinas");
  const html=read("index.html");
 assert.match(html,/boot\.js\?v=20261118-orbita-v5-0-1/,"HTML carrega bootstrap atualizado");
