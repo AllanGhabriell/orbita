@@ -88,7 +88,7 @@ function dailyCounts(snapshot){
   tasks:tasks.length,tasksDone:tasks.filter(x=>x.status==="done").length,
   plannedStudy:ss.length,studiesDone:ss.filter(x=>x.status==="done").length,
   studiesPartial:ss.filter(x=>x.status==="progress").length,studiesNotDone:ss.filter(x=>x.status==="notdone").length,
-  missingStudyTimes:ss.filter(x=>x.actualMin==null).length,
+  missingStudyTimes:ss.filter(x=>x.actualMin==null&&x.status!=="notdone").length,
   unmarked:a.filter(x=>["pending","progress"].includes(x.status)).length+ss.filter(x=>["pending","progress"].includes(x.status)).length};
 }
 function hasCommitment(date){
@@ -422,6 +422,9 @@ function overviewPeriod(x){
 
  html+='<section class="card"><div class="card-head"><h2>Mais indicadores</h2></div><div class="evo-rows">'+
  reportRow("Sessões concluídas",n.studiesDone+" / "+n.study)+
+ reportRow("Sessões parciais",String(n.partial))+
+ reportRow("Sessões não realizadas",String(n.studiesNotDone))+
+ reportRow("Sessões planejadas",String(n.study))+
  reportRow("Rotinas concluídas",n.habitDone+" / "+n.habits)+
  reportRow("Pontualidade registrada",n.habitRecordedTimes?n.habitOnTime+"/"+n.habitRecordedTimes:"Não avaliada")+
  reportRow("Tarefas secundárias concluídas",String(n.tasksDone))+
