@@ -126,7 +126,7 @@ async function create(){
    status(oauthReturnError?"error":"signedout",oauthReturnError||"");
   }
   initialized=true;
-  remoteTimer=setInterval(()=>{checkRemoteUpdates().catch(err=>status("error",err));},2500);
+  if(typeof setInterval==="function")remoteTimer=setInterval(()=>{checkRemoteUpdates().catch(err=>status("error",err));},2500);
  }catch(err){
   authInitializing=false;
   oauthReturnError=explainOAuthError(err);
@@ -138,7 +138,7 @@ async function onSession(session,event){
  const next=session?.user||null;
  if(!next){
   user=null;cloudVersion=0;
-  clearInterval(remoteTimer);remoteTimer=null;
+  if(remoteTimer!==null&&typeof clearInterval==="function")clearInterval(remoteTimer);remoteTimer=null;
   status(oauthReturnError?"error":isConfigured(readConfig())?"signedout":"guest",oauthReturnError||"");
   C.render();return;
  }
