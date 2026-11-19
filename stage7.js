@@ -796,7 +796,7 @@ function ring(){
  (r.mode!=="continuous"?'<button class="btn small ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
  '<button class="btn small ghost" data-s7="partial">Encerrar parcial</button></div></details></div>')+
- </div></div>'+
+ '</div></div>' +
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
  '<p class="note">O estudo e as pausas podem ser corrigidos em minutos e segundos. Tempo desconsiderado não conta como estudo.</p></section>';
 }
