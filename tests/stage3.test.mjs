@@ -274,7 +274,7 @@ assert.equal(T.plannerLabel(visualFuture[0]),"Física II","projeção continua c
 // 5.05: o dia real é destacado, mesmo com outra data selecionada.
 assert.match(element("view").innerHTML,/study-plan-day is-today/,"dia real recebe destaque independente da seleção");
 assert.match(element("view").innerHTML,/HOJE/,"o destaque inclui identificação textual");
-const historicalDate=C.addDays(date,-1),newDate=C.addDays(date,3);
+const historicalDate=C.addDays(date,-7),newDate=C.addDays(date,3);
 const pastSession={...T.session(visualExtra[0].id),id:"history-copy-01",date:historicalDate,status:"done",actualMin:38,actualTime:"09:00",completedAt:"2026-11-01T12:00:00.000Z",evidence:{questions:8},archived:false};
 T.model.sessions.push(pastSession);
 P.model.closedDays.push(historicalDate);
