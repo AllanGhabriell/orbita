@@ -402,14 +402,20 @@ function updateSession(id,data){
 function setSessionStatus(id,status,actualMin,actualTime){
  const x=session(id);if(!x||x.archived)throw Error("Sessão não encontrada.");
  if(!editable(x.date))throw Error("O dia está finalizado.");
- if(!["pending","progress","done"].includes(status))throw Error("Status inválido.");
+ if(!["pending","progress","done","notdone"].includes(status))throw Error("Status inválido.");
  const minutes=optionalMin(actualMin);
  if(actualTime&&!validTime(actualTime))throw Error("Horário inválido.");
+ if(status==="notdone"){
+  if(window.OrbitaStage7?.inspect?.activeSessionId===id)throw Error("Encerre o cronômetro antes de marcar como não realizada.");
+  const timer=window.OrbitaStage7?.inspect?.model?.records?.[id];
+  if(minutes!==null||x.actualMin!=null||Number(timer?.studyMs)>0||x.status==="progress")
+   throw Error("Há estudo registrado. Encerre como parcial ou corrija o registro antes de marcar como não realizada.");
+ }
  if(x.status==="done"&&status!=="done"&&x.kind==="cycle")canUndoCompletedStep(x);
  const old=x.status;
  // Vagas futuras seguem o próximo assunto REAL na hora da execução,
  // sem fixar a matéria durante o planejamento de uma semana inteira.
- if(x.rotationSlot&&status!=="pending"){
+ if(x.rotationSlot&&status!=="pending"&&status!=="notdone"){
   const c=cycle(x.cycleId);ensureCycleActive(c);
   const sub=cycleState(c);
   x.subjectId=sub.id;x.stepNo=c.stepNo;x.discipline=sub.title;
@@ -421,10 +427,11 @@ function setSessionStatus(id,status,actualMin,actualTime){
   x.rotationSlot=true;x.wasRotationSlot=true;x.subjectId="";x.stepNo=0;
   x.discipline="Próxima matéria do ciclo";x.resolvedAt=null;
  }
- x.status=status;x.actualMin=minutes;x.actualTime=actualTime||"";
+ x.status=status;x.actualMin=status==="notdone"?null:minutes;x.actualTime=status==="notdone"?"":actualTime||"";
+ if(status==="notdone")x.evidence={questions:null,correct:null,quality:null};
  if(status==="done")x.completedAt=x.completedAt||now();
  else x.completedAt=null;
- logs("session_status",{sessionId:id,from:old,to:status,actualMin:minutes});
+ logs("session_status",{sessionId:id,from:old,to:status,actualMin:status==="notdone"?null:minutes});
  const c=x.kind==="cycle"?cycle(x.cycleId):null;
  if(c&&status==="done"&&x.stepNo===c.stepNo){
   if(progression(c))lastHomeAdvance=c.id;
@@ -453,7 +460,7 @@ function summarize(filter={}){
   inc("methods",x.methodLabel||method(x.methodId)?.title||"Sem modalidade",x);
   inc("cycles",x.cycleLabel||cycle(x.cycleId)?.title||(x.cycleId?"Ciclo arquivado":"Complementar independente"),x);
  }
- return {sessions:entries.length,completed:entries.filter(x=>x.status==="done").length,inProgress:entries.filter(x=>x.status==="progress").length,plannedMin:planned,actualMin:actual,actualRecorded,unrecorded:entries.length-actualRecorded,groups};
+ return {sessions:entries.length,completed:entries.filter(x=>x.status==="done").length,inProgress:entries.filter(x=>x.status==="progress").length,notDone:entries.filter(x=>x.status==="notdone").length,pending:entries.filter(x=>x.status==="pending").length,plannedMin:planned,actualMin:actual,actualRecorded,unrecorded:entries.length-actualRecorded,groups};
 }
 function loadFor(date){
  const frozen=s.evolution?.closed?.[date];if(frozen)return {studyPlanned:frozen.plan.studyMin,otherPlanned:frozen.plan.otherMin,totalPlanned:frozen.plan.totalMin,available:frozen.availableMin,overlap:[],linkedFocuses:new Set(frozen.studies.filter(x=>x.focusId).map(x=>x.focusId)).size};
