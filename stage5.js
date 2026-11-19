@@ -7,7 +7,7 @@ const META="orbita:cloud-meta-v1";
 const VERSION=1;
 const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
-let client=null,user=null,cloudVersion=0,mode="unconfigured",busy=false,initialized=false,saveTimer=null,networkTimer=null,lastError="",conflict=null;
+let client=null,user=null,cloudVersion=0,mode="unconfigured",busy=false,initialized=false,saveTimer=null,networkTimer=null,lastError="",conflict=null,remoteCheckBusy=false,remoteTimer=null;
 let cfg=null;
 let authInitializing=true,oauthReturnError=null,authSnapshot=null;
 function readConfig(){
@@ -126,6 +126,7 @@ async function create(){
    status(oauthReturnError?"error":"signedout",oauthReturnError||"");
   }
   initialized=true;
+  remoteTimer=setInterval(()=>{checkRemoteUpdates().catch(err=>status("error",err));},2500);
  }catch(err){
   authInitializing=false;
   oauthReturnError=explainOAuthError(err);
@@ -137,6 +138,7 @@ async function onSession(session,event){
  const next=session?.user||null;
  if(!next){
   user=null;cloudVersion=0;
+  clearInterval(remoteTimer);remoteTimer=null;
   status(oauthReturnError?"error":isConfigured(readConfig())?"signedout":"guest",oauthReturnError||"");
   C.render();return;
  }
@@ -254,7 +256,7 @@ async function initialReconcile(){
 function scheduleSync(){
  if(mode!=="ready"||!client||!user)return;
  clearTimeout(saveTimer);
- saveTimer=setTimeout(()=>push(currentDoc()).catch(err=>status(navigator.onLine?"error":"offline",err)),1300);
+ saveTimer=setTimeout(()=>push(currentDoc()).catch(err=>status(navigator.onLine?"error":"offline",err)),250);
 }
 Storage.onUserSave=()=>scheduleSync();
 async function push(doc){
@@ -265,6 +267,9 @@ async function push(doc){
   if(error)throw error;
   if(data?.status==="conflict"){
    const remote=await fetchRemote();
+   const meta=boundMeta(),unchanged=meta&&checksum(currentDoc())===meta.hash;
+   if(unchanged&&isValidDoc(remote.document)){await importState(remote.document,remote.version);return;}
+   // Duas alterações simultâneas não devem ser sobrescritas silenciosamente.
    conflict={remote,local:currentDoc()};
    status("conflict");return;
   }
@@ -274,6 +279,22 @@ async function push(doc){
   if(checksum(currentDoc())!==checksum(doc))scheduleSync();
  }catch(err){status(navigator.onLine?"error":"offline",err);}
  finally{busy=false;}
+}
+// Verifica novas versões entre aparelhos. Não importa dados sobre edições
+// locais ainda não enviadas; a gravação usa controle de versão no banco.
+async function checkRemoteUpdates(){
+ if(remoteCheckBusy||busy||!user||!client||mode!=="ready"||!navigator.onLine||document.hidden)return;
+ remoteCheckBusy=true;
+ try{
+  const remote=await fetchRemote();
+  if(remote.version===cloudVersion)return;
+  if(!isValidDoc(remote.document))throw Error("A versão recebida da nuvem é inválida.");
+  const meta=boundMeta(),local=currentDoc(),localClean=!!meta&&checksum(local)===meta.hash;
+  if(localClean)await importState(remote.document,remote.version);
+  else if(checksum(local)===checksum(remote.document)){setLastSync(local,remote.version);status("ready");}
+  else await push(local);
+ }catch(err){status(navigator.onLine?"error":"offline",err);}
+ finally{remoteCheckBusy=false;}
 }
 async function syncNow(){
  if(!user)return notify("Entre com Google antes de sincronizar.");
@@ -377,7 +398,7 @@ function settingsPanel(){
  const label=user?.user_metadata?.name||user?.email||"";
  return '<section class="card s5-panel"><div class="card-head"><h2>Dados e sincronização</h2><span class="status" id="s5-status">'+E({ready:"Sincronização ativa",syncing:"Enviando alterações",conflict:"Conflito de versões",loading:"Conectando",offline:"Offline",error:"Atenção",signedout:"Não conectado",unconfigured:"Não configurado"}[mode]||mode)+'</span></div>'+
  '<p class="note s5-auth-error" id="s5-error" role="alert" '+(!lastError?'hidden':'')+'>'+E(lastError)+'</p>'+
- (user?'<div class="s5-user"><div><strong>'+E(label)+'</strong><small>Dados privados da conta Google. O login do navegador é separado do banco local.</small></div></div><div class="row"><button class="btn primary" data-s5="sync">Sincronizar agora</button><button class="btn small" data-s5="logout">Sair da conta</button></div>':
+ (user?'<div class="s5-user"><div><strong>'+E(label)+'</strong><small>Dados sincronizados automaticamente entre dispositivos conectados à mesma conta.</small></div></div><div class="row"><button class="btn small" data-s5="logout">Sair da conta</button></div>':
  (client?'<div class="row"><button class="btn primary" data-s5="login">Continuar com Google</button><span class="note">Sem login, seus dados permanecem neste aparelho.</span></div>':'<p class="note">A conexão com o banco já está configurada no Órbita. Se o login não aparecer, confira sua conexão com a internet e atualize a página.</p>'))+
  '<div class="s5-conflict" id="s5-conflict-actions" '+(mode!=="conflict"?"hidden":"")+'><strong>Há duas versões dos seus dados.</strong><p class="note">Nada será sobrescrito automaticamente. Primeiro exporte um backup, depois escolha qual cópia utilizar. A proteção de dias finalizados é aplicada pelo banco.</p><div class="row"><button class="btn" data-s5="chooseRemote">Usar nuvem</button><button class="btn" data-s5="chooseLocal">Usar dispositivo</button></div></div>'+
  '<div class="row" style="margin-top:12px"><button class="btn" data-s5="export">Exportar backup JSON</button><button class="btn" data-s5="import">Importar backup JSON</button><input id="s5-import-file" type="file" accept=".json,application/json" hidden></div>'+
@@ -409,7 +430,9 @@ document.addEventListener("change",event=>{
  receiveBackup(event.target.files?.[0]).catch(err=>{status(mode==="conflict"?"conflict":"error",err);notify(textError(err));});
 });
 window.addEventListener("online",()=>{if(user&&mode!=="conflict"){clearTimeout(networkTimer);networkTimer=setTimeout(()=>initialReconcile().catch(err=>status("error",err)),600);}});
-window.OrbitaStage5={decorate,inspect:{oauthCallback,clearOAuthCallback,explainOAuthError,checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client},mergeClosures}};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkRemoteUpdates().catch(err=>status("error",err));});
+window.addEventListener("focus",()=>{checkRemoteUpdates().catch(err=>status("error",err));});
+window.OrbitaStage5={decorate,inspect:{oauthCallback,clearOAuthCallback,explainOAuthError,checksum,isConfigured,meaningful,checkFrozenCompatibility,get mode(){return mode},get version(){return cloudVersion},get user(){return user},get client(){return client},mergeClosures,checkRemoteUpdates}};
 C.render();
 create();
 })();
