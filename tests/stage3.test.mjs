@@ -271,4 +271,31 @@ T.setSessionStatus(visualDay[1].id,"pending",null,"");
 assert.equal(T.cycleState(visualCycle).id,visualMath.id,"desfazer reabre a etapa");
 assert.equal(T.plannerLabel(visualFuture[0]),"Física II","projeção continua condicional à sessão pendente");
 
+// 5.05: o dia real é destacado, mesmo com outra data selecionada.
+assert.match(element("view").innerHTML,/study-plan-day is-today/,"dia real recebe destaque independente da seleção");
+assert.match(element("view").innerHTML,/HOJE/,"o destaque inclui identificação textual");
+const historicalDate=C.addDays(date,-1),newDate=C.addDays(date,3);
+const pastSession={...T.session(visualExtra[0].id),id:"history-copy-01",date:historicalDate,status:"done",actualMin:38,actualTime:"09:00",completedAt:"2026-11-01T12:00:00.000Z",evidence:{questions:8},archived:false};
+T.model.sessions.push(pastSession);
+P.model.closedDays.push(historicalDate);
+const oldSnapshot=JSON.stringify(pastSession),oldLength=T.model.sessions.length;
+const copiedOld=T.planCopyOne(pastSession.id,newDate);
+assert.equal(T.model.sessions.length,oldLength+1,"cópia cria uma sessão, não altera a origem");
+assert.equal(JSON.stringify(T.session(pastSession.id)),oldSnapshot,"registro de dia finalizado permanece intacto");
+assert.equal(copiedOld.status,"pending");
+assert.equal(copiedOld.actualMin,null);
+assert.equal(copiedOld.completedAt,null);
+assert.equal(copiedOld.evidence,null,"não copia evidências de estudo realizado");
+assert.notEqual(copiedOld.id,pastSession.id,"cópia recebe identificador próprio");
+assert.throws(()=>T.planMove(pastSession.id,newDate),/iniciada|concluída|Dias passados/,"histórico nunca é movido");
+assert.throws(()=>T.planCopyOne(pastSession.id,historicalDate),/dia atual ou futuro/,"destino passado bloqueado");
+assert.throws(()=>T.planCopyOne(pastSession.id,copyOldInvalidDate()),/dia atual ou futuro/,"destino inválido bloqueado");
+function copyOldInvalidDate(){return "2001-01-01";}
+T.actions.planPrevWeek();
+assert.match(element("view").innerHTML,/study-plan-day is-past/,"semana anterior fica acinzentada");
+assert.match(element("view").innerHTML,/Copiar para outro dia/,"sessão passada continua copiável pelo botão");
+assert.doesNotMatch(element("view").innerHTML,/study-plan-day is-today/,"dia selecionado no passado não vira hoje");
+assert.match(read("stage3.css"),/\.study-plan-day\.is-today[\s\S]*#bc913c/,"dia de hoje recebe dourado");
+assert.match(read("stage3.css"),/\.study-plan-day\.is-past/,"dia anterior recebe tema cinza");
+
 console.log("Etapa 3: ciclos, etapa multi-sessão, correção, pausa, reforço, vínculo com foco, estatísticas por dimensão e editor preservado.");
