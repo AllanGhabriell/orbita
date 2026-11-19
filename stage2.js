@@ -183,23 +183,38 @@ function decorateOrganize(){
 }
 function blockOptions(selected){return '<option value="">Sem bloco</option>'+p.blocks.filter(b=>!b.archived||b.id===selected).map(b=>'<option value="'+a(b.id)+'" '+(selected===b.id?"selected":"")+'>'+e(b.title)+(b.archived?" (arquivado)":"")+'</option>').join("");}
 function formField(label,name,value,type="text",attrs=""){return '<div class="field"><label>'+e(label)+'</label><input type="'+type+'" name="'+name+'" value="'+a(value??"")+'" '+attrs+'></div>';}
+function nextOpenOccurrence(original,from){
+ let cursor=from;
+ const end=original.recurrence?.end||D(from,3660);
+ for(let i=0;i<=3660&&cursor<=end;i++,cursor=D(cursor,1)){
+  if(occurrence(original,cursor)&&!locked(cursor)&&!s.evolution?.closed?.[cursor])return cursor;
+ }
+ return null;
+}
 function entryModal(type,id,date){
- if(locked(date||s.date))return notify("Dia finalizado: apenas consulta ao registro original.");
  let original=id?find(id):null;
  if(!original&&!C.availabilityReady())return notify("Configure sua disponibilidade antes de planejar.");
- const x=id?(occurrence(original,date||original.date)||original):baseEntry({type,date:date||s.date,recurrence:type==="habit"?{kind:"daily"}:{kind:"none"}});
+ const recurring=!!original&&original.recurrence?.kind!=="none";
+ let selected=date||original?.date||s.date;
+ // Organizar abre modelos antigos: buscar a próxima ocorrência não finalizada.
+ if(recurring&&(selected<day()||locked(selected)||s.evolution?.closed?.[selected])){
+  selected=nextOpenOccurrence(original,day());
+  if(!selected)return notify("Não há ocorrências abertas para editar; o histórico permanece protegido.");
+ }
+ if(locked(selected)||s.evolution?.closed?.[selected])return notify("O dia "+fmt(selected,false)+" já foi finalizado.");
+ const x=id?(occurrence(original,selected)||original):baseEntry({type,date:selected,recurrence:type==="habit"?{kind:"daily"}:{kind:"none"}});
  const editing=!!original;
- const form='<form id="s2-entry" class="section-stack"><input type="hidden" name="id" value="'+a(id||"")+'"><input type="hidden" name="editDate" value="'+a(date||x.date)+'"><input type="hidden" name="type" value="'+a(type||x.type)+'">'+
+ const form='<form id="s2-entry" class="section-stack"><input type="hidden" name="id" value="'+a(id||"")+'"><input type="hidden" name="editDate" value="'+a(selected)+'"><input type="hidden" name="type" value="'+a(type||x.type)+'">'+
  formField("Nome da atividade","title",x.title,"text",'required maxlength="140"')+
  '<div class="field"><label>Objetivo relacionado (opcional)</label><select name="goalId"><option value="">Sem objetivo</option>'+s.goals.filter(g=>!g.archived).map(g=>'<option value="'+a(g.id)+'" '+(x.goalId===g.id?"selected":"")+'>'+e(g.title)+'</option>').join("")+'</select></div>'+
- '<div class="form-grid">'+formField("Data inicial","date",x.date,"date",'required min="'+firstUse()+'"')+
+ '<div class="form-grid">'+formField(recurring?"A partir da ocorrência":"Data inicial","date",recurring?selected:x.date,"date",'required min="'+(recurring?selected:firstUse())+'" '+(recurring?'readonly title="Histórico anterior preservado"':""))+
  '<div class="field"><label>Bloco</label><select name="blockId">'+blockOptions(x.blockId)+'</select></div></div>'+
  (type==="task"?'<div class="form-grid"><div class="field"><label>Prioridade</label><select name="priority"><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="medium" '+(x.priority==="medium"?"selected":"")+'>Média</option><option value="low" '+(x.priority==="low"?"selected":"")+'>Baixa</option></select></div>'+formField("Prazo opcional","dueDate",x.dueDate,"date")+'</div>':"")+
  '<div class="form-grid">'+formField(type==="habit"?"Horário-alvo (opcional)":"Horário (opcional)","startTime",x.startTime||"","time")+
  formField("Duração estimada em minutos","estimatedMin",x.estimatedMin??"","number",'min="1" max="1440" step="1" placeholder="Opcional"')+'</div>'+
  '<div class="field"><label>'+(type==="habit"?"Tipo de rotina":"Repetição")+'</label><select name="repeat"><option value="daily" '+(x.recurrence?.kind==="daily"?"selected":"")+'>Diária — todos os dias</option><option value="weekdays" '+(x.recurrence?.kind==="weekdays"?"selected":"")+'>Semanal — dias escolhidos</option><option value="interval" '+(x.recurrence?.kind==="interval"?"selected":"")+'>Por intervalo — a cada N dias</option><option value="monthday" '+(x.recurrence?.kind==="monthday"?"selected":"")+'>Mensal — dia do mês</option><option value="none" '+(x.recurrence?.kind==="none"?"selected":"")+'>Pontual — somente uma vez</option></select></div>'+
- '<div class="repeat-fields" id="s2-repeat-fields">'+repeatFields(x.recurrence||{kind:"none"},x.date)+'</div>'+
- (editing&&x.recurrence?.kind!=="none"?'<div class="field"><label>Alcance da edição</label><select name="scope"><option value="future" '+((date||x.date)===original?.date?"selected":"")+'>Esta e futuras ocorrências</option><option value="single" '+((date||x.date)!==original?.date?"selected":"")+'>Somente esta ocorrência</option></select></div>':"")+
+ '<div class="repeat-fields" id="s2-repeat-fields">'+repeatFields(x.recurrence||{kind:"none"},recurring?selected:x.date)+'</div>'+
+ (editing&&x.recurrence?.kind!=="none"?'<div class="field"><label>Alcance da edição</label><select name="scope"><option value="future" '+(type==="focus"||selected===original?.date?"selected":"")+'>Esta e futuras ocorrências</option><option value="single" '+(type!=="focus"&&selected!==original?.date?"selected":"")+'>Somente esta ocorrência</option></select><small>O histórico anterior não será modificado.</small></div>':"")+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar</button></div></form>';
  C.openModal(editing?"Editar atividade":"Nova atividade",form,"");
 }
@@ -405,9 +420,14 @@ function submission(id,data){
  if(id==="s2-entry"){
   const origin=find(String(data.get("id")||"")),date=ds(data.get("editDate")||"");
   const payload=readForm(data,origin);
-  if(!canChange(date||payload.date)||!canChange(payload.date))return;
-  if(payload.recurrence.kind!=="none"&&payload.recurrence.end&&payload.recurrence.end>D(payload.date,3650))throw Error("O período máximo por sequência é de dez anos.");
   const scope=String(data.get("scope")||"single");
+  const recurring=!!origin&&origin.recurrence?.kind!=="none";
+  if(recurring&&payload.date!==date)throw Error("A data da ocorrência não pode ser alterada nesta edição.");
+  // A data original da sequência pode estar fechada; validar somente a
+  // ocorrência efetiva. Nunca salvar em uma data finalizada.
+  if(!canChange(date||payload.date)||(!recurring&&!canChange(payload.date)))return;
+  if(s.evolution?.closed?.[date||payload.date]||(!recurring&&s.evolution?.closed?.[payload.date]))throw Error("O dia escolhido já foi finalizado.");
+  if(payload.recurrence.kind!=="none"&&payload.recurrence.end&&payload.recurrence.end>D(payload.date,3650))throw Error("O período máximo por sequência é de dez anos.");
   if(origin)updateEntry(payload,origin,date,scope);
   else {const added=baseEntry(payload);p.entries.push(added);p.events.push({kind:"entry_created",id:added.id,date:added.date,at:added.createdAt});}
   save();C.closeModal();render();notify(origin?"Atividade atualizada.":"Atividade cadastrada.");return;
