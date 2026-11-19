@@ -848,7 +848,9 @@ function ring(){
  (a.phase==="running"?'<button class="btn small ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+
  (r.mode!=="continuous"?'<button class="btn small ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
- '<button class="btn small ghost" data-s7="partial">Encerrar parcial</button></div></details></div>')+
+ '<button class="btn small ghost" data-s7="partial">Encerrar parcial</button></div></details>'+
+ (a.phase==="paused"&&settings().pauseReminderMode!=="off"?'<button class="btn small ghost s7-pause-sound" data-s7="'+(pauseReminderSilenced?"replayPauseReminder":"silencePauseReminder")+'">'+(pauseReminderSilenced?"▶ Reproduzir lembrete":"♪ Silenciar lembrete")+'</button>':"")+
+ '</div>')+
  '</div></div>' +
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
  '<p class="note">O estudo e as pausas podem ser corrigidos em minutos e segundos. Tempo desconsiderado não conta como estudo.</p></section>';
@@ -938,6 +940,8 @@ function settingsPanel(){
  '<header class="s7-group-head"><span class="s7-group-icon" aria-hidden="true">♫</span><div><h3 id="s7-sound-heading">Sons e efeitos</h3><p>Escolha como será avisado</p></div></header>'+
  s7SettingRow("Som de conclusão",'<select id="s7-setting-finishSound" aria-label="Som de conclusão">'+soundOptions(q.finishSound)+'</select>')+
  s7SettingRow("Som de pausa",'<select id="s7-setting-pauseSound" aria-label="Som de pausa">'+soundOptions(q.pauseSound)+'</select>')+
+ s7SettingRow("Lembrete enquanto o estudo estiver pausado",'<select id="s7-setting-pauseReminderMode" aria-label="Alarme durante toda a pausa">'+
+ option("off","Desativado",q.pauseReminderMode)+option("continuous","Som contínuo até silenciar",q.pauseReminderMode)+option("interval","Apitos a cada 20 segundos",q.pauseReminderMode)+'</select>',"Opcional: silenciar não encerra a pausa. Alguns celulares impedem áudio com a tela bloqueada.")+
  s7SettingRow("Repetir som de conclusão",s7Switch("s7-setting-loopFinish",q.loopFinish,"Repetir som de conclusão"))+
  s7SettingRow("Repetir som de pausa",s7Switch("s7-setting-loopPause",q.loopPause,"Repetir som de pausa"))+
  s7SettingRow("Desligar som por inatividade",'<select id="s7-setting-alarmIdleMinutes" aria-label="Tempo até desligar alarme">'+[["0","Não desligar automaticamente"],["5","5 minutos"],["10","10 minutos"],["15","15 minutos (padrão)"],["30","30 minutos"]].map(([v,t])=>option(v,t,String(q.alarmIdleMinutes))).join("")+'</select>',"O som é silenciado; a sessão e a pausa continuam")+
@@ -1050,7 +1054,7 @@ async function upload(which,file){
  }
 }
 const numeric={goalMin:[1,720],blockMin:[1,180],restMin:[1,90],pauseMinutes:[0,240],volume:[0,100],alarmIdleMinutes:[0,30],inactivityWarningMinutes:[0,120],autoPauseMinutes:[0,30]};
-const strings={mode:["continuous","pomodoro","custom"],finishSound:["orbita","bell","digital","soft","custom","none"],pauseSound:["orbita","bell","digital","soft","custom","none"]};
+const strings={mode:["continuous","pomodoro","custom"],finishSound:["orbita","bell","digital","soft","custom","none"],pauseSound:["orbita","bell","digital","soft","custom","none"],pauseReminderMode:["off","continuous","interval"]};
 // Evita dupla contabilização se a pessoa tentar concluir/registrar a sessão com o timer ainda aberto.
 document.addEventListener("click",e=>{
  const b=e.target.closest?.('[data-s3="quickDone"],[data-s3="recordSession"]');
@@ -1067,6 +1071,8 @@ document.addEventListener("click",e=>{
   else if(act==="timedPause")timedPauseModal();
   else if(act==="pause")pause(b.dataset.kind||"rest");
   else if(act==="resume")resume();
+  else if(act==="silencePauseReminder")silencePauseReminder();
+  else if(act==="replayPauseReminder")replayPauseReminder();
   else if(act==="resumeIdle")resumeIdle();
   else if(act==="finishNotDone")finishAsNotDone();
   else if(act==="finishChoices")finishChoices();
@@ -1140,12 +1146,14 @@ document.addEventListener("change",e=>{
   if(!Number.isFinite(n)||n<min||n>max)return C.notify("Valor inválido.");
   if(key==="alarmIdleMinutes"&&![0,5,10,15,30].includes(n)||key==="inactivityWarningMinutes"&&![0,30,60,120].includes(n)||key==="autoPauseMinutes"&&![0,5,10,15,30].includes(n))return C.notify("Escolha um dos intervalos disponíveis.");
   settings()[key]=n;
+  if(key==="volume"&&timing.active?.phase==="paused"){pauseReminderSilenced=false;startPauseReminder();}
   if(key==="alarmIdleMinutes"){if(!autoSilenceAlarm())scheduleAlarmTimeout();}
   if(key==="inactivityWarningMinutes")inactivityPrompt=false;
   if(key==="autoPauseMinutes"&&n>0)autoPauseForInactivity();
  }else if(key in strings){
   if(!strings[key].includes(el.value))return;
   settings()[key]=el.value;
+  if((key==="pauseReminderMode"||key==="pauseSound")&&timing.active?.phase==="paused"){pauseReminderSilenced=false;startPauseReminder();}
  }else if(["visual","repeatPause","loopFinish","loopPause"].includes(key))settings()[key]=el.checked;
  else return;
  persist();C.render();
@@ -1153,6 +1161,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,finishChoices,finishAsNotDone,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
-C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,finishChoices,finishAsNotDone,startPauseReminder,stopPauseReminder,silencePauseReminder,replayPauseReminder,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+C.render();renderAlarm();if(timing.active?.phase==="paused")startPauseReminder();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
