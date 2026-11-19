@@ -311,8 +311,20 @@ function planCopyRange(sourceStart,targetStart,days=1,replace=false){
  logs("planner_copied",{sourceStart,targetStart,days,replace,count:copies.length});
  finish();save();render();return copies;
 }
+function planCopyOne(id,date){
+ const source=session(id);
+ if(!source||source.archived)throw Error("Sessão de origem não encontrada.");
+ if(!datesOkay(date)||date<first()||date<day()||blocked(date))throw Error("Escolha um dia atual ou futuro aberto para copiar.");
+ if(source.date===date)throw Error("Escolha outro dia para a cópia.");
+ if(cycle(source.cycleId)?.archived)throw Error("Reative o ciclo arquivado antes de copiar.");
+ const finish=planJournal(),copy=planCopyDraft(source,date);
+ Object.assign(copy,{id:unique(),createdAt:now(),date,planOrder:planNextOrder(date),status:"pending",actualMin:null,actualTime:"",completedAt:null,evidence:null});
+ db.sessions.push(copy);logs("planner_session_copied",{sourceId:id,date,copyId:copy.id});
+ finish();save();render();return copy;
+}
 function planMove(id,date,order=0){
  const x=session(id);planIsEditable(x);
+ if(x.date<day())throw Error("Dias passados são somente leitura. Use Copiar.");
  if(!datesOkay(date)||date<first()||blocked(date))throw Error("Escolha um dia disponível para mover a sessão.");
  const finish=planJournal();
  if(x.date===date){const target=Number(order)||1;const peers=planDayEntries(date).filter(q=>q.id!==id);
@@ -624,19 +636,19 @@ function plannerView(){
  const count=dates.reduce((n,d)=>n+planDayEntries(d).length,0);
  const minutes=dates.reduce((n,d)=>n+loadFor(d).studyPlanned,0);
  const weekdayCards=dates.map((date,i)=>{
-  const items=planDayEntries(date),daily=loadFor(date),finished=blocked(date),
+  const items=planDayEntries(date),daily=loadFor(date),finished=blocked(date),past=date<day(),today=date===day(),
    remaining=daily.available>0&&daily.totalPlanned>daily.available;
   const plan=items.map((x,j)=>{
    const c=cycle(x.cycleId),m=method(x.methodId),chosen=plannerSelection.has(x.id);
-   const editable=x.status==="pending"&&!finished;
+   const editable=x.status==="pending"&&!finished&&!past;
    const badgeLabel=x.status==="done"?"Concluída":x.status==="progress"?"Em andamento":x.rotationSlot?"Previsão do ciclo":sessionModeLabel(x);
-   return '<div class="study-plan-item '+(chosen?"is-selected ":"")+(editable?"is-editable":"")+'" data-plan-id="'+A(x.id)+'" draggable="'+(editable?"true":"false")+'"><div class="study-plan-item-top"><span class="study-plan-grip" aria-hidden="true">⠿</span><div class="study-plan-item-body"><strong>Sessão '+(j+1)+'</strong><span class="study-plan-item-subject">'+E(plannerLabel(x))+'</span><small>'+E(c?.title||x.area||"Estudo independente")+' · '+E(minuteLabel(x.plannedMin))+(m?' · '+E(m.title):"")+(x.topic?' · '+E(x.topic):"")+'</small></div><span class="study-plan-status">'+E(badgeLabel)+'</span></div>'+
- (editable?'<div class="study-plan-item-actions"><button class="btn small ghost" data-s3="planSelect" data-id="'+A(x.id)+'" aria-pressed="'+chosen+'">'+(chosen?"✓ Selecionado":"Selecionar")+'</button><button class="btn small ghost" data-s3="planEdit" data-id="'+A(x.id)+'">Editar</button><details class="study-plan-more"><summary>Mais ações</summary><div class="study-plan-more-content"><button class="btn small ghost" data-s3="planDuplicate" data-id="'+A(x.id)+'">Duplicar</button><button class="btn small ghost" data-s3="planMove" data-id="'+A(x.id)+'">Mover</button><button class="btn small danger" data-s3="planRemove" data-id="'+A(x.id)+'">Excluir</button></div></details></div>':'<small class="study-plan-locked">Para alterar uma sessão iniciada, corrija sua execução no Início.</small>')+'</div>';
+   return '<div class="study-plan-item '+(chosen?"is-selected ":"")+(editable?"is-editable":"")+(past?" is-history":"")+'" data-plan-id="'+A(x.id)+'" draggable="true" title="'+(past?"Arraste para copiar":"Arraste para copiar ou mover")+'"><div class="study-plan-item-top"><span class="study-plan-grip" aria-hidden="true">⠿</span><div class="study-plan-item-body"><strong>Sessão '+(j+1)+'</strong><span class="study-plan-item-subject">'+E(plannerLabel(x))+'</span><small>'+E(c?.title||x.area||"Estudo independente")+' · '+E(minuteLabel(x.plannedMin))+(m?' · '+E(m.title):"")+(x.topic?' · '+E(x.topic):"")+'</small></div><span class="study-plan-status">'+E(badgeLabel)+'</span></div>'+
+ (editable?'<div class="study-plan-item-actions"><button class="btn small ghost" data-s3="planSelect" data-id="'+A(x.id)+'" aria-pressed="'+chosen+'">'+(chosen?"✓ Selecionado":"Selecionar")+'</button><button class="btn small ghost" data-s3="planEdit" data-id="'+A(x.id)+'">Editar</button><details class="study-plan-more"><summary>Mais ações</summary><div class="study-plan-more-content"><button class="btn small ghost" data-s3="planDuplicate" data-id="'+A(x.id)+'">Duplicar</button><button class="btn small ghost" data-s3="planCopyOne" data-id="'+A(x.id)+'">Copiar para outro dia</button><button class="btn small ghost" data-s3="planMove" data-id="'+A(x.id)+'">Mover</button><button class="btn small danger" data-s3="planRemove" data-id="'+A(x.id)+'">Excluir</button></div></details></div>':'<div class="study-plan-history-actions"><small class="study-plan-locked">Somente leitura; você pode copiar sem alterar o histórico.</small><button class="btn small ghost" data-s3="planCopyOne" data-id="'+A(x.id)+'">Copiar para outro dia</button></div>')+'</div>';
   }).join("");
-  return '<div class="study-plan-day '+(date===s.date?"is-today":"")+'" data-plan-date="'+A(date)+'"><div class="study-plan-day-head"><button class="study-plan-day-title" data-s3="planPreviewDay" data-date="'+A(date)+'"><strong>'+plannerDow[i]+'</strong><small>'+E(spanDate(date))+'</small></button><span class="study-plan-day-total">'+items.length+' · '+E(minuteLabel(daily.studyPlanned))+'</span></div>'+
+  return '<div class="study-plan-day '+(today?"is-today":past?"is-past":"is-future")+'" data-plan-date="'+A(date)+'"><div class="study-plan-day-head"><button class="study-plan-day-title" data-s3="planPreviewDay" data-date="'+A(date)+'"><strong>'+plannerDow[i]+(today?' · HOJE':'')+'</strong><small>'+E(spanDate(date))+'</small></button><span class="study-plan-day-total">'+items.length+' · '+E(minuteLabel(daily.studyPlanned))+'</span></div>'+
   (remaining?'<p class="study-plan-overload">Carga acima da disponibilidade</p>':"")+
   '<div class="study-plan-day-items">'+(plan||'<p class="study-plan-placeholder">Nenhum estudo planejado para este dia.</p>')+'</div>'+
-  (finished?'<small>Dia finalizado: histórico preservado</small>':'<div class="study-plan-day-footer"><button class="btn small primary" data-s3="planAdd" data-date="'+A(date)+'">+ Estudo</button><button class="btn small ghost" data-s3="planCopyDay" data-date="'+A(date)+'">Copiar dia</button></div>')+'</div>';
+  (finished||past?'<small>'+(finished?'Dia finalizado: histórico preservado.':'Dia passado: somente consulta e cópia.')+'</small>':'<div class="study-plan-day-footer"><button class="btn small primary" data-s3="planAdd" data-date="'+A(date)+'">+ Estudo</button><button class="btn small ghost" data-s3="planCopyDay" data-date="'+A(date)+'">Copiar dia</button></div>')+'</div>';
  }).join("");
  const hasSelection=plannerSelection.size;
  return '<div class="hero-row"><div><div class="overline">EDIÇÃO DA SUA ROTINA</div><h1>Planejamento de estudos</h1><p class="kicker">Escolha ciclos e matérias já cadastrados. Configure o que aparecerá no Início; conclua os estudos somente lá.</p></div><div class="row"><button class="btn primary" data-s3="planAdd" data-date="'+A(s.date)+'">+ Estudo</button><button class="btn ghost" data-s3="openLibrary">Biblioteca</button><button class="btn ghost" data-s3="backStudies">Ciclos</button></div></div>'+
@@ -646,7 +658,7 @@ function plannerView(){
  (plannerUndo?'<button class="btn small ghost" data-s3="planUndo">↶ Desfazer última edição</button>':"")+'</div></section>'+
  '<div class="study-plan-week">'+weekdayCards+'</div>'+
  plannerPreview(plannerSelectedDate)+
- '<p class="note">Cada cartão corresponde a uma sessão. No computador, arraste para outro dia; no celular, use Mover. Matérias futuras que seguem o ciclo são previsões, não compromissos fixos: podem mudar conforme as conclusões reais.</p>';
+ '<p class="note">Cada cartão corresponde a uma sessão. Hoje aparece dourado e dias anteriores ficam cinza. Arraste uma sessão antiga para copiar; para sessões atuais e futuras, escolha Copiar ou Mover ao soltar. No celular, use as ações da sessão. Matérias futuras que seguem o ciclo são previsões, não compromissos fixos: podem mudar conforme as conclusões reais.</p>';
 }
 function studyLibraryView(){
  const cycles=db.cycles.filter(x=>!x.archived);
