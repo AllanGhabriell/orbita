@@ -920,7 +920,7 @@ function updateSessionChoices(){
 }
 function recordModal(id){
  const x=session(id);if(!x)return;
- modal("Registrar estudo",'<form id="s3-record" class="section-stack"><input name="id" value="'+A(id)+'" type="hidden"><p class="note">'+E(x.discipline)+' · '+E(fmt(x.date,false))+'</p><div class="field"><label>Situação</label><select name="status"><option value="pending" '+(x.status==="pending"?"selected":"")+'>Pendente</option><option value="progress" '+(x.status==="progress"?"selected":"")+'>Em andamento / parcial</option><option value="done" '+(x.status==="done"?"selected":"")+'>Concluída</option></select></div>'+
+ modal("Registrar estudo",'<form id="s3-record" class="section-stack"><input name="id" value="'+A(id)+'" type="hidden"><p class="note">'+E(x.discipline)+' · '+E(fmt(x.date,false))+'</p><div class="field"><label>Situação</label><select name="status"><option value="pending" '+(x.status==="pending"?"selected":"")+'>Pendente</option><option value="progress" '+(x.status==="progress"?"selected":"")+'>Em andamento / parcial</option><option value="done" '+(x.status==="done"?"selected":"")+'>Concluída</option><option value="notdone" '+(x.status==="notdone"?"selected":"")+'>Não realizada</option></select><small>Não realizada não soma tempo nem avança o ciclo.</small></div>'+
  '<div class="form-grid">'+field("Tempo efetivo (minutos, opcional)","actualMin",x.actualMin??"","number",'min="1" max="1440" placeholder="Não inferir do previsto"')+
  field("Hora real de início (opcional)","actualTime",x.actualTime||"","time")+'</div>'+
  '<div class="form-grid">'+field("Questões respondidas (opcional)","questions",x.evidence?.questions??"","number",'min="0" max="10000"')+field("Questões corretas (opcional)","correct",x.evidence?.correct??"","number",'min="0" max="10000"')+'</div>'+
@@ -1030,6 +1030,16 @@ const actions={
  if(location.hash!=="#inicio")return notify("Registre estudos somente na tela Início.");
  recordModal(el.dataset.id);
 },
+ markNotDone(el){
+  const x=session(el.dataset.id);if(!x||x.status!=="pending")return;
+  if(location.hash!=="#inicio")return notify("Altere a situação no Início.");
+  setSessionStatus(x.id,"notdone",null,"");save();render();notify("Sessão marcada como não realizada; o ciclo não avançou.");
+ },
+ markPending(el){
+  const x=session(el.dataset.id);if(!x||x.status!=="notdone")return;
+  if(location.hash!=="#inicio")return notify("Altere a situação no Início.");
+  setSessionStatus(x.id,"pending",null,"");save();render();notify("Sessão devolvida ao planejamento pendente.");
+ },
  quickDone(el){
   if(location.hash!=="#inicio")return notify("Conclua e desfaça sessões somente na tela Início.");
   const x=session(el.dataset.id);if(!x)return;
@@ -1124,9 +1134,11 @@ function submission(id,data){
  if(correct!==null&&(!Number.isInteger(correct)||correct<0||correct>10000))throw Error("Quantidade de acertos inválida.");
  if(correct!==null&&(questions===null||correct>questions))throw Error("Informe primeiro o total de questões; acertos não podem exceder o total.");
  if(quality!==null&&(!Number.isInteger(quality)||quality<1||quality>5))throw Error("Qualidade percebida inválida.");
- const x=setSessionStatus(String(data.get("id")),String(data.get("status")),data.get("actualMin"),String(data.get("actualTime")||""));
+ const requested=String(data.get("status"));
+ if(requested==="notdone"&&(questions!==null||correct!==null||quality!==null))throw Error("Sessão não realizada não deve conter resultados de estudo.");
+ const x=setSessionStatus(String(data.get("id")),requested,data.get("actualMin"),String(data.get("actualTime")||""));
  window.OrbitaStage7?.inspect?.syncManualRecord?.(x.id,x.actualMin);
- x.evidence={questions,correct,quality};logs("learning_evidence",{sessionId:x.id,questions,correct,quality});save();close();render();notify(x.status==="done"?"Sessão concluída.":"Registro atualizado.");return;
+ if(requested!=="notdone"){x.evidence={questions,correct,quality};logs("learning_evidence",{sessionId:x.id,questions,correct,quality});}save();close();render();notify(x.status==="done"?"Sessão concluída.":"Registro atualizado.");return;
  }
 }
 document.addEventListener("click",event=>{
