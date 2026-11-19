@@ -460,7 +460,7 @@ function summarize(filter={}){
   inc("methods",x.methodLabel||method(x.methodId)?.title||"Sem modalidade",x);
   inc("cycles",x.cycleLabel||cycle(x.cycleId)?.title||(x.cycleId?"Ciclo arquivado":"Complementar independente"),x);
  }
- return {sessions:entries.length,completed:entries.filter(x=>x.status==="done").length,inProgress:entries.filter(x=>x.status==="progress").length,notDone:entries.filter(x=>x.status==="notdone").length,pending:entries.filter(x=>x.status==="pending").length,plannedMin:planned,actualMin:actual,actualRecorded,unrecorded:entries.length-actualRecorded,groups};
+ return {sessions:entries.length,completed:entries.filter(x=>x.status==="done").length,inProgress:entries.filter(x=>x.status==="progress").length,notDone:entries.filter(x=>x.status==="notdone").length,pending:entries.filter(x=>x.status==="pending").length,plannedMin:planned,actualMin:actual,actualRecorded,unrecorded:entries.filter(x=>x.status!=="notdone"&&x.actualMin==null).length,groups};
 }
 function loadFor(date){
  const frozen=s.evolution?.closed?.[date];if(frozen)return {studyPlanned:frozen.plan.studyMin,otherPlanned:frozen.plan.otherMin,totalPlanned:frozen.plan.totalMin,available:frozen.availableMin,overlap:[],linkedFocuses:new Set(frozen.studies.filter(x=>x.focusId).map(x=>x.focusId)).size};
