@@ -444,3 +444,13 @@
 .study-plan-history-actions .btn{font-size:10.5px;padding:8px 9px;white-space:normal}
 .study-plan-day.is-today.is-drop-target,.study-plan-day.is-future.is-drop-target{border-color:#cb9a4e;box-shadow:0 0 0 2px rgba(199,159,76,.2)}
 @media(max-width:760px){.study-plan-history-actions .btn{width:100%}}
+
+/* Órbita 5.06 — registro explícito de sessões planejadas e não realizadas. */
+.study-daily-entry.is-notdone,.study-session-row.not-done,.study-plan-item.is-notdone{
+ border-color:rgba(218,89,91,.55)!important;
+ background:linear-gradient(95deg,rgba(209,65,70,.095),transparent 68%),var(--surface2);
+}
+.study-daily-entry.is-notdone .study-daily-number,.study-session-row.not-done .study-session-mark{color:#e4777e;background:rgba(209,65,70,.16)}
+.study-daily-entry.is-notdone .study-daily-label>small,.study-plan-item.is-notdone .study-plan-status{color:#e4777e}
+.study-plan-item.is-notdone .study-plan-status{border-color:rgba(218,89,91,.46);background:rgba(209,65,70,.12)}
+.study-missed-count{color:#e4777e;font-weight:650}
