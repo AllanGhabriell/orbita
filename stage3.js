@@ -796,6 +796,24 @@ function planCopyModal(kind="week",source=""){
  '<p class="study-batch-error" id="s3-plan-error" role="alert" hidden></p>'+
  '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Copiar '+(week?"semana":"dia")+'</button></div></form>');
 }
+function planCopyOneModal(id){
+ const x=session(id);if(!x||x.archived)throw Error("Sessão não encontrada.");
+ const target=add(x.date<day()?day():x.date,1);
+ modal("Copiar sessão para outro dia",'<form id="s3-plan-copy-one" class="section-stack"><input type="hidden" name="id" value="'+A(id)+'">'+
+ '<p class="note">Original: '+E(fmt(x.date,false))+' · '+E(plannerLabel(x))+'. O histórico não será modificado e a cópia começará pendente, sem resultados.</p>'+
+ field("Dia de destino","date",target,"date",'min="'+A(day())+'" required')+
+ '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Copiar sessão</button></div></form>');
+}
+function planDropModal(id,target){
+ const x=session(id);if(!x||x.archived)throw Error("Sessão não encontrada.");
+ if(!datesOkay(target)||target<day()||blocked(target))throw Error("Escolha um dia atual ou futuro aberto.");
+ const canMove=x.date>=day()&&x.status==="pending"&&!blocked(x.date);
+ modal("Copiar ou mover sessão?",'<p class="note">De '+E(fmt(x.date,false))+' para '+E(fmt(target,false))+'.</p>'+
+ '<p class="note">'+(canMove?"Copiar mantém a sessão original; mover muda sua data.":"A sessão é histórica ou já foi iniciada. Só é possível copiá-la, preservando o registro original.")+'</p>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button>'+
+ '<button type="button" class="btn primary" data-s3="planDropCopy" data-id="'+A(id)+'" data-date="'+A(target)+'">Copiar</button>'+
+ (canMove?'<button type="button" class="btn" data-s3="planDropMove" data-id="'+A(id)+'" data-date="'+A(target)+'">Mover</button>':"")+'</div>');
+}
 function planMoveModal(id){
  const x=session(id);planIsEditable(x);
  modal("Mover sessão",'<form id="s3-plan-move" class="section-stack"><input type="hidden" name="id" value="'+A(id)+'">'+
@@ -925,6 +943,9 @@ const actions={
   notify("Sessão duplicada sem copiar resultados.");
  },
  planMove(el){planMoveModal(el.dataset.id);},
+ planCopyOne(el){planCopyOneModal(el.dataset.id);},
+ planDropCopy(el){const x=planCopyOne(el.dataset.id,el.dataset.date);plannerWeek=x.date;plannerSelectedDate=x.date;plannerSelection.clear();close();render();notify("Sessão copiada, sem alterar o histórico.");},
+ planDropMove(el){planMove(el.dataset.id,el.dataset.date);plannerWeek=el.dataset.date;plannerSelectedDate=el.dataset.date;plannerSelection.clear();close();render();notify("Sessão movida para outro dia.");},
  planRemove(el){const x=session(el.dataset.id);planIsEditable(x);
   ask("Excluir sessão do planejamento","Essa sessão será removida apenas da agenda. Você poderá desfazer em seguida.",
     "planConfirmRemove",'data-id="'+A(x.id)+'"');},
@@ -1045,6 +1066,11 @@ function submission(id,data){
   close();render();notify(copied.length+" sessão(ões) copiadas. Conclusões não foram copiadas.");
   return;
  }
+ if(id==="s3-plan-copy-one"){
+  const x=planCopyOne(String(data.get("id")),String(data.get("date")));
+  plannerWeek=x.date;plannerSelectedDate=x.date;plannerSelection.clear();
+  close();render();notify("Sessão copiada. O histórico original foi preservado.");return;
+ }
  if(id==="s3-plan-move"){
   const date=String(data.get("date"));planMove(String(data.get("id")),date);
   plannerWeek=date;plannerSelectedDate=date;plannerSelection.clear();
@@ -1120,14 +1146,14 @@ document.addEventListener("dragstart",event=>{
  const item=event.target.closest?.(".study-plan-item[draggable='true']");
  if(!item||!event.dataTransfer)return;
  event.dataTransfer.setData("text/plain",item.dataset.planId);
- event.dataTransfer.effectAllowed="move";
+ event.dataTransfer.effectAllowed="copyMove";
  item.classList.add("is-dragging");
 });
 document.addEventListener("dragover",event=>{
  const zone=event.target.closest?.(".study-plan-day");
  if(!zone||screen!=="planner")return;
  event.preventDefault();
- if(event.dataTransfer)event.dataTransfer.dropEffect="move";
+ if(event.dataTransfer)event.dataTransfer.dropEffect="copy";
  zone.classList.add("is-drop-target");
 });
 document.addEventListener("drop",event=>{
@@ -1140,14 +1166,18 @@ document.addEventListener("drop",event=>{
   const rows=[...zone.querySelectorAll(".study-plan-item")];
   const target=event.target.closest?.(".study-plan-item");
   const position=target?rows.indexOf(target)+1:0;
-  planMove(id,zone.dataset.planDate,position);
-  plannerSelectedDate=zone.dataset.planDate;plannerSelection.clear();
-  notify("Sessão reorganizada. Pode desfazer a última edição.");
+  const x=session(id),targetDate=zone.dataset.planDate;
+  if(!x)throw Error("Sessão não encontrada.");
+  if(x.date===targetDate){
+   if(x.date<day()||blocked(x.date))throw Error("Não é permitido reorganizar um dia passado; copie a sessão para outra data.");
+   planMove(id,targetDate,position);plannerSelectedDate=targetDate;plannerSelection.clear();
+   notify("Sessão reorganizada. Pode desfazer a última edição.");
+  }else planDropModal(id,targetDate);
  }catch(err){notify(err.message||"Não foi possível mover.");}
 });
 document.addEventListener("dragend",()=>{
  for(const n of document.querySelectorAll(".study-plan-day.is-drop-target,.study-plan-item.is-dragging"))n.classList.remove("is-drop-target","is-dragging");
 });
-window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,sessionOrdinal,sessionModeLabel,rotationPreview,plannerLabel,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
+window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planCopyOne,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,sessionOrdinal,sessionModeLabel,rotationPreview,plannerLabel,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
 render();
 })();
