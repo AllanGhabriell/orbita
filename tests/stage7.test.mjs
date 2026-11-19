@@ -297,6 +297,19 @@ test("dia encerrado impede iniciar, sem produzir sessão falsa",()=>{
  assert.equal(h.state.timing.active,null);
  assert.equal(h.item.status,"pending");
 });
+test("finalizar como não realizada só é permitido sem estudo efetivo",()=>{
+ const h=harness();h.stage.start("math-1");
+ h.stage.finishChoices();
+ assert.match(h.modal,/data-s7="finishNotDone"/,"modal oferece não realizada somente sem tempo");
+ h.stage.finishAsNotDone();
+ assert.equal(h.item.status,"notdone");
+ assert.equal(h.item.actualMin,null);
+ assert.equal(h.state.timing.active,null);
+ assert.equal(h.state.timing.records["math-1"],undefined);
+ const other=harness();other.stage.start("math-1");other.setTime(2*60000);
+ assert.throws(()=>other.stage.finishAsNotDone(),/estudo registrado/i);
+ assert.equal(other.item.status,"progress");
+});
 test("timer 5.06 exibe somente três ações principais, sem botões duplicados",()=>{
  const h=harness();h.stage.start("math-1");
  const html=h.decorate("inicio",'<div class="study-daily-summary"></div>');
