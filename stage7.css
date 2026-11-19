@@ -169,3 +169,15 @@ body[data-theme=light] .s7-alarm-card{background:#fff;box-shadow:0 16px 46px rgb
 .s7-idle-alert{display:flex;flex-direction:column;gap:9px;border:1px solid var(--warning);border-radius:12px;padding:13px;background:var(--surface2);margin:8px 0}
 .s7-idle-alert strong{font-size:13px}.s7-idle-alert p{font-size:12px;line-height:1.55;margin:0;color:var(--muted)}
 .s7-idle-alert .btn{align-self:flex-start}
+
+/* Órbita 5.06: manter a disposição do cronômetro, mas com três controles principais. */
+.s7-primary-actions{display:flex;align-items:flex-start;flex-wrap:wrap;gap:9px;width:100%}
+.s7-primary-actions>.btn{min-height:40px;flex:0 1 auto}
+.s7-more{position:relative;min-width:140px}
+.s7-more>summary{display:inline-flex;align-items:center;min-height:40px;padding:9px 13px;border:1px solid var(--borderStrong);border-radius:10px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:12px;font-weight:600;list-style:none}
+.s7-more>summary::-webkit-details-marker{display:none}
+.s7-more[open]{flex:1 0 100%}
+.s7-more-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:8px;padding:12px;border:1px solid var(--border);background:var(--surface2);border-radius:12px}
+.s7-more-actions>.btn{min-height:36px}
+.s7-more-actions>.field{min-width:min(100%,210px);margin:0}
+@media(max-width:600px){.s7-primary-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.s7-primary-actions>.btn{width:100%}.s7-more{grid-column:1/-1}.s7-more>summary{width:100%}.s7-more[open]{grid-column:1/-1}.s7-more-actions>.btn{flex:1 1 100%}}
