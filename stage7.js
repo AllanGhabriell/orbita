@@ -304,7 +304,7 @@ function makeRecord(x){
 }
 function start(id){
  const x=session(id);
- if(!x||x.archived||x.status==="done")throw Error("Escolha uma sessão pendente ou em andamento.");
+ if(!x||x.archived||x.status==="done"||x.status==="notdone")throw Error("Escolha uma sessão pendente ou em andamento.");
  if(x.date!==C.today())throw Error("O cronômetro só inicia sessões da data atual. Selecione o dia de hoje.");
  if(V?.isClosed?.(x.date))throw Error("Este dia já foi finalizado.");
  if(timing.active)throw Error("Já existe uma sessão ativa. Finalize-a antes de iniciar outra.");
@@ -785,7 +785,7 @@ function ring(){
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="idle"?"ESTUDO INTERROMPIDO":a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span>'+(Number(r.unaccountedMs)>0?'<span>Desconsiderado: <strong>'+fmtMs(r.unaccountedMs)+'</strong></span>':"")+'</div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
- (a.phase==="idle"?'<div class="s7-idle-alert"><strong>Contagem interrompida após a meta.</strong><p>O excedente não será contabilizado até você confirmar. Se estudou, corrija o tempo em Mais opções.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button></div>':
+ (a.phase==="idle"?'<div class="s7-idle-alert"><strong>Contagem interrompida após a meta.</strong><p>O excedente não será contabilizado até você confirmar. Se estudou durante a ausência, use a correção.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo</button></div>':
  '<div class="s7-primary-actions">'+
  (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button>':'<button class="btn primary" data-s7="resume">▶ Retomar estudo</button>')+
  '<button class="btn ghost" data-s7="finishChoices">Finalizar sessão</button>'+
@@ -802,7 +802,7 @@ function ring(){
 }
 function homeButtons(id){
  const x=session(id);
- if(!x||x.status==="done"||V?.isClosed?.(x.date)||x.date!==C.today())return "";
+ if(!x||x.status==="done"||x.status==="notdone"||V?.isClosed?.(x.date)||x.date!==C.today())return "";
  if(timing.active?.sessionId===id)return '<span class="s7-inline-state '+(timing.active.phase==="paused"?"s7-muted":"")+'">'+(timing.active.phase==="paused"?"Ⅱ PAUSADO":"● EM ESTUDO")+'</span>';
  return '<button class="btn small ghost" data-s7="start" data-id="'+A(id)+'" '+(timing.active?"disabled title=\"Outra sessão ativa\"":"")+'>◷ Cronometrar</button>';
 }
