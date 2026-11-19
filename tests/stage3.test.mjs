@@ -298,4 +298,32 @@ assert.doesNotMatch(element("view").innerHTML,/study-plan-day is-today/,"dia sel
 assert.match(read("stage3.css"),/\.study-plan-day\.is-today[\s\S]*#bc913c/,"dia de hoje recebe dourado");
 assert.match(read("stage3.css"),/\.study-plan-day\.is-past/,"dia anterior recebe tema cinza");
 
+// 5.06: uma sessão planejada e não realizada deve permanecer no histórico,
+// sem somar horas e sem antecipar a rotação do ciclo.
+const missCycle=T.saveCycle({title:"Ciclo sessões não realizadas",area:"ENEM",defaultMin:90});
+const missSubject=T.saveSubject({cycleId:missCycle.id,title:"Matemática teste",targetSessions:2});
+T.saveSubject({cycleId:missCycle.id,title:"Física teste",targetSessions:1});
+const missed=T.planCreate({cycleId:missCycle.id,date,mode:"rotation",plannedMin:"90",count:3});
+const beforeMiss=T.summarize({from:date,to:date});
+const stepBefore=missCycle.stepNo,currentBefore=T.cycleState(missCycle).id;
+T.setSessionStatus(missed[0].id,"done",90,"09:00");
+T.setSessionStatus(missed[1].id,"notdone",null,"");
+assert.equal(T.session(missed[1].id).status,"notdone");
+assert.equal(T.session(missed[1].id).actualMin,null,"não realizada não inventa minutos");
+assert.equal(T.cycleState(missCycle).id,currentBefore,"não realizada não avança matéria");
+assert.equal(missCycle.stepNo,stepBefore,"não realizada não muda etapa");
+const missStats=T.summarize({from:date,to:date,cycleId:missCycle.id});
+assert.equal(missStats.sessions,3,"três sessões permanecem planejadas");
+assert.equal(missStats.completed,1);
+assert.equal(missStats.notDone,1);
+assert.equal(missStats.pending,1);
+assert.equal(missStats.actualMin,90,"somente a sessão concluída soma estudo");
+assert.equal(missStats.unrecorded,1,"não realizada não conta como tempo faltando informar");
+assert.throws(()=>T.setSessionStatus(missed[1].id,"notdone",20,""),/estudo registrado/i,"não realizada não aceita tempo");
+assert.match(element("view").innerHTML,/Não realizada|not-done/);
+T.setSessionStatus(missed[1].id,"pending",null,"");
+assert.equal(T.session(missed[1].id).status,"pending","situação pode voltar a pendente");
+T.setSessionStatus(missed[1].id,"notdone",null,"");
+assert.equal(T.summarize({from:date,to:date,cycleId:missCycle.id}).notDone,1);
+
 console.log("Etapa 3: ciclos, etapa multi-sessão, correção, pausa, reforço, vínculo com foco, estatísticas por dimensão e editor preservado.");
