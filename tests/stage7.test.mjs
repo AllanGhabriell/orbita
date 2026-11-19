@@ -326,6 +326,24 @@ test("timer 5.06 exibe somente três ações principais, sem botões duplicados"
  assert.match(h.modal,/data-s7="finish"/);
  assert.match(h.modal,/data-s7="partial"/);
 });
+test("lembrete durante pausa é opcional e não modifica os minutos estudados",()=>{
+ const h=harness();
+ assert.equal(h.stage.model.settings.pauseReminderMode,"off","desativado por padrão");
+ h.stage.model.settings.pauseReminderMode="interval";
+ h.stage.start("math-1");h.setTime(10*60000);h.stage.pause("rest");
+ const savedStudy=h.state.timing.records["math-1"].studyMs;
+ assert.equal(savedStudy,10*60000);
+ assert.equal(h.state.timing.active.phase,"paused");
+ assert.match(h.decorate("inicio",'<div class="study-daily-summary"></div>'),/silencePauseReminder/);
+ h.stage.silencePauseReminder();
+ assert.equal(h.state.timing.active.pauseSoundSilenced,true);
+ assert.match(h.decorate("inicio",'<div class="study-daily-summary"></div>'),/replayPauseReminder/);
+ h.stage.resume();
+ assert.equal(h.state.timing.records["math-1"].studyMs,savedStudy,"silenciar não altera estudo");
+ assert.equal(h.state.timing.active.phase,"running");
+ assert.match(source,/s7-setting-pauseReminderMode/);
+ assert.match(source,/continuous.*interval/s);
+});
 test("interface possui indicadores e alertas configuráveis",()=>{
  const h=harness();
  assert.equal(h.stage.model.settings.mode,"continuous");
