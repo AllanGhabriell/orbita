@@ -83,16 +83,36 @@ function scheduleAlarmTimeout(){
 }
 function autoPauseForInactivity(){
  const a=timing.active,r=activeRecord(),limit=Number(settings().autoPauseMinutes)*60000;
- if(!a||!r||a.phase!=="running"||!limit||!Number.isFinite(limit))return false;
- const last=Number(a.lastInteractionAt)||Number(a.since)||clock(),cutoff=Math.max(Number(a.since)||0,last+limit);
+ if(!a||!r||a.phase!=="running"||!limit||!Number.isFinite(limit)||r.overtimeConfirmed)return false;
+ // A meta é um período protegido: a falta de cliques enquanto o usuário
+ // estuda no caderno NÃO é inatividade que possa interromper a sessão.
+ const goal=Math.max(1,Number(r.goalMin)||90)*60000;
+ const accumulated=Math.max(0,Number(r.studyMs)||0);
+ const remaining=Math.max(0,goal-accumulated);
+ const goalAt=Number(a.since)+remaining;
+ if(!Number.isFinite(goalAt)||clock()<goalAt+limit)return false;
+ // Somente o excedente da meta pode ser interrompido. Interações posteriores
+ // ao fim da meta reiniciam a tolerância de esquecimento.
+ const last=Number(a.lastInteractionAt)||Number(a.since)||clock();
+ const cutoff=Math.max(goalAt+limit,last+limit);
  if(clock()<cutoff)return false;
  r.studyMs=studyMs(r,cutoff);
  r.corrections||(r.corrections=[]);
  r.corrections.push({type:"auto_idle_pause",registeredAt:clock(),effectiveAt:cutoff});
  timing.active={sessionId:a.sessionId,phase:"idle",since:cutoff,lastInteractionAt:last,alertIndex:0};
  if(timing.alarm)silenceAlarm();
- persist();C.render();C.notify("Estudo interrompido por inatividade. Tempo após o limite não será contado até você continuar.");
+ persist();C.render();C.notify("Possível esquecimento após a meta: o excedente foi interrompido. O estudo planejado foi preservado.");
  return true;
+}
+function confirmOvertime(){
+ const a=timing.active,r=activeRecord();
+ if(!a||!r||a.phase!=="running")return;
+ r.overtimeConfirmed=true;
+ r.corrections||(r.corrections=[]);
+ r.corrections.push({type:"overtime_confirmed",registeredAt:clock()});
+ persist();
+ if(timing.alarm)dismissAlarm();
+ C.render();
 }
 function resumeIdle(){
  const a=timing.active,r=activeRecord();
@@ -101,6 +121,7 @@ function resumeIdle(){
  r.unaccountedMs=(Number(r.unaccountedMs)||0)+excluded;
  r.corrections||(r.corrections=[]);r.corrections.push({type:"auto_idle_resumed",registeredAt:at,excludedMs:excluded});
  timing.active={sessionId:a.sessionId,phase:"running",since:at,lastInteractionAt:at,alertIndex:0};
+ r.overtimeConfirmed=true; // O clique explícito em continuar também confirma o excedente.
  if(timing.alarm)dismissAlarm();
  persist();C.render();tick();
 }
@@ -279,7 +300,7 @@ function alertUser(message,which){
  void systemNotification(which,message);
 }
 function makeRecord(x){
- return timing.records[x.id]|| (timing.records[x.id]={sessionId:x.id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],lastBlockAlert:0,goalNotified:false,mode:settings().mode,goalMin:Number(x.plannedMin)||Number(settings().goalMin)||90,finishedAt:null});
+ return timing.records[x.id]|| (timing.records[x.id]={sessionId:x.id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],lastBlockAlert:0,goalNotified:false,overtimeConfirmed:false,mode:settings().mode,goalMin:Number(x.plannedMin)||Number(settings().goalMin)||90,finishedAt:null});
 }
 function start(id){
  const x=session(id);
@@ -292,7 +313,7 @@ function start(id){
  T.setSessionStatus(id,"progress",x.actualMin,x.actualTime||"");
  const r=makeRecord(x);
  if(r.originalStatus===undefined)r.originalStatus=beforeStatus;
- r.finishedAt=null;
+ r.finishedAt=null;r.overtimeConfirmed=false;
  timing.active={sessionId:id,phase:"running",since:clock(),lastInteractionAt:clock(),alertIndex:0};
  persist();C.render();tick();
 }
@@ -566,7 +587,7 @@ function resetTimer(id){
  snapshotUndo([id]);
  if(trackTimeMatches(x,r))x.actualMin=null;
  const keptMode=r.mode,keptGoal=r.goalMin,originalStatus=r.originalStatus;
- timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,originalStatus,lastBlockAlert:0,goalNotified:false,finishedAt:null,resetAt:new Date().toISOString()};
+ timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,originalStatus,lastBlockAlert:0,goalNotified:false,overtimeConfirmed:false,finishedAt:null,resetAt:new Date().toISOString()};
  if(timing.active?.sessionId===id)timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
  if(timing.alarm?.sessionId===id)dismissAlarm();
  persist();C.closeModal();C.render();tick();C.notify("Cronômetro zerado. Use ⋯ para desfazer.");
@@ -838,7 +859,7 @@ function settingsPanel(){
  s7SettingRow("Bloco personalizado",number("blockMin",q.blockMin,1,180,"min"))+
  s7SettingRow("Descanso personalizado",number("restMin",q.restMin,1,90,"min"))+
  s7SettingRow("Avisar pausa prolongada",number("pauseMinutes",q.pauseMinutes,0,240,"min"),"0 para desativar")+
- s7SettingRow("Pausa automática por inatividade",'<select id="s7-setting-autoPauseMinutes" aria-label="Interromper estudo por inatividade">'+[["0","Desativada"],["5","5 minutos"],["10","10 minutos (padrão)"],["15","15 minutos"],["30","30 minutos"]].map(([v,t])=>option(v,t,String(q.autoPauseMinutes))).join("")+'</select>',"Só volta a contar após confirmar; tempo posterior não entra no estudo")+
+ s7SettingRow("Proteção contra esquecimento após a meta",'<select id="s7-setting-autoPauseMinutes" aria-label="Tolerância após a meta antes de interromper o excedente">'+[["0","Desativada"],["5","5 minutos"],["10","10 minutos (padrão)"],["15","15 minutos"],["30","30 minutos"]].map(([v,t])=>option(v,t,String(q.autoPauseMinutes))).join("")+'</select>',"Nunca pausa durante a meta. Após atingi-la, interrompe apenas o excedente sem interação; Continuar estudando confirma a extensão.")+
  s7SettingRow("Verificar possível esquecimento",'<select id="s7-setting-inactivityWarningMinutes" aria-label="Aviso de possível esquecimento">'+[["0","Desativado"],["30","30 minutos"],["60","1 hora (padrão)"],["120","2 horas"]].map(([v,t])=>option(v,t,String(q.inactivityWarningMinutes))).join("")+'</select>',"Aviso discreto: não pausa nem encerra o estudo")+
  s7SettingRow("Repetir lembrete",s7Switch("s7-setting-repeatPause",q.repeatPause,"Repetir lembrete de pausa"))+
  '</section>'+
@@ -994,7 +1015,8 @@ document.addEventListener("click",e=>{
   else if(act==="resetCurrentPause")resetCurrentPause();
   else if(act==="alarmSilence")silenceAlarm();
   else if(act==="alarmReplay")replayAlarm();
-  else if(act==="alarmDismiss"||act==="alarmContinue")dismissAlarm();
+  else if(act==="alarmDismiss")dismissAlarm();
+  else if(act==="alarmContinue")confirmOvertime();
   else if(act==="alarmResume"){if(timing.active?.phase==="paused")resume();else dismissAlarm();}
   else if(act==="alarmCorrect")correctModal();
   else if(act==="alarmFinish")askFinish(true);
@@ -1058,6 +1080,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
