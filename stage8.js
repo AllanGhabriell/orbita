@@ -225,7 +225,7 @@ function indicators(ctx){
  bindNextNotes();
  const linked=notes.filter(n=>matches(n,ctx));
  if(!linked.length)return "";
- const symbol=linked.length===1?icons[linked[0].icon]||icons.pin:icons.pin;
+ const symbol=icons.pin; // Área de estudos apenas informa: as ações ficam exclusivamente no mural.
  return '<button type="button" class="s8-linked-pin" data-s8="jump" data-note-ids="'+A(linked.map(x=>x.id).join(","))+'" title="'+A(linked.length+" lembrete(s) vinculado(s). Abrir no mural.")+'" aria-label="Abrir '+linked.length+' lembrete(s) vinculado(s)">'+symbol+(linked.length>1?'<span>'+linked.length+'</span>':"")+'</button>';
 }
 function sorted(){return [...notes].sort((a,b)=>(rank[a.priority]??1)-(rank[b.priority]??1)||String(b.createdAt).localeCompare(String(a.createdAt)));}
@@ -277,17 +277,6 @@ function edit(idValue,preselected){
  '<small id="s8-link-help">Vínculos específicos encerram ao concluir a atividade; o lembrete permanece no mural.</small></div>'+
  '<p class="note">Lembretes não possuem conclusão ou data obrigatória. Ficam aqui até você excluir ou transformar em uma atividade.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar lembrete</button></div></form>');
-}
-function linkFromEntry(entryId,date){
- const entries=S2?.allOn?.(date)||[];
- const found=entries.find(x=>x.id===entryId);
- if(!found)return C.notify("Atividade não encontrada para vincular.");
- edit(null,{scope:"today",target:"entry|"+encodeURIComponent(entryId)+"|"+encodeURIComponent(date)});
-}
-function linkFromSession(sessionId){
- const found=S3?.model?.sessions?.find(x=>x.id===sessionId&&!x.archived);
- if(!found)return C.notify("Sessão não encontrada para vincular.");
- edit(null,{scope:found.date===C.state.date?"today":"future",target:"session|"+encodeURIComponent(sessionId)+"|"});
 }
 function saveNote(data){
  const title=String(data.get("title")||"").trim().slice(0,140);
@@ -379,8 +368,6 @@ document.addEventListener("click",ev=>{
   else if(action==="remove")remove(b.dataset.id);
   else if(action==="convert")convert(b.dataset.id);
   else if(action==="jump")jump(b.dataset.noteIds);
-  else if(action==="linkFromEntry")linkFromEntry(b.dataset.id,b.dataset.date);
-  else if(action==="linkFromSession")linkFromSession(b.dataset.id);
  }catch(err){C.notify(err.message||"Não foi possível executar a ação.");}
 });
 document.addEventListener("change",event=>{
@@ -415,6 +402,6 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
   document.body.appendChild(incoming);
  }
  place();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkFromEntry,linkFromSession,linkLabel,selectedDateForLink}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
 C.render();
 })();
