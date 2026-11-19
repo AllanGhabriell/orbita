@@ -537,8 +537,8 @@ function homePanel(){
     '<div class="study-daily-label"><strong>Sessão '+number+'</strong><span class="study-daily-subject">'+E(label)+'</span>'+
     '<small>'+E(desc)+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
     (x.status==="notdone"?'<button class="btn small ghost" data-s3="markPending" data-id="'+A(x.id)+'">↶ Voltar a pendente</button>':
- '<button class="btn small '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button>')+
-    (x.status==="pending"?'<button class="btn small ghost" data-s3="markNotDone" data-id="'+A(x.id)+'" title="Registrar que esta sessão não aconteceu">Não realizada</button>':"")+
+ '<button class="btn small s3-quick-status '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'" title="Clique direito ou segure para escolher a situação">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button>')+
+    
  '<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>'+(window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||""):
     '<span class="status">Dia fechado</span>')+'</div></div>';
   }).join("");
@@ -918,6 +918,17 @@ function updateSessionChoices(){
  const area=form.querySelector('[name="area"]');if(c&&area&&!area.value)area.value=c.area;
  const discipline=form.querySelector('[name="discipline"]');if(active&&discipline&&!discipline.value)discipline.value=active.title;
 }
+function quickStudyStatusModal(id){
+ const x=session(id);if(!x||x.archived)throw Error("Sessão não encontrada.");
+ if(blocked(x.date))throw Error("Dia finalizado: histórico protegido.");
+ modal("Situação da sessão",'<div class="section-stack"><p class="note">'+E(plannerLabel(x))+' · '+E(fmt(x.date,false))+'</p>'+
+ '<div class="s3-quick-status-menu" role="group" aria-label="Escolher situação">'+
+ '<button type="button" class="btn ghost" data-s3="quickStatus" data-id="'+A(id)+'" data-value="done">✓ Concluída</button>'+
+ '<button type="button" class="btn ghost" data-s3="quickStatus" data-id="'+A(id)+'" data-value="pending">◷ Pendente</button>'+
+ '<button type="button" class="btn ghost s3-notdone-option" data-s3="quickStatus" data-id="'+A(id)+'" data-value="notdone">× Não realizada</button>'+
+ '<button type="button" class="btn ghost" data-s3="quickStatusEdit" data-id="'+A(id)+'">Registrar tempo parcial ou detalhes</button></div>'+
+ '<button class="btn small ghost" type="button" data-action="closeModal">Cancelar</button></div>');
+}
 function recordModal(id){
  const x=session(id);if(!x)return;
  modal("Registrar estudo",'<form id="s3-record" class="section-stack"><input name="id" value="'+A(id)+'" type="hidden"><p class="note">'+E(x.discipline)+' · '+E(fmt(x.date,false))+'</p><div class="field"><label>Situação</label><select name="status"><option value="pending" '+(x.status==="pending"?"selected":"")+'>Pendente</option><option value="progress" '+(x.status==="progress"?"selected":"")+'>Em andamento / parcial</option><option value="done" '+(x.status==="done"?"selected":"")+'>Concluída</option><option value="notdone" '+(x.status==="notdone"?"selected":"")+'>Não realizada</option></select><small>Não realizada não soma tempo nem avança o ciclo.</small></div>'+
@@ -1030,6 +1041,13 @@ const actions={
  if(location.hash!=="#inicio")return notify("Registre estudos somente na tela Início.");
  recordModal(el.dataset.id);
 },
+ quickStatus(el){
+  const x=session(el.dataset.id);if(!x)return;
+  const value=el.dataset.value;
+  setSessionStatus(x.id,value,value==="notdone"||value==="pending"?null:x.actualMin,value==="notdone"||value==="pending"?"":x.actualTime||"");
+  close();save();render();notify(value==="notdone"?"Sessão registrada como não realizada, sem avançar o ciclo.":"Situação da sessão atualizada.");
+ },
+ quickStatusEdit(el){recordModal(el.dataset.id);},
  markNotDone(el){
   const x=session(el.dataset.id);if(!x||x.status!=="pending")return;
   if(location.hash!=="#inicio")return notify("Altere a situação no Início.");
@@ -1159,6 +1177,44 @@ document.addEventListener("change",event=>{
  if(el?.id==="s3-plan-go-date"&&datesOkay(el.value)){plannerWeek=el.value;plannerSelectedDate=el.value;render();}
  if(el?.name==="subjectId"){
   const sub=subject(el.value),form=$("s3-session");if(sub&&form){const discipline=form.querySelector('[name="discipline"]');if(discipline)discipline.value=sub.title;}
+ }
+});
+// Clique direito ou toque longo na conclusão abre a situação, sem sobrecarregar a área.
+let studyHoldTimer=null,studyHoldPoint=null,suppressStudyClickUntil=0;
+document.addEventListener("contextmenu",event=>{
+ const b=event.target.closest?.(".s3-quick-status");if(!b)return;
+ event.preventDefault();try{quickStudyStatusModal(b.dataset.id);}catch(err){notify(err.message);}
+});
+document.addEventListener("pointerdown",event=>{
+ const b=event.target.closest?.(".s3-quick-status");
+ if(!b||event.pointerType==="mouse")return;
+ clearTimeout(studyHoldTimer);
+ studyHoldPoint={id:event.pointerId,x:event.clientX,y:event.clientY};
+ studyHoldTimer=setTimeout(()=>{
+  suppressStudyClickUntil=Date.now()+1000;
+  studyHoldTimer=null;studyHoldPoint=null;
+  try{quickStudyStatusModal(b.dataset.id);}catch(err){notify(err.message);}
+ },550);
+});
+document.addEventListener("pointermove",event=>{
+ if(!studyHoldPoint||studyHoldPoint.id!==event.pointerId)return;
+ if(Math.hypot(event.clientX-studyHoldPoint.x,event.clientY-studyHoldPoint.y)>12){
+  clearTimeout(studyHoldTimer);studyHoldTimer=null;studyHoldPoint=null;
+ }
+});
+for(const type of ["pointerup","pointercancel"])document.addEventListener(type,()=>{
+ if(studyHoldTimer!==null)clearTimeout(studyHoldTimer);
+ studyHoldTimer=null;studyHoldPoint=null;
+});
+document.addEventListener("click",event=>{
+ if(Date.now()<suppressStudyClickUntil&&event.target.closest?.(".s3-quick-status")){
+  event.preventDefault();event.stopImmediatePropagation?.();
+ }
+},true);
+document.addEventListener("keydown",event=>{
+ const b=event.target.closest?.(".s3-quick-status");if(!b)return;
+ if(event.key==="ContextMenu"||(event.shiftKey&&event.key==="F10")){
+  event.preventDefault();try{quickStudyStatusModal(b.dataset.id);}catch(err){notify(err.message);}
  }
 });
 // Desktop: arrastar sessão para outro dia ou mudar sua posição.
