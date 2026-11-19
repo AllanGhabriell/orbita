@@ -87,7 +87,7 @@ function dailyCounts(snapshot){
   habitPunctual:habits.filter(x=>x.status==="done"&&x.startTime&&x.actualTime&&x.actualTime<=x.startTime).length,
   tasks:tasks.length,tasksDone:tasks.filter(x=>x.status==="done").length,
   plannedStudy:ss.length,studiesDone:ss.filter(x=>x.status==="done").length,
-  studiesPartial:ss.filter(x=>x.status==="progress").length,
+  studiesPartial:ss.filter(x=>x.status==="progress").length,studiesNotDone:ss.filter(x=>x.status==="notdone").length,
   missingStudyTimes:ss.filter(x=>x.actualMin==null).length,
   unmarked:a.filter(x=>["pending","progress"].includes(x.status)).length+ss.filter(x=>["pending","progress"].includes(x.status)).length};
 }
@@ -171,7 +171,7 @@ function periodData(kind,date,preview=true){
   }
  }
  const count={days:rows.length,closed:rows.filter(x=>!!x.confirmed).length,plannedActive:0,rest:0,unplannedPauses:0,focus:0,doneFocus:0,missedFocus:0,
-  habits:0,habitDone:0,habitRecordedTimes:0,habitOnTime:0,tasks:0,tasksDone:0,study:0,studiesDone:0,partial:0,actualMin:0,
+  habits:0,habitDone:0,habitRecordedTimes:0,habitOnTime:0,tasks:0,tasksDone:0,study:0,studiesDone:0,partial:0,studiesNotDone:0,actualMin:0,
   studyActualMin:0,plannedMin:0,knownStudyMinutes:0,missingStudyTimes:0,missingActivityTimes:0,
   changedPlans:0,lateRest:0,daysWithStudy:0,workDays:0,questions:0,correct:0,questionSessions:0,qualityRated:0,qualitySum:0,open,unobserved,elapsed:pastDays};
  const byArea={};const byDiscipline={};const byMethod={};const byTopic={};
@@ -182,7 +182,7 @@ function periodData(kind,date,preview=true){
   count.habits+=n.habitCount;count.habitDone+=n.habitDone;
   count.habitRecordedTimes+=n.habitOnTime;count.habitOnTime+=n.habitPunctual;
   count.tasks+=n.tasks;count.tasksDone+=n.tasksDone;count.study+=n.plannedStudy;
-  count.studiesDone+=n.studiesDone;count.partial+=n.studiesPartial;
+  count.studiesDone+=n.studiesDone;count.partial+=n.studiesPartial;count.studiesNotDone+=n.studiesNotDone;
   count.actualMin+=(snap.result.actualStudyMin||0)+(snap.result.actualOtherMin||0);
   count.studyActualMin+=snap.result.actualStudyMin||0;
   count.plannedMin+=snap.plan.totalMin||0;count.knownStudyMinutes+=snap.result.recordedStudies||0;
