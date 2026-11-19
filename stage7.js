@@ -60,12 +60,12 @@ function tone(kind){
 }
 // Lembrete opt-in que acompanha a pausa, sem interferir no alarme de meta.
 function stopPauseReminder(){
- if(pauseReminderInterval!==null){clearInterval(pauseReminderInterval);pauseReminderInterval=null;}
+ if(pauseReminderInterval!==null){if(typeof clearInterval==="function")clearInterval(pauseReminderInterval);pauseReminderInterval=null;}
  if(pauseReminderAudio){try{pauseReminderAudio.pause();pauseReminderAudio.currentTime=0;}catch{}pauseReminderAudio=null;}
 }
 function startPauseReminder(){
  stopPauseReminder();
- if(timing.active?.phase!=="paused"||pauseReminderSilenced)return;
+ if(timing.active?.phase!=="paused"||pauseReminderSilenced||timing.active.pauseSoundSilenced)return;
  const mode=settings().pauseReminderMode;
  if(mode==="off"||Number(settings().volume)===0)return;
  if(mode==="interval"){
@@ -87,10 +87,12 @@ function startPauseReminder(){
  }
 }
 function silencePauseReminder(){
- pauseReminderSilenced=true;stopPauseReminder();C.render();C.notify("Lembrete silenciado. O cronômetro continua pausado.");
+ pauseReminderSilenced=true;if(timing.active?.phase==="paused")timing.active.pauseSoundSilenced=true;
+ stopPauseReminder();persist();C.render();C.notify("Lembrete silenciado. O cronômetro continua pausado.");
 }
 function replayPauseReminder(){
- pauseReminderSilenced=false;audioUnlock();startPauseReminder();C.render();
+ pauseReminderSilenced=false;if(timing.active?.phase==="paused")timing.active.pauseSoundSilenced=false;
+ audioUnlock();startPauseReminder();persist();C.render();
 }
 // Alarme persistente e independente da navegação: não ocupa espaço quando inativo.
 function stopAlarmAudio(){
@@ -849,7 +851,7 @@ function ring(){
  (r.mode!=="continuous"?'<button class="btn small ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
  '<div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
  '<button class="btn small ghost" data-s7="partial">Encerrar parcial</button></div></details>'+
- (a.phase==="paused"&&settings().pauseReminderMode!=="off"?'<button class="btn small ghost s7-pause-sound" data-s7="'+(pauseReminderSilenced?"replayPauseReminder":"silencePauseReminder")+'">'+(pauseReminderSilenced?"▶ Reproduzir lembrete":"♪ Silenciar lembrete")+'</button>':"")+
+ (a.phase==="paused"&&settings().pauseReminderMode!=="off"?'<button class="btn small ghost s7-pause-sound" data-s7="'+((pauseReminderSilenced||a.pauseSoundSilenced)?"replayPauseReminder":"silencePauseReminder")+'">'+((pauseReminderSilenced||a.pauseSoundSilenced)?"▶ Reproduzir lembrete":"♪ Silenciar lembrete")+'</button>':"")+
  '</div>')+
  '</div></div>' +
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
@@ -1146,14 +1148,14 @@ document.addEventListener("change",e=>{
   if(!Number.isFinite(n)||n<min||n>max)return C.notify("Valor inválido.");
   if(key==="alarmIdleMinutes"&&![0,5,10,15,30].includes(n)||key==="inactivityWarningMinutes"&&![0,30,60,120].includes(n)||key==="autoPauseMinutes"&&![0,5,10,15,30].includes(n))return C.notify("Escolha um dos intervalos disponíveis.");
   settings()[key]=n;
-  if(key==="volume"&&timing.active?.phase==="paused"){pauseReminderSilenced=false;startPauseReminder();}
+  if(key==="volume"&&timing.active?.phase==="paused"){startPauseReminder();}
   if(key==="alarmIdleMinutes"){if(!autoSilenceAlarm())scheduleAlarmTimeout();}
   if(key==="inactivityWarningMinutes")inactivityPrompt=false;
   if(key==="autoPauseMinutes"&&n>0)autoPauseForInactivity();
  }else if(key in strings){
   if(!strings[key].includes(el.value))return;
   settings()[key]=el.value;
-  if((key==="pauseReminderMode"||key==="pauseSound")&&timing.active?.phase==="paused"){pauseReminderSilenced=false;startPauseReminder();}
+  if((key==="pauseReminderMode"||key==="pauseSound")&&timing.active?.phase==="paused"){pauseReminderSilenced=false;timing.active.pauseSoundSilenced=false;startPauseReminder();}
  }else if(["visual","repeatPause","loopFinish","loopPause"].includes(key))settings()[key]=el.checked;
  else return;
  persist();C.render();
