@@ -7,7 +7,7 @@ const root=C.state;
 const timing=root.timing&&typeof root.timing==="object"?root.timing:(root.timing={});
 if(!timing.records||typeof timing.records!=="object"||Array.isArray(timing.records))timing.records={};
 if(!timing.settings||typeof timing.settings!=="object")timing.settings={};
-const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"orbita",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true,alarmIdleMinutes:15,inactivityWarningMinutes:60,autoPauseMinutes:10};
+const defaults={mode:"continuous",goalMin:90,blockMin:25,restMin:5,pauseMinutes:10,repeatPause:true,finishSound:"orbita",pauseSound:"digital",volume:65,visual:true,desktopNotifications:false,loopFinish:true,loopPause:true,alarmIdleMinutes:15,inactivityWarningMinutes:60,autoPauseMinutes:10,pauseReminderMode:"off"};
 for(const [k,v] of Object.entries(defaults))if(timing.settings[k]===undefined)timing.settings[k]=v;
 if(!timing.active||typeof timing.active!=="object")timing.active=null;
 const E=C.esc,A=C.attr, $=id=>document.getElementById(id);
@@ -15,6 +15,7 @@ const clock=()=>Date.now();
 const titleBase=document.title;
 let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null,demoAlarm=null,activityAt=clock(),inactivityPrompt=false,alarmTimeout=null,lastActivityPersist=0;
 const uploadBusy={finish:false,pause:false},presetSound="./assets/orbita-alarm.wav";
+let pauseReminderAudio=null,pauseReminderInterval=null,pauseReminderSilenced=false;
 const iconLink=document.querySelector('link[rel="icon"]'),originalIcon=iconLink?.getAttribute("href")||"./assets/orbita.svg";
 const alarmIcon="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#201535"/><path d="M17 45c5-5 6-10 6-19 0-13 18-13 18 0 0 9 1 14 6 19H17zm10 6h10" stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" fill="none"/><circle cx="48" cy="15" r="9" fill="#f05f73"/></svg>');
 const fmtMs=ms=>{const secs=Math.max(0,Math.floor(ms/1000));return String(Math.floor(secs/3600)).padStart(2,"0")+":"+String(Math.floor(secs%3600/60)).padStart(2,"0")+":"+String(secs%60).padStart(2,"0");};
@@ -56,6 +57,40 @@ function tone(kind){
    oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start(start);oscillator.stop(start+.18);
   });
  }catch{}
+}
+// Lembrete opt-in que acompanha a pausa, sem interferir no alarme de meta.
+function stopPauseReminder(){
+ if(pauseReminderInterval!==null){clearInterval(pauseReminderInterval);pauseReminderInterval=null;}
+ if(pauseReminderAudio){try{pauseReminderAudio.pause();pauseReminderAudio.currentTime=0;}catch{}pauseReminderAudio=null;}
+}
+function startPauseReminder(){
+ stopPauseReminder();
+ if(timing.active?.phase!=="paused"||pauseReminderSilenced)return;
+ const mode=settings().pauseReminderMode;
+ if(mode==="off"||Number(settings().volume)===0)return;
+ if(mode==="interval"){
+  tone("digital");
+  pauseReminderInterval=setInterval(()=>{
+   if(timing.active?.phase!=="paused"){stopPauseReminder();return;}
+   tone("digital");
+  },20000);
+  return;
+ }
+ if(mode==="continuous"){
+  try{
+   const source=settings().pauseSound==="custom"&&settings().pauseUpload?settings().pauseUpload:presetSound;
+   const audio=new Audio(source);
+   audio.loop=true;audio.volume=Math.max(0,Math.min(1,Number(settings().volume)/100));
+   pauseReminderAudio=audio;
+   audio.play()?.catch(()=>C.notify("O navegador impediu o áudio da pausa. Toque em Reproduzir lembrete."));
+  }catch{C.notify("Não foi possível iniciar o lembrete sonoro da pausa.");}
+ }
+}
+function silencePauseReminder(){
+ pauseReminderSilenced=true;stopPauseReminder();C.render();C.notify("Lembrete silenciado. O cronômetro continua pausado.");
+}
+function replayPauseReminder(){
+ pauseReminderSilenced=false;audioUnlock();startPauseReminder();C.render();
 }
 // Alarme persistente e independente da navegação: não ocupa espaço quando inativo.
 function stopAlarmAudio(){
@@ -337,11 +372,13 @@ function pause(kind="rest"){
  const at=clock();r.studyMs=studyMs(r,at);
  r.pauses.push({startedAt:at,endedAt:null,kind,corrected:false});
  timing.active={sessionId:a.sessionId,phase:"paused",since:at,alertIndex:0};
+ pauseReminderSilenced=false;startPauseReminder();
  persist();C.render();tick();
 }
 function resume(){
  const a=timing.active,r=activeRecord();
  if(!a||!r||a.phase!=="paused")throw Error("Não há pausa para retomar.");
+ stopPauseReminder();pauseReminderSilenced=false;
  audioUnlock();
  const at=clock();r.pauseMs=pauseMs(r,at);
  if(r.pauses.length&&r.pauses.at(-1).endedAt===null)r.pauses.at(-1).endedAt=at;
@@ -380,6 +417,7 @@ function finish(done){
  const current=timing.active;
  const at=clock(),studied=studyMs(r,at),paused=pauseMs(r,at);
  if(studied<1000&&!window.confirm("Menos de um segundo de estudo registrado. Encerrar mesmo assim?"))return;
+ stopPauseReminder();pauseReminderSilenced=false;
  // A etapa do ciclo somente avança após conclusão confirmada.
  T.setSessionStatus(x.id,done?"done":"progress",studied?Math.max(1,Math.round(studied/60000)):null,x.actualTime||"");
  r.studyMs=studied;r.pauseMs=paused;
@@ -517,6 +555,7 @@ function finishAsNotDone(){
  if(studyMs(r)>=1000||x.actualMin!=null)throw Error("A sessão já possui estudo registrado. Encerre como parcial, não como não realizada.");
  if(!window.confirm("Registrar esta sessão como não realizada? Nenhum tempo de estudo será contabilizado e o ciclo não avançará."))return;
  if(timing.alarm)dismissAlarm();
+ stopPauseReminder();pauseReminderSilenced=false;
  timing.active=null;delete timing.records[x.id];
  T.setSessionStatus(x.id,"pending",null,"");
  T.setSessionStatus(x.id,"notdone",null,"");
@@ -611,7 +650,7 @@ function resetTimer(id){
  if(trackTimeMatches(x,r))x.actualMin=null;
  const keptMode=r.mode,keptGoal=r.goalMin,originalStatus=r.originalStatus;
  timing.records[id]={sessionId:id,startedAt:new Date().toISOString(),studyMs:0,pauseMs:0,pauses:[],corrections:[],goalMin:keptGoal,mode:keptMode,originalStatus,lastBlockAlert:0,goalNotified:false,overtimeConfirmed:false,finishedAt:null,resetAt:new Date().toISOString()};
- if(timing.active?.sessionId===id)timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};
+ if(timing.active?.sessionId===id){stopPauseReminder();pauseReminderSilenced=false;timing.active={sessionId:id,phase:"running",since:clock(),alertIndex:0};}
  if(timing.alarm?.sessionId===id)dismissAlarm();
  persist();C.closeModal();C.render();tick();C.notify("Cronômetro zerado. Use ⋯ para desfazer.");
 }
@@ -621,7 +660,7 @@ function discardTimer(id){
  snapshotUndo([id]);
  if(trackTimeMatches(x,r))x.actualMin=null;
  delete timing.records[id];
- if(timing.active?.sessionId===id)timing.active=null;
+ if(timing.active?.sessionId===id){stopPauseReminder();pauseReminderSilenced=false;timing.active=null;}
  if(timing.alarm?.sessionId===id)dismissAlarm();
  if(x.status==="progress"&&r.originalStatus==="pending"&&x.actualMin==null)T.setSessionStatus(x.id,"pending",null,x.actualTime||"");
  persist();C.closeModal();C.render();tick();C.notify("Cronometragem descartada. É possível desfazer pelo menu da sessão por 60 segundos.");
