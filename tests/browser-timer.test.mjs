@@ -42,6 +42,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.waitForSelector(".s7-timer.s7-running");
   assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Em estudo/);
   assert.equal(await page.evaluate(()=>!!document.querySelector("#s7-global-status")),false,"faixa de inatividade não ocupa o topo");
+  await page.click('.s7-timer .s7-more > summary');
   await page.click('.s7-timer [data-s7="pause"][data-kind="preparation"]');
   await page.waitForSelector(".s7-timer.s7-paused");
   assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Pausado/);
@@ -54,6 +55,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.waitForSelector(".s7-timer.s7-running");
   await new Promise(resolve=>setTimeout(resolve,1250)); // garante tempo produtivo não nulo antes do encerramento
   page.once("dialog",dialog=>dialog.accept());
+  await page.click('.s7-timer .s7-more > summary');
   await page.click('.s7-timer [data-s7="partial"]');
   await page.waitForFunction(()=>window.OrbitaCore.state.timing.active===null);
   const result=await page.evaluate(()=>{
