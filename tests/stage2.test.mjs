@@ -155,4 +155,41 @@ C.go("planejamento");
 assert.ok(html().includes("2 sessão(ões) de estudo"),"indicador semanal inclui sessões de estudo não arquivadas");
 assert.ok(html().includes("2 ses."),"rótulo compacto apresenta sessões");
 
+// Regressão: um foco recorrente criado num dia fechado pode ser renomeado
+// a partir da próxima ocorrência aberta sem reescrever o histórico.
+const future1=C.addDays(today,1),future2=C.addDays(today,2),future3=C.addDays(today,3);
+submit("s2-entry",{type:"focus",title:"Matemática antiga",date:today,repeat:"daily",repeatTermination:"date",repeatEnd:C.addDays(today,6)});
+const recurringFocus=S.model.entries.find(x=>x.title==="Matemática antiga");
+S.model.records[recurringFocus.id+"@"+today]={status:"done",actualMin:90};
+S.model.closedDays.push(today);
+S.model.closedDays.push(future1);
+const beforeRecord=JSON.stringify(S.model.records[recurringFocus.id+"@"+today]);
+S.submission("s2-entry",form({id:recurringFocus.id,editDate:today,type:"focus",title:"Não permitir",date:today,repeat:"daily",repeatTermination:"date",repeatEnd:C.addDays(today,6),scope:"future"}));
+assert.equal(recurringFocus.title,"Matemática antiga","dia fechado não pode ser alterado");
+S.model.closedDays.pop();
+const nextOpen=S.occurrence(recurringFocus,future1);
+assert.ok(nextOpen,"a sequência existente possui ocorrência futura");
+S.model.closedDays.push(future1);
+S.model.closedDays.push(future2);
+S.quickStatusMenu; // método existente deve continuar disponível
+S.model.closedDays.splice(S.model.closedDays.indexOf(future2),1);
+// Em Organizar, o modelo original já é histórico: o modal abre a próxima
+// ocorrência livre, e não a data da criação.
+const clickListeners=listeners.click||[];
+const editHandler=clickListeners.find(fn=>typeof fn==="function"&&String(fn).includes("data-s2"));
+assert.ok(editHandler,"manipulador de edição disponível");
+editHandler({target:{closest:()=>({dataset:{s2:"editEntry",id:recurringFocus.id,date:today}})},preventDefault(){}});
+const modal=element("modal-host").innerHTML;
+assert.match(modal,new RegExp('name="editDate" value="'+future2+'"'),"editar modelo antigo abre primeira ocorrência não fechada");
+assert.match(modal,/name="scope"/,"edição de recorrência oferece escopo");
+assert.match(modal,/value="future" selected/,"focos recorrentes preferem futuras ocorrências");
+submit("s2-entry",{id:recurringFocus.id,editDate:future2,type:"focus",title:"Matemática renomeada",date:future2,repeat:"daily",repeatTermination:"date",repeatEnd:C.addDays(today,6),scope:"future"});
+assert.equal(S.occurrence(recurringFocus,today).title,"Matemática antiga","histórico mantém nome original");
+assert.equal(S.occurrence(recurringFocus,future1).title,"Matemática antiga","dia fechado intermediário permanece intacto");
+assert.equal(S.occurrence(recurringFocus,future2),null,"modelo anterior acaba na véspera do novo");
+assert.equal(S.kindOn(future2,"focus").filter(x=>x.title==="Matemática renomeada").length,1,"nova ocorrência não é duplicada");
+assert.equal(S.kindOn(future3,"focus").filter(x=>x.title==="Matemática renomeada").length,1,"edição alcança ocorrências seguintes");
+assert.equal(JSON.stringify(S.model.records[recurringFocus.id+"@"+today]),beforeRecord,"registro concluído não muda");
+assert.equal(S.model.closedDays.includes(today),true,"dia original continua finalizado");
+
 console.log("Etapa 2: verificações de tarefas, focos, conclusão, blocos, recorrência, continuidade, pausa, remanejamento, tempo real e cópias passaram.");
