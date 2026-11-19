@@ -426,3 +426,11 @@ body[data-theme="light"] .mobile-nav{
     grid-template-columns:repeat(4,minmax(0,1fr));
   }
 }
+
+/* Versão discreta no canto inferior, fora dos controles de estudo. */
+.sidebar-note{font-size:9px;letter-spacing:.08em;font-weight:400;opacity:.48;padding:6px 14px 1px;text-align:left;user-select:none}
+.orbita-version-mobile{display:none}
+@media(max-width:720px){
+ .orbita-version-mobile{display:block;position:fixed;left:10px;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:2;color:var(--soft);font-size:9px;font-weight:400;opacity:.42;pointer-events:none;user-select:none}
+}
+@media(min-width:721px) and (max-width:760px){.orbita-version-mobile{display:block;position:fixed;left:10px;bottom:calc(70px + env(safe-area-inset-bottom,0px));z-index:2;color:var(--soft);font-size:9px;opacity:.42;pointer-events:none}}
