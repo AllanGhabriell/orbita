@@ -297,6 +297,22 @@ test("dia encerrado impede iniciar, sem produzir sessão falsa",()=>{
  assert.equal(h.state.timing.active,null);
  assert.equal(h.item.status,"pending");
 });
+test("timer 5.06 exibe somente três ações principais, sem botões duplicados",()=>{
+ const h=harness();h.stage.start("math-1");
+ const html=h.decorate("inicio",'<div class="study-daily-summary"></div>');
+ assert.match(html,/s7-primary-actions/);
+ assert.match(html,/data-s7="finishChoices"/);
+ assert.match(html,/s7-more/);
+ assert.equal((html.match(/data-s7="correct"/g)||[]).length,1,"corrigir tempo aparece somente uma vez");
+ assert.equal((html.match(/data-s7="pause" data-kind="rest"/g)||[]).length,1);
+ assert.equal((html.match(/data-s7="finishChoices"/g)||[]).length,1);
+ assert.equal((html.match(/data-s7="partial"/g)||[]).length,1,"parcial aparece apenas nas opções secundárias");
+ h.stage.finishChoices();
+ assert.match(h.modal,/Concluir sessão/);
+ assert.match(h.modal,/Encerrar parcial/);
+ assert.match(h.modal,/data-s7="finish"/);
+ assert.match(h.modal,/data-s7="partial"/);
+});
 test("interface possui indicadores e alertas configuráveis",()=>{
  const h=harness();
  assert.equal(h.stage.model.settings.mode,"continuous");
