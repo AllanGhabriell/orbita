@@ -49,7 +49,7 @@ assert.match(html,/boot\.js\?v=20261119-reminder-readonly-v5-02/,"HTML carrega b
  assert.ok(cssVersion,"CSS do cronômetro tem versão explícita no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css?v="+cssVersion),"o Service Worker contém a versão de CSS realmente usada no HTML");
  assert.ok(sw.includes("./stage7.js")&&sw.includes("./stage7.css"),"cronômetro incluído no cache PWA");
-assert.ok(html.includes("styles.css?v=20261104-profile-goals-mobile"),"CSS do perfil no celular tem versão nova");
+assert.ok(html.includes("styles.css?v=20261119-reminder-readonly-v5-02"),"CSS do perfil no celular tem versão nova");
 assert.ok(html.includes("stage2.css?v=20261118-orbita-v5-0-1"),"Organizar recebe CSS atualizado");
 assert.ok(html.includes("stage2.css?v=20261118-orbita-v5-0-1"),"CSS das prioridades de tarefas com versão atualizada");
 assert.ok(html.includes("stage3.css?v=20261103-session-focus"),"stylesheet recebe versão para superar cache antigo");
