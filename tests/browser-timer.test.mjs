@@ -120,6 +120,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.click('#s7-alarm-host [data-s7="alarmContinue"]');
   assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.alarm),null);
   assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.active.sessionId),"alarm-case");
+  await page.click('.s7-timer .s7-more > summary');
   page.once("dialog",dialog=>dialog.accept());
   await page.click('.s7-timer [data-s7="partial"]');
   await page.waitForFunction(()=>window.OrbitaCore.state.timing.active===null);
