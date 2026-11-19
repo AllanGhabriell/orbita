@@ -509,6 +509,15 @@ function updateTotalsPreview(form){
  target.textContent=Math.max(0,Math.round(tracked-study-rest))+" min";
 }
 
+function finishChoices(){
+ const a=timing.active;if(!a)return;
+ const r=activeRecord(),x=session(a.sessionId);
+ C.openModal("Finalizar sessão",'<div class="section-stack"><p class="note">'+E(x?.discipline||"Estudo")+' · '+E(duration(r?studyMs(r):0))+' de estudo registrado.</p>'+
+ '<p class="note">Concluir avança o ciclo quando aplicável; encerrar parcial registra somente o tempo realizado.</p>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button>'+
+ '<button type="button" class="btn ghost" data-s7="partial">Encerrar parcial</button>'+
+ '<button type="button" class="btn primary" data-s7="finish">Concluir sessão</button></div></div>');
+}
 function askFinish(done){
  const a=timing.active;if(!a)return;
  if(!window.confirm(done?"Concluir a sessão e avançar o ciclo, quando aplicável?":"Encerrar e salvar o tempo parcial sem avançar o ciclo?"))return;
@@ -776,9 +785,18 @@ function ring(){
  return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="idle"?"ESTUDO INTERROMPIDO":a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span>'+(Number(r.unaccountedMs)>0?'<span>Desconsiderado: <strong>'+fmtMs(r.unaccountedMs)+'</strong></span>':"")+'</div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
- (a.phase==="idle"?'<div class="s7-idle-alert"><strong>O cronômetro parou automaticamente.</strong><p>Nenhum tempo adicional será contado até você continuar. Se estudou durante a ausência, use Corrigir tempo do cronômetro.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button></div>':a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+'<button class="btn ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+(r.mode!=="continuous"?'<button class="btn ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
- '<button class="btn primary" data-s7="resume">▶ Retomar estudo</button><div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
- '<button class="btn ghost small" data-s7="correct">Corrigir tempo do cronômetro</button>'+(lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+'<div class="row"><button class="btn small ghost" data-s7="partial">Encerrar parcial</button><button class="btn small" data-s7="finish">Finalizar como concluído</button></div></div></div>'+
+ (a.phase==="idle"?'<div class="s7-idle-alert"><strong>Contagem interrompida após a meta.</strong><p>O excedente não será contabilizado até você confirmar. Se estudou, corrija o tempo em Mais opções.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button></div>':
+ '<div class="s7-primary-actions">'+
+ (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button>':'<button class="btn primary" data-s7="resume">▶ Retomar estudo</button>')+
+ '<button class="btn ghost" data-s7="finishChoices">Finalizar sessão</button>'+
+ '<details class="s7-more"><summary>⋯ Mais opções</summary><div class="s7-more-actions">'+
+ '<button class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button>'+
+ (lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+
+ (a.phase==="running"?'<button class="btn small ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+
+ (r.mode!=="continuous"?'<button class="btn small ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
+ '<div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
+ '<button class="btn small ghost" data-s7="partial">Encerrar parcial</button></div></details></div>')+
+ </div></div>'+
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
  '<p class="note">O estudo e as pausas podem ser corrigidos em minutos e segundos. Tempo desconsiderado não conta como estudo.</p></section>';
 }
@@ -997,6 +1015,7 @@ document.addEventListener("click",e=>{
   else if(act==="pause")pause(b.dataset.kind||"rest");
   else if(act==="resume")resume();
   else if(act==="resumeIdle")resumeIdle();
+  else if(act==="finishChoices")finishChoices();
   else if(act==="finish")askFinish(true);
   else if(act==="partial")askFinish(false);
   else if(act==="correct")correctModal();
@@ -1080,6 +1099,6 @@ document.addEventListener("change",e=>{
 document.addEventListener("visibilitychange",()=>{tick();});
 window.addEventListener("focus",tick);
 setInterval(tick,1000);
-window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
+window.OrbitaStage7={decorate,inspect:{get model(){return timing},tick,autoPauseForInactivity,resumeIdle,confirmOvertime,alertUser,silenceAlarm,dismissAlarm,replayAlarm,renderAlarm,showDemoAlarm,compactWav,upload,metrics,studyMs,pauseMs,start,pause,resume,correction,correctRestMinutes,reallocateCurrent,correctSessionTotals,correctModal,autoSilenceAlarm,noteActivity,finish,finishChoices,resetTimer,discardTimer,cancelAccidentalPause,resetCurrentPause,syncManualRecord,removeDeletedSession,get activeSessionId(){return timing.active?.sessionId||null},editTotals,editPause,deletePause,clearPauses,moveRecord,undo,sessionMenu,hasActiveForDate:date=>timing.active&&session(timing.active.sessionId)?.date===date,fmtMs}};
 C.render();renderAlarm();if(timing.alarm&&!timing.alarm.silenced&&!autoSilenceAlarm()){alarmSound(timing.alarm.which);scheduleAlarmTimeout();}tick();
 })();
