@@ -71,6 +71,13 @@ assert.throws(()=>S.mergeClosures(x,z),/mesmo dia foi finalizado/,"dias divergen
 assert.equal(S.meaningful(x),true);
 assert.equal(S.meaningful({goals:[],planner:{entries:[]},studies:{cycles:[]},evolution:{closed:{}}}),false);
 
+const cloudCode=read("stage5.js");
+assert.match(cloudCode,/checkRemoteUpdates/,"novas versões são procuradas automaticamente");
+assert.match(cloudCode,/2500/,"verificação periódica aproxima dispositivos em poucos segundos");
+assert.match(cloudCode,/visibilitychange/,"reentrada no aplicativo verifica atualizações");
+assert.match(cloudCode,/p_expected_version:cloudVersion/,"gravação mantém controle de concorrência");
+assert.match(cloudCode,/status\("conflict"\)/,"versões concorrentes não são sobrescritas silenciosamente");
+assert.doesNotMatch(cloudCode,/data-s5="sync"/,"botão manual de sincronização removido da interface");
 const manifest=JSON.parse(read("manifest.webmanifest"));
 assert.equal(manifest.display,"standalone");
 assert.equal(manifest.scope,"./");
