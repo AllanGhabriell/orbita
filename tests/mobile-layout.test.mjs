@@ -29,6 +29,12 @@ assert.match(patch,/\.view\[data-route="inicio"\] \.view-inner\{min-height:0/,"r
 assert.match(patch,/\.day-tile \.day-meta\{display:none\}/,"descrição longa ocultada só no mobile");
 assert.match(patch,/\.day-tile \.day-meta-compact\{/,"metadado compacto tem estilo mobile");
 assert.doesNotMatch(styles.slice(0,styles.indexOf("/* Correções restritas ao celular:")),/day-meta-compact/,"não altera o CSS anterior");
+const mobileHome=styles.slice(styles.indexOf("/* Órbita 5.07 — prioridade mobile."),styles.indexOf("/* Órbita 5.07 — prioridade mobile.")+6200);
+assert.match(mobileHome,/@media \(max-width:720px\)/,"hierarquia alterada apenas em tela pequena");
+assert.match(mobileHome,/\.view\[data-route="inicio"\] \.view-inner>\.hero-goal\{order:1\}/,"objetivo principal fica em destaque");
+assert.match(mobileHome,/\.study-home-panel\{order:3\}/,"sessões de estudo aparecem antes de avisos");
+assert.match(mobileHome,/\.evo-mentor-access\{order:8/,"Orientador vira elemento secundário no celular");
+assert.match(mobileHome,/\.evo-warning/,"fechamentos pendentes ficam compactos sem desaparecer");
 assert.equal(node("view").dataset.route,"inicio");
 C.state.availability.weekly=Array.from({length:7},()=>({mode:"hours",hours:6}));
 C.go("planejamento");
