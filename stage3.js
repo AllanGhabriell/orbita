@@ -531,7 +531,10 @@ function homePanel(){
   const flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
   const entries=group.items.map(x=>{
    const number=sessionOrdinal(x),label=plannerLabel(x);
-   const desc=[x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista",x.startTime||"",
+   const finished=x.status==="done"||x.status==="progress"||x.status==="notdone";
+   const registered=x.actualMin!=null&&Number.isFinite(Number(x.actualMin));
+   const timeLabel=finished?(registered?minuteLabel(x.actualMin)+" realizada(s)":x.status==="notdone"?"0min realizado":"Tempo não informado"):(x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista");
+   const desc=[timeLabel,x.startTime||"",
     x.status==="done"?"Concluída":x.status==="notdone"?"Não realizada":x.status==="progress"?"Em andamento":"Pendente"].filter(Boolean).join(" · ");
    return '<div class="study-daily-entry '+(x.status==="done"?"is-done":x.status==="notdone"?"is-notdone":"")+'"><span class="study-daily-number">'+number+'</span>'+
     '<div class="study-daily-label"><strong>Sessão '+number+'</strong><span class="study-daily-subject">'+E(label)+'</span>'+
