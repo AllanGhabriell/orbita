@@ -478,11 +478,33 @@ function previousComparison(x){
  metric("Atual",currentRate+"%",a.doneFocus+"/"+a.focus+" focos")+
  '</div><p class="note" style="margin-top:12px">'+E(message)+' Compare também a quantidade e a dificuldade dos compromissos; porcentagens isoladas não demonstram qualidade do estudo.</p></section>';
 }
+
+function mentorActivitySummary(x){
+ const n=x.count,rows=[
+  ["Focos do dia",n.doneFocus,n.focus],
+  ["Sessões de estudo",n.studiesDone,n.study],
+  ["Tarefas secundárias",n.tasksDone,n.tasks]
+ ];
+ const cards=rows.map(([name,done,total])=>{
+  const pct=total?Math.round(done/total*100):null;
+  const klass=pct===null?"neutral":pct>=75?"good":pct>=45?"mid":"bad";
+  return '<div class="evo-boss-activity"><div><strong>'+E(name)+'</strong><span>'+done+' / '+total+'</span></div><div class="evo-boss-progress" role="img" aria-label="'+E(name+': '+(pct===null?'sem dados':pct+' por cento concluídos'))+'"><i class="'+klass+'" style="width:'+(pct||0)+'%"></i></div><small>'+(pct===null?"Sem compromissos no período":pct+"% realizados")+'</small></div>';
+ }).join("");
+ const seen=Object.keys(ev.visitedDays||{}).filter(day=>day>=x.from&&day<=x.to&&day<=today()).length;
+ const high=p.entries.filter(v=>v.type==="task"&&v.priority==="high"&&!v.archived&&v.date<=today()).filter(v=>{
+  const record=p.records[v.id+"@"+(v.date||today())];
+  return (record?.status||v.status||"pending")!=="done";
+ }).length;
+ return '<section class="card evo-boss-usage"><div class="card-head"><div><h2>Execução do planejamento</h2><p class="note">Quanto você está planejando e quanto realmente entrega?</p></div></div>'+
+ '<div class="evo-boss-activity-grid">'+cards+'</div><div class="evo-boss-usage-foot"><span>◷ '+seen+' dia(s) com abertura registrada neste período</span><span>◉ '+high+' tarefa(s) de alta prioridade ainda pendente(s)</span></div>'+
+ '<p class="note">Abrir o Órbita não equivale a estudar. Tarefas recorrentes e datas ainda não encerradas podem estar pendentes legitimamente.</p></section>';
+}
 function overviewPeriod(x){
  const n=x.count,rate=focusRate(n),source=x.final?"Relatório definitivo":"Análise provisória";
  let html='<div class="row-between"><div><div class="overline">EVOLUÇÃO · '+E(source.toUpperCase())+'</div><h2 style="margin:7px 0">'+E(fmt(x.from,false))+' — '+E(fmt(x.to,false))+'</h2></div><div class="row">'+C.tag(x.final?"Consolidado":"Provisório",x.final?"good":"warn")+'</div></div>';
  if(!x.final)html+='<p class="note">Parte do período ainda não foi finalizada ou não possui registros. As análises são descritivas; dias sem atividade registrada não são tratados como fracasso.</p>';
  html+='<div class="metrics-grid">'+metric("Compromissos",rate==null?"—":rate+"",n.doneFocus+" de "+n.focus+" focos concluídos")+metric("Horas reais de estudo",minutes(n.studyActualMin),n.missingStudyTimes+" sessões sem tempo")+metric("Horas planejadas",minutes(n.plannedMin),"Tarefas e estudos sem dupla contagem")+metric("Descansos",n.rest+" planejado(s)",n.unplannedPauses+" pausa(s) extraordinária(s)")+'</div>';
+ html+=mentorActivitySummary(x);
  html+=previousComparison(x);
  html+='<section class="card evo-period-chart"><div class="card-head"><h2>Distribuição diária do estudo</h2><span class="note">Minutos realmente informados</span></div>'+chartDays(x)+'</section>';
  
