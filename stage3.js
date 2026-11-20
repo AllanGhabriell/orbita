@@ -531,7 +531,8 @@ function homePanel(){
   const flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
   const entries=group.items.map(x=>{
    const number=sessionOrdinal(x),label=plannerLabel(x);
-   const finished=x.status==="done"||x.status==="progress"||x.status==="notdone";
+   const inTimer=window.OrbitaStage7?.inspect?.activeSessionId===x.id;
+   const finished=x.status==="done"||x.status==="notdone"||(x.status==="progress"&&!inTimer);
    const registered=x.actualMin!=null&&Number.isFinite(Number(x.actualMin));
    const timeLabel=finished?(registered?minuteLabel(x.actualMin)+" realizada(s)":x.status==="notdone"?"0min realizado":"Tempo não informado"):(x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista");
    const desc=[timeLabel,x.startTime||"",
