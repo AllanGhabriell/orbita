@@ -116,6 +116,17 @@ assert.equal(V.isClosed(emptyDay),false,"dia vazio nunca foi encerrado artificia
 const mentor=V.mentorAnalysis();
 assert.ok(mentor.items.length>=1,"orientador geral gera parecer mesmo com poucos dados");
 assert.ok(V.mentorPanel().includes("Meu Orientador"),"painel do supervisor disponível");
+assert.match(V.mentorPanel(),/NOTA DE EXECUÇÃO/,"avaliação destaca a nota de execução");
+assert.match(V.mentorPanel(),/Pontos positivos/,"painel reconhece avanços");
+assert.match(V.mentorPanel(),/Pontos de melhoria/,"painel deixa cobranças exploráveis");
+assert.match(V.mentorPanel(),/Minha evolução/,"histórico visual disponível");
+assert.match(V.mentorPanel(),/type="range" id="s4-mentor-target"/,"a meta semanal pode ser negociada");
+assert.equal(V.mentorVisualData().current.score!==null,true,"registros encerrados produzem pontuação calculada");
+V.actions.mentorAcceptGoal();
+assert.ok(Number.isInteger(V.model.mentor.goal.target),"meta aceita persiste no modelo");
+assert.equal(V.model.mentor.goal.weekStart,C.addDays(C.firstDayOfWeek(date),7),"meta vale para a próxima semana");
+assert.ok(V.mentorPanel().includes("Compromisso registrado"),"Orientador relembra o compromisso assumido");
+
 assert.match(el("view").innerHTML,/./,"interface permanece operante");
 const oldRead=V.model.mentor.lastReadSignature;
 V.actions.mentorOpen();
