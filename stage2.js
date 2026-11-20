@@ -72,7 +72,7 @@ function allOn(date){
  const frozen=s.evolution?.closed?.[date];if(frozen)return frozen.activities.map(x=>({...x,date,displayTitle:x.title,occurrenceDate:date,record:{status:x.status,actualMin:x.actualMin,actualTime:x.actualTime}}));
  const rows=p.entries.map(x=>occurrence(x,date)).filter(Boolean);
  // Tarefas flexíveis seguem acessíveis até a conclusão, inclusive se criadas em outro dia.
- for(const entry of p.entries.filter(x=>x.type==="task"&&x.recurrence?.kind==="none"&&x.date<date)){
+ for(const entry of p.entries.filter(x=>x.type==="task"&&(!x.recurrence||x.recurrence.kind==="none")&&x.date<date)){
   const completed=Object.entries(p.records).find(([k,v])=>k.startsWith(entry.id+"@")&&v.status==="done");
   if(completed&&completed[0].split("@")[1]<date)continue;
   if(entry.archivedAt&&entry.archivedAt<=date)continue;
@@ -109,7 +109,7 @@ function itemRow(o,date,compact=false){
  return '<div class="task-row '+(st==="done"?"task-done":"")+'" style="--task-color:'+a(color)+'"><div class="task-mark">'+(st==="done"?"✓":st==="progress"?"◷":st==="notdone"?"×":st==="moved"?"↷":"·")+'</div><div class="task-main"><div class="task-title">'+e(entryTitle(o))+' '+taskAge+'</div><div class="task-meta">'+priorityBadge+blockLabel(o.blockId)+(desc?'<span>'+e(desc)+'</span>':"")+'<span>'+e(statusText(st))+'</span></div></div><div class="task-actions">'+controls+(window.OrbitaStage8?.indicatorFor?.({kind:"entry",id:o.id,date,status:st})||"")+'<button class="btn small ghost" data-s2="editEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Editar">✎</button><button class="btn small ghost" data-s2="moreEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Mais ações">⋯</button></div></div>';
 }
 function emptyList(message){return '<p class="note empty-inline">'+e(message)+'</p>';}
-function listFor(date,type){const items=kindOn(date,type);return items.length?'<div class="task-list">'+items.map(x=>itemRow(x,date)).join("")+'</div>':emptyList(({focus:"Nenhum foco definido.",task:"Nenhuma tarefa secundária.",habit:"Nenhuma rotina cadastrada."})[type]);}
+function listFor(date,type){const hidden=s.settings?.hideCompletedEntries?.[type]===true;const items=kindOn(date,type).filter(x=>!hidden||x.status!=="done");return items.length?'<div class="task-list">'+items.map(x=>itemRow(x,date)).join("")+'</div>':emptyList(({focus:"Nenhum foco definido.",task:"Nenhuma tarefa secundária.",habit:"Nenhuma rotina cadastrada."})[type]);}
 function decorateHome(){
  const goal=C.activeGoal(),rest=restInfo(s.date),avail=C.resolveAvailability(s.date),ready=C.availabilityReady();
  let html='<section class="hero-row"><div><div class="overline">PLANEJAMENTO DO DIA</div><h1>'+e(fmt(s.date,true))+'</h1></div><div class="row">'+C.dateNavigator()+(s.date!==day()?button("Hoje","goToday","small ghost"):"")+'</div></section>';
@@ -123,7 +123,9 @@ function decorateHome(){
  if(estimated&&available&&estimated>available)html+='<div class="action-strip warning-strip"><span class="icon">!</span><p>Você planejou '+C.hoursLabel(estimated/60)+' e informou '+C.hoursLabel(available/60)+' disponíveis. Revise se a carga é viável.</p></div>';
  html+='<div class="grid-2 dashboard-panels">';
  for(const [type,title] of [["focus","Focos do dia"],["task","Tarefas secundárias"]]){
-  html+='<section class="card board"><div class="card-head"><h2>'+title+'</h2><button class="btn small ghost" data-s2="newEntry" data-type="'+type+'">+ Adicionar</button></div>'+listFor(s.date,type)+'</section>';
+  const hidden=s.settings?.hideCompletedEntries?.[type]===true;
+  const eye='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.7-7 10-7 10 7 10 7-3.7 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'+(hidden?'<path d="m3 3 18 18"/>':'')+'</svg>';
+  html+='<section class="card board"><div class="card-head"><h2>'+title+'</h2><div class="row"><button class="btn small ghost" data-s2="toggleDoneVisibility" data-type="'+type+'" aria-label="'+(hidden?'Mostrar':'Ocultar')+' itens concluídos" title="'+(hidden?'Mostrar':'Ocultar')+' itens concluídos" aria-pressed="'+hidden+'">'+eye+'</button><button class="btn small ghost" data-s2="newEntry" data-type="'+type+'">+ Adicionar</button></div></div>'+listFor(s.date,type)+'</section>';
  }
  html+='</div><section class="card board"><div class="card-head"><h2>Rotinas e hábitos</h2><button class="btn small ghost" data-s2="newEntry" data-type="habit">+ Adicionar</button></div>'+listFor(s.date,"habit")+'</section>';
  html+='<div class="row-between"><p class="note">Duração planejada nesta data: <strong>'+C.hoursLabel(estimated/60)+'</strong>. Horas efetivas só serão computadas quando informadas.</p><button class="btn small" data-s2="newEntry" data-type="focus">Novo foco</button></div>';
@@ -390,6 +392,7 @@ function quickStatusMenu(id,date,x=0,y=0,trigger=null){
  }else C.openModal("Situação rápida",content);
 }
 const actions={
+ toggleDoneVisibility(b){const type=b.dataset.type;if(!["focus","task"].includes(type))return;s.settings||(s.settings={});s.settings.hideCompletedEntries||={};s.settings.hideCompletedEntries[type]=!s.settings.hideCompletedEntries[type];save();render();},
  quickStatus(b){quickRecord(b.dataset.id,b.dataset.date,b.dataset.value);closeStatusMenu();},
  closeStatusMenu(){closeStatusMenu()},
  newEntry(b){entryModal(b.dataset.type||"focus")},editEntry(b){const x=find(b.dataset.id);if(x)entryModal(x.type,x.id,b.dataset.date||x.date)},
