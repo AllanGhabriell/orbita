@@ -800,6 +800,34 @@ function moveRecord(id,targetId,split,minutes=0){
  }
  persist();C.closeModal();C.render();C.notify(split?"Tempo dividido sem duplicação.":"Cronometragem transferida para a outra sessão.");
 }
+function editStartModal(id){
+ const x=session(id),r=record(id);
+ if(!x||!r||x.archived||V?.isClosed?.(x.date)||root.evolution?.closed?.[x.date])throw Error("Sessão indisponível ou dia finalizado.");
+ const at=new Date(r.startedAt);
+ if(!Number.isFinite(at.getTime()))throw Error("Horário original indisponível.");
+ const local=new Date(at.getTime()-at.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ C.openModal("Corrigir início do estudo",'<form id="s7-edit-start" class="section-stack"><input name="id" type="hidden" value="'+A(id)+'">'+
+ '<p class="note">'+E(x.discipline)+' · indique o horário em que realmente começou, caso tenha iniciado o cronômetro com atraso.</p>'+
+ '<div class="field"><label>Início real do estudo</label><input name="start" type="datetime-local" required value="'+A(local)+'"></div>'+
+ '<p class="note">Somente o período anterior ao início registrado será adicionado como estudo. Nenhuma pausa será alterada.</p>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-s7="manage" data-id="'+A(id)+'">Voltar</button><button class="btn primary" type="submit">Salvar horário</button></div></form>');
+}
+function editStart(id,start){
+ const x=session(id),r=record(id);
+ if(!x||!r||x.archived||V?.isClosed?.(x.date)||root.evolution?.closed?.[x.date])throw Error("Sessão indisponível ou dia finalizado.");
+ const previous=new Date(r.startedAt).getTime(),at=clock();
+ if(!Number.isFinite(start)||!Number.isFinite(previous)||start>=previous||start>at)throw Error("Informe um início anterior ao horário registrado.");
+ if(previous-start>24*3600000)throw Error("A correção não pode exceder 24 horas.");
+ const d=new Date(start),localDate=[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+ if(localDate!==x.date)throw Error("O início precisa ser no dia desta sessão.");
+ const added=previous-start;
+ if(studyMs(r,at)+added>24*3600000)throw Error("A correção ultrapassaria 24 horas de estudo.");
+ snapshotUndo([id]);
+ r.startedAt=new Date(start).toISOString();r.studyMs=(Number(r.studyMs)||0)+added;
+ noteEdit(r,"actual_start_corrected",{previousStart:new Date(previous).toISOString(),actualStart:r.startedAt,creditedStudyMs:added});
+ if(timing.active?.sessionId!==id)updateActual(x,r);
+ persist();C.closeModal();C.render();tick();C.notify("Início corrigido; pausas preservadas.");
+}
 function manageModal(id){
  const x=session(id),r=record(id);
  if(!x||V?.isClosed?.(x.date))throw Error("Sessão inexistente ou dia finalizado.");
@@ -809,7 +837,8 @@ function manageModal(id){
   return C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p>O registro foi descartado.</p><div class="row">'+undoButton+'</div></div>');
  }
  const active=timing.active?.sessionId===id;
- const controls='<button class="btn small ghost" data-s7="editTotals" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Editar tempos</button>'+
+ const controls='<button class="btn small ghost" data-s7="editStart" data-id="'+A(id)+'">Corrigir início real</button>'+
+ '<button class="btn small ghost" data-s7="editTotals" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Editar tempos</button>'+
  '<button class="btn small ghost" data-s7="pauses" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Gerenciar pausas</button>'+
  '<button class="btn small ghost" data-s7="transfer" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Transferir para outra sessão</button>'+
  '<button class="btn small ghost" data-s7="split" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Dividir tempo entre sessões</button>'+
@@ -1083,6 +1112,7 @@ document.addEventListener("click",e=>{
   else if(act==="correct")correctModal();
   else if(act==="manage")manageModal(b.dataset.id);
   else if(act==="editTotals")editTotalsModal(b.dataset.id);
+  else if(act==="editStart")editStartModal(b.dataset.id);
   else if(act==="pauses")pausesModal(b.dataset.id);
   else if(act==="editPause")editPauseModal(b.dataset.id,Number(b.dataset.index));
   else if(act==="deletePause")deletePause(b.dataset.id,Number(b.dataset.index));
@@ -1116,7 +1146,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("submit",e=>{
  // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
  const id=e.target?.getAttribute?.("id")||e.target?.id;
- if(!["s7-correction-form","s7-correct-rest","s7-reallocate-form","s7-correct-totals","s7-timed-pause-form","s7-edit-totals","s7-edit-pause","s7-move-record"].includes(id))return;
+ if(!["s7-correction-form","s7-correct-rest","s7-reallocate-form","s7-correct-totals","s7-timed-pause-form","s7-edit-totals","s7-edit-start","s7-edit-pause","s7-move-record"].includes(id))return;
  e.preventDefault();
  const data=new FormData(e.target);
  try{
@@ -1126,6 +1156,7 @@ document.addEventListener("submit",e=>{
   else if(id==="s7-correct-totals")correctSessionTotals(data.get("studyMinutes"),data.get("restMinutes"),String(data.get("nextPhase")||"running"));
    else if(id==="s7-timed-pause-form")startTimedPause(data.get("minutes"),data.get("reason"));
   else if(id==="s7-edit-totals")editTotals(String(data.get("id")),Number(data.get("study")),Number(data.get("paused")),String(data.get("reason")||""));
+  else if(id==="s7-edit-start")editStart(String(data.get("id")),new Date(data.get("start")).getTime());
   else if(id==="s7-edit-pause")editPause(String(data.get("id")),Number(data.get("index")),new Date(data.get("start")).getTime(),new Date(data.get("end")).getTime(),String(data.get("kind")));
   else if(id==="s7-move-record")moveRecord(String(data.get("id")),String(data.get("target")),data.get("operation")==="split",Number(data.get("minutes")));
  }catch(err){C.notify(err.message||"Confira os valores informados.");}
