@@ -199,4 +199,5 @@ document.addEventListener("click",async event=>{
  }catch(error){status.textContent=error?.message||"Falha ao gerar relatório.";C.notify(status.textContent);}
 });
 window.OrbitaCouncilExport={decorate,makeReport:make};
+C.render();
 })();
