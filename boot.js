@@ -70,7 +70,7 @@ function load(src){
  });
 }
 for(const file of ["config.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js","stage6.js","stage7.js","stage8.js"]){
- try{await load("./"+file+(file==="stage2.js"?"?v=20261119-reminder-readonly-v5-02":file==="stage3.js"?"?v=20261119-study-final-v5-06":file==="stage4.js"?"?v=20261120-mentor-v5-08":file==="stage7.js"?"?v=20261119-orbita-v5-07-final":file==="stage8.js"?"?v=20261119-reminder-readonly-v5-02":file==="app.js"?"?v=20261119-reminder-readonly-v5-02":file==="stage5.js"?"?v=20261119-orbita-v5-07-final":""));}catch(err){
+ try{await load("./"+file+(file==="stage2.js"?"?v=20261119-reminder-readonly-v5-02":file==="stage3.js"?"?v=20261120-sessions-goals-v5-08b":file==="stage4.js"?"?v=20261120-mentor-v5-08":file==="stage7.js"?"?v=20261120-sessions-goals-v5-08b":file==="stage8.js"?"?v=20261119-reminder-readonly-v5-02":file==="app.js"?"?v=20261120-sessions-goals-v5-08b":file==="stage5.js"?"?v=20261119-orbita-v5-07-final":""));}catch(err){
   console.error(err);
   const view=document.getElementById("view");if(view)view.textContent="Não foi possível carregar o aplicativo. Verifique a conexão e atualize a página.";
   return;
