@@ -166,3 +166,13 @@
  .evo-boss-tile-body{padding:0 11px 12px}
 }
 @media(max-width:380px){.evo-boss-grid{grid-template-columns:1fr}}
+
+/* Estatísticas independentes: acessíveis quando solicitadas, sem competir com o diagnóstico. */
+.evo-boss-stat-panel{border:1px solid var(--border);border-radius:15px;background:var(--surface2);overflow:hidden}
+.evo-boss-stat-panel>summary{display:flex;align-items:center;cursor:pointer;padding:15px 17px;font-size:13px;font-weight:750;list-style:none;min-height:51px}
+.evo-boss-stat-panel>summary::-webkit-details-marker{display:none}
+.evo-boss-stat-panel>summary:hover,.evo-boss-stat-panel>summary:focus-visible{background:var(--surface3)}
+.evo-boss-stat-panel[open]>summary{border-bottom:1px solid var(--borderStrong)}
+.evo-boss-stat-panel .evo-statistics-area{padding:16px;background:var(--surface)}
+.evo-boss-stat-panel .evo-statistics-area>.evo-toolbar{margin:0 0 4px}
+.evo-boss-stat-panel .evo-statistics-area>.evo-period-chart{min-width:0}
