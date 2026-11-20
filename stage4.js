@@ -511,8 +511,12 @@ function reportRow(left,right){return '<div class="row-between evo-row"><span>'+
 function viewEvolution(){
  const current=periodData(period,referenceDate);
  return '<div class="hero-row"><div><div class="overline">SEU HISTÓRICO</div><h1>Minha evolução</h1><p class="kicker">Os resultados vêm de registros reais. Constância conta tanto quanto aumentar a quantidade.</p></div><div class="row"><button class="btn small ghost" data-s4="backProfile">← Perfil</button><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Fechar dia</button></div></div>'+
+ 
+ mentorPanel()+
+ '<details class="evo-boss-stat-panel" id="evo-boss-statistics"><summary>▥ Consultar todas as estatísticas · dia, semana, mês e ano</summary><div class="evo-statistics-area">'+
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
- mentorPanel()+'<div class="evo-statistics-area"><div class="card-head"><h2>Estatísticas detalhadas</h2><span class="note">Explore os números e os períodos acima</span></div>'+overviewPeriod(current)+'</div>'+
+ overviewPeriod(current)+
+ '</div></details>'+
  '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="checkline"><input id="s4-mentor-enabled" type="checkbox" '+(ev.settings.mentorEnabled!==false?"checked":"") +'> Ativar Orientador</label><label class="checkline"><input id="s4-mentor-notices" type="checkbox" '+(ev.settings.mentorNotices!==false?"checked":"")+'> Avisos discretos na tela inicial</label><label class="field">Tom do feedback<select id="s4-tone"><option value="strict" '+(ev.settings.strictness==="strict"?"selected":"")+'>Chefe chato · exigente</option><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
 }
 function yesterday(){return add(today(),-1);}
@@ -598,7 +602,7 @@ const actions={
  backProfile(){C.go("perfil")},
  viewStats(){goView()},
  mentorOpen(){goView()},
- mentorStats(){document.querySelector?.(".evo-statistics-area")?.scrollIntoView?.({behavior:"smooth",block:"start"});},
+ mentorStats(){const node=document.getElementById?.("evo-boss-statistics");if(node){node.open=true;node.scrollIntoView?.({behavior:"smooth",block:"start"});}},
  mentorAcceptGoal(){const d=mentorVisualData(),target=Number(mentorDraftTarget===null?d.proposal??60:mentorDraftTarget);if(!Number.isInteger(target)||target<0||target>100)return C.notify("Meta inválida.");const start=add(periodStart("week",today()),7);ev.mentor.goal={target,weekStart:start,weekEnd:add(start,6),createdAt:now(),suggested:d.proposal,baseline:d.previous.score};mentorDraftTarget=target;C.save();C.render();C.notify("Compromisso semanal registrado. O Orientador vai cobrar o resultado.");},
  mentorOptions(){mentorOptionsOpen=!mentorOptionsOpen;C.render()},
  mentorSnooze(b){const min=Number(b.dataset.min);if(![10,15,1440].includes(min))return;const until=min===1440?new Date(new Date().setHours(23,59,59,999)):new Date(Date.now()+min*60000);ev.mentor.snoozeUntil=until.toISOString();ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
