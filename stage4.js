@@ -391,7 +391,7 @@ function mentorTrendGraph(data){
   return '<div class="evo-boss-barcol" title="'+E("Semana de "+fmt(w.from,false)+": "+(w.score===null?"sem nota":w.score+"/100"))+'"><strong>'+(w.score===null?"—":w.score)+'</strong><div class="evo-boss-barback">'+(w.score!==null?'<span class="'+color+'" style="height:'+h+'%"></span>':"")+'</div><small>'+E(i===weeks.length-1?"Atual":"S-"+(weeks.length-i-1))+'</small></div>';
  }).join("")+'</div><p class="note">Notas de execução (0–100). Só entram compromissos de dias finalizados; semanas sem registros não recebem nota.</p>';
 }
-let mentorDraftTarget=null;
+let mentorDraftTarget=null,statsExpanded=false;
 function mentorPanel(){
  if(ev.settings.mentorEnabled===false)return '<section class="card"><h2>Orientador desativado</h2><p class="note">Suas estatísticas continuam disponíveis. Você pode reativar a análise nas preferências abaixo.</p></section>';
  const d=mentorVisualData(),x=d.current,tone=ev.settings.strictness||"firm",score=x.score;
@@ -513,7 +513,7 @@ function viewEvolution(){
  return '<div class="hero-row"><div><div class="overline">SEU HISTÓRICO</div><h1>Minha evolução</h1><p class="kicker">Os resultados vêm de registros reais. Constância conta tanto quanto aumentar a quantidade.</p></div><div class="row"><button class="btn small ghost" data-s4="backProfile">← Perfil</button><button class="btn small" data-s4="reviewDate" data-date="'+A(state.date)+'">Fechar dia</button></div></div>'+
  
  mentorPanel()+
- '<details class="evo-boss-stat-panel" id="evo-boss-statistics"><summary>▥ Consultar todas as estatísticas · dia, semana, mês e ano</summary><div class="evo-statistics-area">'+
+ '<details class="evo-boss-stat-panel" id="evo-boss-statistics" '+(statsExpanded?'open':'')+'><summary>▥ Consultar todas as estatísticas · dia, semana, mês e ano</summary><div class="evo-statistics-area">'+
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
  overviewPeriod(current)+
  '</div></details>'+
@@ -602,16 +602,16 @@ const actions={
  backProfile(){C.go("perfil")},
  viewStats(){goView()},
  mentorOpen(){goView()},
- mentorStats(){const node=document.getElementById?.("evo-boss-statistics");if(node){node.open=true;node.scrollIntoView?.({behavior:"smooth",block:"start"});}},
+ mentorStats(){statsExpanded=true;const node=document.getElementById?.("evo-boss-statistics");if(node){node.open=true;node.scrollIntoView?.({behavior:"smooth",block:"start"});}},
  mentorAcceptGoal(){const d=mentorVisualData(),target=Number(mentorDraftTarget===null?d.proposal??60:mentorDraftTarget);if(!Number.isInteger(target)||target<0||target>100)return C.notify("Meta inválida.");const start=add(periodStart("week",today()),7);ev.mentor.goal={target,weekStart:start,weekEnd:add(start,6),createdAt:now(),suggested:d.proposal,baseline:d.previous.score};mentorDraftTarget=target;C.save();C.render();C.notify("Compromisso semanal registrado. O Orientador vai cobrar o resultado.");},
  mentorOptions(){mentorOptionsOpen=!mentorOptionsOpen;C.render()},
  mentorSnooze(b){const min=Number(b.dataset.min);if(![10,15,1440].includes(min))return;const until=min===1440?new Date(new Date().setHours(23,59,59,999)):new Date(Date.now()+min*60000);ev.mentor.snoozeUntil=until.toISOString();ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
  mentorDismiss(){ev.mentor.dismissedSignature=mentorAnalysis().digest;ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
  mentorDisableNotices(){ev.settings.mentorNotices=false;mentorOptionsOpen=false;C.save();C.render()},
- period(b){period=b.dataset.period;referenceDate=state.date;C.render()},
- prevPeriod(){referenceDate=period==="day"?add(referenceDate,-1):period==="week"?add(referenceDate,-7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()-1,1,12)):referenceDate.slice(0,4)-1+"-01-01";if(referenceDate<first())referenceDate=first();C.render()},
- nextPeriod(){referenceDate=period==="day"?add(referenceDate,1):period==="week"?add(referenceDate,7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()+1,1,12)):(Number(referenceDate.slice(0,4))+1)+"-01-01";C.render()},
- currentPeriod(){referenceDate=today();C.render()},
+ period(b){statsExpanded=true;period=b.dataset.period;referenceDate=state.date;C.render()},
+ prevPeriod(){statsExpanded=true;referenceDate=period==="day"?add(referenceDate,-1):period==="week"?add(referenceDate,-7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()-1,1,12)):referenceDate.slice(0,4)-1+"-01-01";if(referenceDate<first())referenceDate=first();C.render()},
+ nextPeriod(){statsExpanded=true;referenceDate=period==="day"?add(referenceDate,1):period==="week"?add(referenceDate,7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()+1,1,12)):(Number(referenceDate.slice(0,4))+1)+"-01-01";C.render()},
+ currentPeriod(){statsExpanded=true;referenceDate=today();C.render()},
  dismissReminder(){ev.lastReminderDismissed=now();C.save();C.render()},
  disableReminder(){ev.settings.reminders=false;C.save();C.render()}
 };
