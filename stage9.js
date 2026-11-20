@@ -167,20 +167,13 @@ function make(){
  return lines.join("\n");
 }
 function panel(){
- return '<section class="card" id="csa-export"><details><summary style="cursor:pointer;display:flex;align-items:center;gap:10px;min-height:36px"><span aria-hidden="true">▤</span><strong>Relatório para o Conselho</strong><small style="margin-left:auto">30 dias · Abrir ▾</small></summary>'+
- '<div class="section-stack" style="padding-top:16px"><p class="note">Gere um retrato dos registros dos últimos 30 dias para consulta ou análise externa. Nenhuma informação será enviada automaticamente.</p>'+
+ return '<div id="csa-export" style="margin-top:22px"><details><summary style="cursor:pointer;display:flex;align-items:center;justify-content:flex-end;gap:7px;min-height:28px;color:var(--muted,inherit);font-size:12px;opacity:.72"><span aria-hidden="true">▤</span><span>Relatório para o Conselho</span></summary>'+
+ '<div class="card section-stack" style="margin-top:12px;padding:16px"><p class="note">Gere um retrato dos registros dos últimos 30 dias para consulta ou análise externa. Nenhuma informação será enviada automaticamente.</p>'+
  '<div class="row"><button type="button" class="btn small primary" data-csa="generate">Gerar relatório</button><button type="button" class="btn small ghost" data-csa="copy" disabled>Copiar texto</button><button type="button" class="btn small ghost" data-csa="download" disabled>Baixar TXT</button></div>'+
- '<label for="csa-preview" class="note">Prévia do documento</label><textarea id="csa-preview" readonly rows="11" spellcheck="false" placeholder="O relatório aparecerá aqui depois de gerado." style="width:100%;min-height:220px;resize:vertical"></textarea><small id="csa-status" class="note" role="status">Nenhum relatório gerado.</small></div></details></section>';
+ '<label for="csa-preview" class="note">Prévia do documento</label><textarea id="csa-preview" readonly rows="11" spellcheck="false" placeholder="O relatório aparecerá aqui depois de gerado." style="width:100%;min-height:220px;resize:vertical"></textarea><small id="csa-status" class="note" role="status">Nenhum relatório gerado.</small></div></details></div>';
 }
-function decorate(route,html){
- if(route!=="perfil")return html;
- // Exibir o acesso logo após o cabeçalho do Perfil, antes dos relatórios longos.
- const start=html.indexOf('<section class="hero-row">');
- if(start<0)return panel()+html;
- const end=html.indexOf("</section>",start);
- if(end<0)return panel()+html;
- return html.slice(0,end+10)+panel()+html.slice(end+10);
-}
+function decorate(route,html){return route==="perfil"?html+panel():html;}
+
 document.addEventListener("click",async event=>{
  const b=event.target.closest?.("[data-csa]");if(!b)return;
  const box=document.getElementById("csa-export");if(!box)return;
