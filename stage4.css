@@ -176,3 +176,19 @@
 .evo-boss-stat-panel .evo-statistics-area{padding:16px;background:var(--surface)}
 .evo-boss-stat-panel .evo-statistics-area>.evo-toolbar{margin:0 0 4px}
 .evo-boss-stat-panel .evo-statistics-area>.evo-period-chart{min-width:0}
+
+/* Barras legíveis para execução de compromissos e uso registrado. */
+.evo-boss-activity-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.evo-boss-activity{display:flex;flex-direction:column;gap:8px;border:1px solid var(--border);border-radius:12px;padding:13px;min-width:0;background:var(--surface2)}
+.evo-boss-activity>div:first-child{display:flex;justify-content:space-between;gap:5px;flex-wrap:wrap;font-size:12px}
+.evo-boss-activity>div:first-child strong{font-weight:700}
+.evo-boss-activity>div:first-child span{font-variant-numeric:tabular-nums;color:var(--muted)}
+.evo-boss-progress{height:9px;width:100%;border-radius:999px;background:var(--surface3);overflow:hidden}
+.evo-boss-progress i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.evo-boss-progress i.good{background:#3cbf8c}
+.evo-boss-progress i.mid{background:#e2b05d}
+.evo-boss-progress i.bad{background:#d86a73}
+.evo-boss-activity small{font-size:11px;color:var(--muted)}
+.evo-boss-usage-foot{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+.evo-boss-usage-foot span{padding:9px 11px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);font-size:11px}
+@media(max-width:720px){.evo-boss-activity-grid{grid-template-columns:1fr}}
