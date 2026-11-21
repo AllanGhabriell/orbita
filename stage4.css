@@ -192,3 +192,58 @@
 .evo-boss-usage-foot{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
 .evo-boss-usage-foot span{padding:9px 11px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);font-size:11px}
 @media(max-width:720px){.evo-boss-activity-grid{grid-template-columns:1fr}}
+
+
+/* Fechamento diário — revisão clara, controle explícito e feedback visual (v5.14) */
+.evo-batch-panel,.evo-batch-detail,.evo-feedback-modal{gap:16px}
+.evo-batch-dates,.evo-review-items{display:flex;flex-direction:column;gap:9px}
+.evo-batch-date{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:1px solid var(--border);border-radius:14px;background:var(--surface2);color:var(--text);padding:16px;cursor:pointer;transition:border-color .15s,background .15s}
+.evo-batch-date:hover,.evo-batch-date:focus-visible{border-color:var(--accent);background:var(--surface3);outline-offset:2px}
+.evo-batch-date-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.evo-batch-date-main strong{font-size:14px}
+.evo-batch-date-main small{font-size:11px;color:var(--muted);line-height:1.4}
+.evo-batch-state{display:inline-block;font-size:10px;font-weight:750;line-height:1.4;padding:7px 10px;border-radius:9px;background:var(--surface3);border:1px solid var(--border);text-align:center}
+.evo-batch-state.good{color:#48d7a5;background:rgba(43,178,125,.1);border-color:rgba(43,178,125,.3)}
+.evo-batch-state.mid{color:#e8b94f;background:rgba(208,153,46,.11);border-color:rgba(208,153,46,.32)}
+.evo-batch-state.bad{color:#f08c9c;background:rgba(212,84,100,.1);border-color:rgba(212,84,100,.32)}
+.evo-batch-state.rest,.evo-batch-state.unknown{color:var(--muted)}
+.evo-review-confirm{display:flex;align-items:flex-start;gap:13px;border:1px solid var(--borderStrong);border-radius:13px;padding:16px;background:var(--surface2);cursor:pointer}
+.evo-review-confirm input,.evo-confirm input[type="checkbox"]{appearance:none;-webkit-appearance:none;flex:0 0 auto;display:grid;place-items:center;width:21px;height:21px;margin:0;border-radius:6px;border:2px solid var(--borderStrong);background:var(--surface3);cursor:pointer;transition:.15s}
+.evo-review-confirm input:checked,.evo-confirm input[type="checkbox"]:checked{background:var(--accent);border-color:var(--accent)}
+.evo-review-confirm input:checked:after,.evo-confirm input[type="checkbox"]:checked:after{content:"✓";font-size:14px;font-weight:800;color:#fff}
+.evo-review-confirm input:focus-visible,.evo-confirm input[type="checkbox"]:focus-visible{outline:2px solid var(--accent2);outline-offset:3px}
+.evo-review-confirm span{display:flex;flex-direction:column;gap:5px}
+.evo-review-confirm strong{font-size:12px}
+.evo-review-confirm small{font-size:11px;color:var(--muted);line-height:1.5}
+.evo-review-item{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);padding:13px 14px}
+.evo-review-item>div:first-child{flex:1;min-width:0}
+.evo-review-item strong{display:block;font-size:12px}
+.evo-review-item small{display:block;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.5}
+.evo-review-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.evo-finish-hero{border:1px solid var(--border);border-radius:18px;padding:22px;background:var(--surface2);color:var(--text);--finish-accent:var(--accent)}
+.evo-finish-hero.good{--finish-accent:#27bb84;border-color:rgba(39,187,132,.45);background:linear-gradient(120deg,rgba(39,187,132,.19),rgba(39,187,132,.035)),var(--surface2)}
+.evo-finish-hero.mid{--finish-accent:#d6a437;border-color:rgba(214,164,55,.43);background:linear-gradient(120deg,rgba(214,164,55,.18),rgba(214,164,55,.02)),var(--surface2)}
+.evo-finish-hero.bad{--finish-accent:#dc6674;border-color:rgba(220,102,116,.4);background:linear-gradient(120deg,rgba(220,102,116,.18),rgba(220,102,116,.02)),var(--surface2)}
+.evo-finish-eyebrow{font-size:10px;font-weight:800;letter-spacing:.13em;color:var(--finish-accent)}
+.evo-finish-hero h2{margin:8px 0 15px;font-size:clamp(20px,3vw,27px);letter-spacing:-.035em}
+.evo-finish-rating{display:flex;gap:12px;align-items:center;justify-content:space-between;font-size:15px;font-weight:750}
+.evo-finish-rating strong{font-size:25px}
+.evo-finish-progress{height:9px;overflow:hidden;margin:11px 0;border-radius:999px;background:rgba(128,128,128,.18)}
+.evo-finish-progress i{display:block;height:100%;border-radius:999px;background:var(--finish-accent)}
+.evo-finish-hero p{font-size:11px;line-height:1.5;margin:11px 0 0;color:var(--muted)}
+.evo-finish-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.evo-finish-grid>div{display:flex;flex-direction:column;gap:8px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
+.evo-finish-grid small{font-size:10px;color:var(--muted);line-height:1.4}
+.evo-finish-grid strong{font-size:clamp(16px,2vw,23px);overflow-wrap:anywhere}
+.evo-finish-notes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.evo-finish-notes>div{padding:14px;border-radius:12px;border:1px solid var(--border);background:var(--surface2)}
+.evo-finish-notes>div:first-child{border-left:3px solid #27bb84}
+.evo-finish-notes>div:last-child{border-left:3px solid #d6a437}
+.evo-finish-notes strong{font-size:12px}
+.evo-finish-notes p{font-size:11px;line-height:1.55;color:var(--muted);margin:8px 0 0}
+.evo-feedback-details{border-top:1px solid var(--border);padding-top:12px}
+.evo-feedback-details summary{font-size:12px;font-weight:700;cursor:pointer;padding:8px 0}
+.evo-feedback-details h3,.evo-batch-detail h3{font-size:13px;margin:10px 0}
+.evo-review-open{padding:12px 0}
+@media(max-width:800px){.evo-finish-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.evo-finish-notes{grid-template-columns:1fr}.evo-review-item{align-items:flex-start;flex-direction:column}.evo-review-actions{justify-content:flex-start}.evo-batch-date{flex-wrap:wrap}.evo-batch-state{margin-left:auto}}
+@media(prefers-reduced-motion:reduce){.evo-batch-date,.evo-review-confirm input{transition:none}}
