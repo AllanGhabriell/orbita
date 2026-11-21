@@ -183,7 +183,13 @@ function batchReview(){
  '<button class="btn primary" type="submit">Finalizar '+dates.length+' dia(s)</button></div></form>');
 }
 function showFinishedFeedback(dates,index=0){
- if(index>=dates.length){C.closeModal();state.date=today();C.save();C.go("inicio");return;}
+ if(index===0&&dates.length){
+  // A navegação avança antes de mostrar o feedback; fechar o pop-up também deixa o dia seguinte à vista.
+  const afterLast=add(dates[dates.length-1],1);
+  state.date=afterLast>today()?afterLast:today();
+  C.save();C.go("inicio");
+ }
+ if(index>=dates.length){C.closeModal();return;}
  const date=dates[index],snap=ev.closed[date];
  if(!snap){showFinishedFeedback(dates,index+1);return;}
  C.openModal("Feedback do dia",'<div class="section-stack evo-feedback-modal">'+
