@@ -491,7 +491,7 @@ function mentorPanel(){
 function metric(label,value,subtitle){return '<div class="metric-card"><span>'+E(label)+'</span><strong>'+E(value)+'</strong>'+(subtitle?'<small>'+E(subtitle)+'</small>':"")+'</div>';}
 function percent(value,total){return total?Math.round(value/total*100)+"%":"—";}
 function dayReview(date){
- const snap=ev.closed[date]||capture(date),n=dailyCounts(snap),closed=!!snap.confirmed,remaining=pendingDates(date);
+ const snap=ev.closed[date]||capture(date),n=dailyCounts(snap),closed=isClosed(date),remaining=pendingDates(date);
  const unavailable=date>today();
  let content='<div class="hero-row"><div><div class="overline">FECHAMENTO DO DIA</div><h1>'+E(fmt(date,true))+'</h1><p class="kicker">'+(closed?"Registro finalizado e bloqueado para edição.":unavailable?"Um dia futuro não pode ser encerrado.":"Revise cada registro antes de tornar o dia definitivo.")+'</p></div><button class="btn small ghost" data-s4="backHome">← Voltar</button></div>';
  if(closed){
@@ -509,6 +509,7 @@ function dayReview(date){
  if(snap.pause)content+='<div class="evo-alert">☾ '+E(snap.pause.kind==="planejado"?"Descanso planejado":snap.pause.kind==="imprevisto"?"Pausa por imprevisto":"Descanso decidido no dia")+(snap.pause.reason?" — "+E(snap.pause.reason):"")+'</div>';
  content+='<section class="card"><div class="card-head"><h2>Revisão dos compromissos</h2>'+C.tag(n.unmarked+" sem conclusão")+'</div>'+(
  snap.activities.length?'<div class="review-lines">'+snap.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")+'</div>':'<p class="note">Nenhuma atividade cadastrada para este dia.</p>')+'</section>';
+ if(!closed)content+='<div class="evo-review-open"><button class="btn small primary" data-s4="openEditableDay" data-date="'+A(date)+'">Editar atividades e estudos deste dia</button><p class="note">Abra o dia, marque ou desmarque os registros e volte para finalizar. Você também pode sair sem encerrar.</p></div>';
  content+='<section class="card"><div class="card-head"><h2>Revisão dos estudos</h2>'+C.tag(n.missingStudyTimes+" tempos não informados")+'</div>'+(
  snap.studies.length?'<div class="review-lines">'+snap.studies.map((x,i)=>reviewStudyLine(x,i)).join("")+'</div>':'<p class="note">Nenhuma sessão de estudo cadastrada.</p>')+'</section>';
  if(!closed&&!unavailable){
@@ -681,14 +682,28 @@ function markViewed(){ev.lastStatsView=now();ev.mentor.previousReview=ev.mentor.
 function goView(){period="week";referenceDate=state.date;markViewed();C.go("evolucao");}
 function confirmSubmit(data){
  if(!data.has("reviewed")||String(data.get("phrase")||"").trim()!=="FINALIZAR")throw Error("Marque a revisão e digite FINALIZAR exatamente.");
- const date=String(data.get("date")||"");finalize(date);
- const snap=ev.closed[date];
- C.closeModal();C.go("fechamento");
- C.notify("Dia finalizado definitivamente.");
- if(lastStudyDayOfWeek(date))C.notify("Fechamento concluído. A prévia semanal está disponível em Evolução.");
+ const date=String(data.get("date")||"");
+ finalize(date);
+ showFinishedFeedback([date]);
 }
 const actions={
  batchReview(){batchReview()},
+ batchDay(b){dayDetailInBatch(b.dataset.date)},
+ markActivity(b){
+  const date=b.dataset.date,id=b.dataset.id,status=b.dataset.status;
+  if(isClosed(date))throw Error("Dia finalizado, sem edição.");
+  S2.quickRecord(id,date,status);
+  dayDetailInBatch(date);
+ },
+ editActivity(b){actions.openEditableDay(b)},
+ editStudy(b){actions.openEditableDay(b)},
+ openEditableDay(b){
+  const date=b.dataset.date;
+  if(!validDate(date)||isClosed(date))throw Error("Esta data não está aberta para edição.");
+  C.closeModal();state.date=date;C.save();C.go("inicio");
+  C.notify("Revise os registros deste dia. Depois, retorne a Revisar e finalizar em lote.");
+ },
+ feedbackNext(b){showFinishedFeedback(feedbackDates,Number(b.dataset.index)||0)},
  reviewDate(b){const date=b.dataset.date||state.date;if(date<first()||!validDate(date))return;state.date=date;C.save();C.go("fechamento");},
  backHome(){C.go("inicio")},
  backProfile(){C.go("perfil")},
