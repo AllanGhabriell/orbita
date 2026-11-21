@@ -113,28 +113,98 @@ function dayHasMovement(date){
  if(snap.studies.some(x=>x.status!=="pending"||x.actualMin!=null||x.actualTime||x.timing))return true;
  return false;
 }
+
+function reviewStatus(s){return ({done:"Concluída",pending:"Pendente",progress:"Parcial / em andamento",notdone:"Não realizada",moved:"Remanejada"})[s]||"Pendente";}
+function reviewTone(snap){
+ const n=dailyCounts(snap),rest=!!snap.pause||snap.availability?.mode==="rest";
+ const total=n.foci+n.tasks+n.habitCount+n.plannedStudy,done=n.doneFocus+n.tasksDone+n.habitDone+n.studiesDone;
+ if(rest&&!total)return {kind:"rest",label:"Descanso registrado",description:"Este dia possui descanso registrado e não tem compromissos identificados para pontuar.",rate:null};
+ if(!total)return {kind:"unknown",label:"Sem dados suficientes",description:"Não há compromissos registrados para classificar o cumprimento.",rate:null};
+ const rate=Math.round(100*done/total),kind=rate>=75?"good":rate>=45?"mid":"bad";
+ return {kind,label:kind==="good"?"Bom cumprimento registrado":kind==="mid"?"Cumprimento parcial":"Abaixo do planejado",description:"Classificação visual baseada apenas na proporção de compromissos marcados como concluídos. Não mede esforço, aprendizagem ou culpa.",rate};
+}
+function visualSummary(snap,final=false){
+ const n=dailyCounts(snap),rating=reviewTone(snap);
+ const totalActivities=n.foci+n.tasks+n.habitCount,doneActivities=n.doneFocus+n.tasksDone+n.habitDone;
+ const missing=n.unmarked;
+ const title=final?"Dia finalizado e preservado":"Balanço provisório — dia aberto";
+ const positive=[];
+ if(n.doneFocus)positive.push(n.doneFocus+" foco(s) concluído(s)");
+ if(n.studiesDone)positive.push(n.studiesDone+" sessão(ões) concluída(s)");
+ if(n.tasksDone)positive.push(n.tasksDone+" tarefa(s) concluída(s)");
+ if(n.habitDone)positive.push(n.habitDone+" rotina(s) concluída(s)");
+ const pending=[];
+ if(missing)pending.push(missing+" registro(s) ainda pendente(s) ou em andamento");
+ if(n.studiesNotDone)pending.push(n.studiesNotDone+" sessão(ões) marcada(s) como não realizada(s)");
+ if(n.missingStudyTimes)pending.push(n.missingStudyTimes+" sessão(ões) sem tempo efetivo informado");
+ return '<section class="evo-finish-hero '+rating.kind+'"><div class="evo-finish-eyebrow">'+(final?"✓ DIA FINALIZADO":"◷ REVISÃO PROVISÓRIA")+'</div>'+
+ '<h2>'+E(title)+'</h2><div class="evo-finish-rating">'+E(rating.label)+(rating.rate!==null?'<strong>'+rating.rate+'%</strong>':"")+'</div>'+
+ (rating.rate!==null?'<div class="evo-finish-progress"><i style="width:'+rating.rate+'%"></i></div>':"")+
+ '<p>'+E(rating.description)+'</p></section>'+
+ '<div class="evo-finish-grid">'+
+ '<div><small>Focos</small><strong>'+n.doneFocus+'/'+n.foci+'</strong></div>'+
+ '<div><small>Tarefas</small><strong>'+n.tasksDone+'/'+n.tasks+'</strong></div>'+
+ '<div><small>Rotinas</small><strong>'+n.habitDone+'/'+n.habitCount+'</strong></div>'+
+ '<div><small>Estudos</small><strong>'+n.studiesDone+'/'+n.plannedStudy+'</strong></div>'+
+ '<div><small>Estudo real registrado</small><strong>'+E(minutes(snap.result.actualStudyMin))+'</strong></div>'+
+ '<div><small>Carga prevista</small><strong>'+E(minutes(snap.plan.totalMin))+'</strong></div>'+
+ '<div><small>Atividades concluídas</small><strong>'+doneActivities+'/'+totalActivities+'</strong></div>'+
+ '<div><small>Registros ainda pendentes</small><strong>'+missing+'</strong></div></div>'+
+ '<div class="evo-finish-notes"><div><strong>✓ Avanços registrados</strong><p>'+E(positive.join(" · ")||"Nenhuma conclusão explicitamente registrada.")+'</p></div>'+
+ '<div><strong>◇ Pontos para conferir</strong><p>'+E(pending.join(" · ")||"Não há pendências identificadas nesta visão.")+'</p></div></div>'+
+ (snap.pause?'<p class="note">Descanso registrado: '+E(snap.pause.kind||"informado")+(snap.pause.reason?" · "+E(snap.pause.reason):"")+'</p>':"");
+}
+function dayDetailInBatch(date){
+ if(!pendingDates().includes(date))throw Error("Esta data já foi finalizada ou não está pendente.");
+ const snap=capture(date),n=dailyCounts(snap);
+ const makeActivity=x=>'<div class="evo-review-item"><div><strong>'+E(x.title)+'</strong><small>'+E(reviewStatus(x.status))+' · previsto '+(x.estimatedMin!=null?minutes(x.estimatedMin):"não informado")+' · real '+(x.actualMin!=null?minutes(x.actualMin):"não informado")+'</small></div>'+
+ '<div class="evo-review-actions">'+(x.status!=="done"?'<button class="btn small ghost" data-s4="markActivity" data-id="'+A(x.id)+'" data-date="'+A(date)+'" data-status="done">✓ Concluir</button>':'<button class="btn small ghost" data-s4="markActivity" data-id="'+A(x.id)+'" data-date="'+A(date)+'" data-status="pending">↶ Desmarcar</button>')+
+ '<button class="btn small ghost" data-s4="editActivity" data-id="'+A(x.id)+'" data-date="'+A(date)+'">Detalhes</button></div></div>';
+ const makeStudy=(x,i)=>'<div class="evo-review-item"><div><strong>Sessão '+(i+1)+' · '+E(x.discipline||"Estudo")+'</strong><small>'+E(reviewStatus(x.status))+' · prevista '+(x.plannedMin!=null?minutes(x.plannedMin):"não informado")+' · realizada '+(x.actualMin!=null?minutes(x.actualMin):"não informado")+'</small></div>'+
+ '<div class="evo-review-actions"><button class="btn small ghost" data-s4="editStudy" data-id="'+A(x.id)+'" data-date="'+A(date)+'">Registrar / corrigir</button></div></div>';
+ C.openModal("Revisar "+fmt(date,false),'<div class="section-stack evo-batch-detail">'+visualSummary(snap,false)+
+ '<p class="note">Este dia permanece aberto. Você pode ajustar registros, voltar à revisão e só então finalizar.</p>'+
+ '<section><h3>Focos, tarefas e rotinas · '+snap.activities.length+'</h3><div class="evo-review-items">'+(snap.activities.map(makeActivity).join("")||'<p class="note">Nenhuma atividade cadastrada.</p>')+'</div></section>'+
+ '<section><h3>Sessões de estudo · '+snap.studies.length+'</h3><div class="evo-review-items">'+(snap.studies.map(makeStudy).join("")||'<p class="note">Nenhuma sessão cadastrada.</p>')+'</div></section>'+
+ '<p class="note">'+n.unmarked+' registro(s) pendente(s). A ausência de registro não comprova falta de execução.</p>'+
+ '<div class="modal-footer"><button class="btn ghost" data-s4="batchReview">← Voltar ao lote</button>'+
+ '<button class="btn primary" data-s4="openEditableDay" data-date="'+A(date)+'">Abrir dia completo</button></div></div>');
+}
 function batchReview(){
  const dates=pendingDates();
  if(!dates.length)return C.notify("Não há dias anteriores aguardando fechamento.");
- const recorded=dates.filter(dayHasMovement),unrecorded=dates.filter(d=>!dayHasMovement(d));
- const row=d=>{const snap=capture(d),n=dailyCounts(snap);return '<div class="review-line"><div><strong>'+E(fmt(d,false))+'</strong><small>'+snap.activities.length+' atividade(s) prevista(s) · '+snap.studies.length+' estudo(s) · '+n.unmarked+' pendente(s)'+(dayHasMovement(d)?' · há registros de execução':' · sem execução registrada')+'</small></div></div>';};
- C.openModal("Revisar dias pendentes",'<form id="s4-batch-finalize" class="section-stack"><p class="note">Feche '+dates.length+' dia(s) de uma só vez. Apenas datas com movimentação aparecem para revisão detalhada. Dias sem registro de execução serão fechados mantendo as atividades pendentes, nunca concluídas automaticamente.</p>'+
- (recorded.length?'<section><h3>Com movimentação · '+recorded.length+'</h3><div class="review-lines">'+recorded.map(row).join("")+'</div></section>':"")+
- (unrecorded.length?'<section><h3>Sem execução registrada · '+unrecorded.length+'</h3><p class="note">Estas datas possuem planejamento, mas não possuem execução registrada. Não será inventado nenhum resultado.</p><div class="review-lines">'+unrecorded.map(row).join("")+'</div></section>':"")+
- '<label class="checkline"><input type="checkbox" name="reviewed" required> Conferi o resumo e concordo em finalizar definitivamente todas as datas listadas.</label>'+
- '<p class="note">O fechamento é irreversível. Se precisar corrigir algum registro, cancele e abra aquele dia antes.</p>'+
- '<div class="modal-footer"><button class="btn ghost" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Finalizar '+dates.length+' dia(s)</button></div></form>');
+ const row=d=>{const snap=capture(d),n=dailyCounts(snap),r=reviewTone(snap);
+  return '<button type="button" class="evo-batch-date" data-s4="batchDay" data-date="'+A(d)+'"><span class="evo-batch-date-main"><strong>'+E(fmt(d,false))+'</strong><small>'+n.doneFocus+'/'+n.foci+' focos · '+n.studiesDone+'/'+n.plannedStudy+' sessões · '+n.tasksDone+'/'+n.tasks+' tarefas</small><small>'+n.unmarked+' pendente(s) · '+(dayHasMovement(d)?"Com registros de execução":"Sem execução registrada")+'</small></span><span class="evo-batch-state '+r.kind+'">'+E(r.label)+'</span><span aria-hidden="true">›</span></button>';};
+ C.openModal("Revisar dias pendentes",'<form id="s4-batch-finalize" class="section-stack evo-batch-panel">'+
+ '<p class="note">Selecione cada data para conferir e corrigir seus registros. O fechamento só acontecerá depois de sua confirmação.</p>'+
+ '<div class="evo-batch-dates">'+dates.map(row).join("")+'</div>'+
+ '<label class="evo-review-confirm"><input type="checkbox" name="reviewed" required><span><strong>Conferi os dias e autorizo o fechamento definitivo</strong><small>As pendências continuarão sem conclusão, e os registros serão preservados.</small></span></label>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button>'+
+ '<button class="btn primary" type="submit">Finalizar '+dates.length+' dia(s)</button></div></form>');
 }
+function showFinishedFeedback(dates,index=0){
+ if(index>=dates.length){C.closeModal();state.date=today();C.save();C.go("inicio");return;}
+ const date=dates[index],snap=ev.closed[date];
+ if(!snap){showFinishedFeedback(dates,index+1);return;}
+ C.openModal("Feedback do dia",'<div class="section-stack evo-feedback-modal">'+
+ '<p class="note">'+E(fmt(date,true))+(dates.length>1?' · '+(index+1)+' de '+dates.length+' dias finalizados':"")+'</p>'+
+ visualSummary(snap,true)+
+ '<details class="evo-feedback-details"><summary>Consultar registros individuais</summary><h3>Atividades</h3><div class="review-lines">'+
+ ((snap.activities||[]).map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")||'<p class="note">Nenhuma atividade.</p>')+'</div>'+
+ '<h3>Estudos</h3><div class="review-lines">'+((snap.studies||[]).map((x,i)=>reviewStudyLine(x,i)).join("")||'<p class="note">Nenhum estudo.</p>')+'</div></details>'+
+ '<div class="modal-footer"><button class="btn primary" data-s4="feedbackNext" data-index="'+(index+1)+'">'+(index===dates.length-1?"Concluir e ir para hoje":"Próximo feedback →")+'</button></div></div>');
+ // A lista serve somente para navegação entre feedbacks; nenhuma alteração é permitida após o fechamento.
+ feedbackDates=dates.slice();
+}
+let feedbackDates=[];
 function finalizeBatch(){
- const dates=pendingDates(),done=[];
+ const dates=pendingDates();
  if(!dates.length)throw Error("Não há dias pendentes.");
- // Validação completa antes de iniciar: impedimentos devem ser resolvidos sem fechar parcialmente o lote.
- for(const d of dates){
-  if(window.OrbitaStage7?.inspect?.hasActiveForDate(d))throw Error("Encerre o cronômetro do dia "+fmt(d,false)+" antes do fechamento em lote.");
- }
- for(const d of dates){finalize(d);done.push(d);}
- C.closeModal();C.go("inicio");C.notify(done.length+" dia(s) finalizado(s). Registros preservados sem conclusões automáticas.");
- return done;
+ for(const d of dates)if(window.OrbitaStage7?.inspect?.hasActiveForDate(d))throw Error("Encerre o cronômetro de "+fmt(d,false)+" antes de finalizar.");
+ // Cada dia é confirmado na ordem cronológica; o snapshot preserva o estado revisado.
+ for(const d of dates)finalize(d);
+ showFinishedFeedback(dates);
+ return dates;
 }
 function awardMilestones(){
  const qualifying=Object.values(ev.closed).filter(x=>{const n=dailyCounts(x);return n.foci>0&&n.doneFocus===n.foci;}).length;
