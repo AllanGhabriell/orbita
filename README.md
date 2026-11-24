@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.22 — datas inteligentes
+
+- Campos de data compartilhados: digitação e colagem em formato brasileiro, compacto e ISO, atalhos H/A/O, deslocamentos relativos e setas.
+- Calendário nativo mantido; datas inválidas e limites originais validados; armazenamento ISO e contratos de formulários preservados.
+- Campos de data e hora também aceitam a data por atalho, preservando o horário existente.
+
 ## v5.21 — mural personalizável e estudos em destaque
 
 - Seleção pelo cartão inteiro, menu de seleção no botão direito, papéis dobrados para observações e ações contextuais ancoradas.

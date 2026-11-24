@@ -538,3 +538,23 @@ body[data-theme="light"] .mobile-nav{
 .modal-card .checkline input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
 .modal-card .checkline input[type=checkbox]:checked:after{content:"";width:8px;height:4px;border-left:2px solid var(--bg2);border-bottom:2px solid var(--bg2);transform:rotate(-45deg) translateY(-1px)}
 .modal-card select,.s8-toolbar select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239a91b5' stroke-width='1.7'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
+
+/* v5.22 — campo de data inteligente, com calendário nativo preservado. */
+.orb-smart-date{display:flex;flex-direction:column;gap:4px;min-width:0;width:100%;max-width:100%;vertical-align:middle}
+.orb-date-row{position:relative;display:flex;align-items:stretch;min-width:0;width:100%;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);transition:border-color .15s}
+.orb-date-row:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 13%,transparent)}
+.orb-date-row .orb-date-text{flex:1;min-width:0;width:100%;max-width:100%;padding:9px 10px;background:transparent!important;color:var(--text);border:0!important;border-radius:10px 0 0 10px;outline:none!important;box-shadow:none!important;font-variant-numeric:tabular-nums;font-size:13px;line-height:1.4}
+.orb-date-text::placeholder{color:var(--soft);opacity:.9}
+.orb-date-calendar{flex:0 0 36px;display:grid;place-items:center;border:0;border-left:1px solid var(--border);border-radius:0 10px 10px 0;padding:0;background:transparent;color:var(--muted);min-height:35px}
+.orb-date-calendar:hover:not(:disabled){background:var(--surface3);color:var(--accent)}
+.orb-date-calendar:focus-visible{outline-offset:-3px}
+.orb-date-row .orb-date-native{position:absolute!important;right:0;top:0;width:1px!important;height:1px!important;min-height:0!important;min-width:0!important;padding:0!important;border:0!important;opacity:0;pointer-events:none;overflow:hidden}
+.orb-date-row .orb-date-native.orb-date-native-fallback{width:100%!important;height:100%!important;opacity:1;pointer-events:auto;z-index:3;background:var(--bg2);color:var(--text);padding:6px!important;border-radius:9px}
+.orb-date-row:has(.orb-date-text[aria-invalid=true]){border-color:var(--danger)}
+.orb-date-error{font-size:11px;color:var(--danger);line-height:1.35}
+.orb-date-row:has(.orb-date-text:disabled){opacity:.55}
+.orb-date-text:read-only{color:var(--muted)}
+.study-plan-date-pick .orb-smart-date{display:inline-flex;width:clamp(142px,19vw,190px)}
+.study-plan-date-pick .orb-date-text{font-size:12px;padding:6px 7px}
+.study-plan-date-pick .orb-date-calendar{flex-basis:30px;min-height:30px}
+@media(max-width:600px){.orb-date-row .orb-date-text{font-size:16px;padding:8px 9px}.study-plan-date-pick .orb-date-text{font-size:14px}.orb-date-calendar{flex-basis:38px}}

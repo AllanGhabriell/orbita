@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {spawnSync} from "node:child_process";
+import puppeteer from "puppeteer-core";
+const chrome=["google-chrome","google-chrome-stable","chromium","chromium-browser"].map(n=>spawnSync("which",[n],{encoding:"utf8"})).find(r=>r.status===0)?.stdout.trim();
+if(!chrome)throw Error("Chrome/Chromium necessário");
+const browser=await puppeteer.launch({executablePath:chrome,headless:true,args:["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"]});
+try{
+ const page=await browser.newPage();
+ await page.setContent('<form id="f" novalidate><label for="date">Prazo</label><input id="date" name="date" type="date" min="2026-01-01" max="2028-12-31" value="2026-11-24"><input id="moment" name="moment" type="datetime-local" value="2026-11-24T13:45"><button id="submit">Salvar</button></form>');
+ await page.addScriptTag({content:readFileSync(new URL("../smart-date.js",import.meta.url),"utf8")});
+ await page.waitForSelector(".orb-date-text");
+ await page.evaluate(()=>{window.saved=[];document.querySelector("#f").addEventListener("submit",e=>{e.preventDefault();window.saved.push(Object.fromEntries(new FormData(e.target)));});});
+ const paste=async(selector,value)=>page.$eval(selector,(el,text)=>{el.focus();el.select();const dt=new DataTransfer();dt.setData("text/plain",text);el.dispatchEvent(new ClipboardEvent("paste",{clipboardData:dt,bubbles:true,cancelable:true}));},value);
+ await paste("#f .orb-date-text","21112026");
+ assert.equal(await page.$eval("#date",el=>el.value),"2026-11-21");
+ assert.equal(await page.$eval("#f .orb-date-text",el=>el.value),"21/11/2026");
+ await page.$eval("#f .orb-date-text",el=>{el.focus();el.value="31022026";el.dispatchEvent(new Event("input",{bubbles:true}));});
+ await page.click("#submit");assert.equal(await page.evaluate(()=>window.saved.length),0);
+ await paste("#f .orb-date-text","2026-11-21");
+ await page.click("#submit");assert.equal(await page.evaluate(()=>window.saved.at(-1).date),"2026-11-21");
+ await page.$eval("#f .orb-date-text",el=>{el.focus();el.select();});
+ await page.keyboard.press("ArrowUp");assert.equal(await page.$eval("#date",el=>el.value),"2026-11-22");
+ await page.keyboard.press("ArrowDown");assert.equal(await page.$eval("#date",el=>el.value),"2026-11-21");
+ await paste("#f .orb-smart-date:nth-of-type(2) .orb-date-text","21112026");
+ assert.equal(await page.$eval("#moment",el=>el.value),"2026-11-21T13:45");
+ await page.evaluate(()=>{document.querySelector("#f").insertAdjacentHTML("beforeend",'<input type="date" id="dynamic" name="dynamic" value="2026-11-24">');});
+ await page.waitForFunction(()=>document.querySelector("#dynamic")?.classList.contains("orb-date-native"));
+ assert.equal(await page.$eval("#dynamic",el=>el.parentElement.querySelector(".orb-date-text").value),"24/11/2026");
+}finally{await browser.close();}
