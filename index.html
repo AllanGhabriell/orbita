@@ -10,13 +10,13 @@
   <link rel="stylesheet" href="./styles.css?v=20261119-orbita-v5-07-final">
   <link rel="stylesheet" href="./stage2.css?v=20261118-orbita-v5-0-1">
   <link rel="stylesheet" href="./stage3.css?v=20261119-study-final-v5-06">
-  <link rel="stylesheet" href="./stage4.css?v=20261121-daily-review-v5-14b">
+  <link rel="stylesheet" href="./stage4.css?v=20261124-v5-15-timer-ui">
   <link rel="stylesheet" href="./stage5.css">
   <link rel="stylesheet" href="./stage6.css">
-  <link rel="stylesheet" href="./stage7.css?v=20261119-orbita-v5-07-final">
+  <link rel="stylesheet" href="./stage7.css?v=20261124-v5-15-timer-ui">
   <link rel="stylesheet" href="./stage8.css?v=20261119-reminder-readonly-v5-02">
   <link rel="manifest" href="./manifest.webmanifest">
-  <script src="./boot.js?v=20261121-daily-review-v5-14b" defer></script>
+  <script src="./boot.js?v=20261124-v5-15-timer-ui" defer></script>
 </head>
 <body data-theme="dark">
   <div class="ambient" aria-hidden="true"><div class="ambient-blob blob-a"></div><div class="ambient-blob blob-b"></div><div id="cursor-glow"></div></div>
@@ -39,7 +39,7 @@
         <button type="button" class="nav-button" data-nav="disponibilidade"><span class="nav-icon">◷</span><span>Disponibilidade</span></button>
         <button type="button" class="nav-button" data-nav="configuracoes"><span class="nav-icon">⚙</span><span>Preferências</span></button>
       </nav>
-      <small class="sidebar-note" aria-label="Versão do Órbita">v5.14</small>
+      <small class="sidebar-note" aria-label="Versão do Órbita">v5.15</small>
     </aside>
 
     <div class="main-shell">
@@ -47,6 +47,7 @@
         <div class="top-title"><div class="eyebrow" id="top-eyebrow">SEU ESPAÇO</div><strong id="top-title">Meu dia</strong></div>
         <div class="top-actions">
           <span class="state-dot" id="storage-indicator" title="Dados salvos neste dispositivo"></span>
+          <button type="button" class="icon-button s4-mentor-top" data-s4="mentorQuick" title="Conversar com Orientador" aria-label="Conversar com Orientador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.5-3A7.5 7.5 0 1 1 20 11.5Z"/><path d="M9 10h6M9 13h4"/></svg><span class="s4-mentor-top-badge" id="s4-mentor-top-badge" hidden></span></button>
           <button type="button" class="icon-button" id="theme-switch" title="Alternar tema" aria-label="Alternar tema">☾</button>
           <button type="button" class="icon-button" id="settings-switch" title="Preferências" aria-label="Preferências">⚙</button>
         </div>
@@ -59,7 +60,7 @@
         <button type="button" data-nav="perfil" class="mobile-link"><span>◉</span><small>Perfil</small></button>
         <button type="button" data-nav="configuracoes" class="mobile-link"><span>⚙</span><small>Mais</small></button>
       </footer>
-      <small class="orbita-version-mobile" aria-label="Versão do Órbita">v5.14</small>
+      <small class="orbita-version-mobile" aria-label="Versão do Órbita">v5.15</small>
     </div>
   </div>
   <div id="modal-host"></div>

@@ -42,12 +42,21 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.waitForSelector(".s7-timer.s7-running");
   assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Em estudo/);
   assert.equal(await page.evaluate(()=>!!document.querySelector("#s7-global-status")),false,"faixa de inatividade não ocupa o topo");
-  await page.click('.s7-timer .s7-more > summary');
+  const beforeMenu=await page.$eval('#s7-trigger-more',el=>({x:el.getBoundingClientRect().x,y:el.getBoundingClientRect().y,h:el.closest('.s7-timer').offsetHeight}));
+  await page.click('#s7-trigger-more');
+  assert.deepEqual(await page.$eval('#s7-trigger-more',el=>({x:el.getBoundingClientRect().x,y:el.getBoundingClientRect().y,h:el.closest('.s7-timer').offsetHeight})),beforeMenu,"abrir menu não desloca cronômetro");
+  await page.keyboard.press("Escape");
+  await page.click('.s7-timer [data-s7-context]',{button:"right"});
   await page.click('.s7-timer [data-s7="pause"][data-kind="preparation"]');
   await page.waitForSelector(".s7-timer.s7-paused");
   assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Pausado/);
   const stateBefore=await page.evaluate(()=>window.OrbitaCore.state.timing.active?.phase);
   assert.equal(stateBefore,"paused");
+  await page.click('[data-s7="togglePauseSound"]');
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.settings.pauseReminderMode),"continuous");
+  await page.click('[data-s7="togglePauseSound"]');
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.settings.pauseReminderMode),"off");
+  assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.active.phase),"paused");
   await page.reload({waitUntil:"load"});
   await page.waitForFunction(()=>!!window.OrbitaStage7,{timeout:20000});
   await page.waitForSelector(".s7-timer.s7-paused");
@@ -55,7 +64,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.waitForSelector(".s7-timer.s7-running");
   await new Promise(resolve=>setTimeout(resolve,1250)); // garante tempo produtivo não nulo antes do encerramento
   page.once("dialog",dialog=>dialog.accept());
-  await page.click('.s7-timer .s7-more > summary');
+  await page.click('#s7-trigger-more');
   await page.click('.s7-timer [data-s7="partial"]');
   await page.waitForFunction(()=>window.OrbitaCore.state.timing.active===null);
   const result=await page.evaluate(()=>{
@@ -120,7 +129,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   await page.click('#s7-alarm-host [data-s7="alarmContinue"]');
   assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.alarm),null);
   assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.active.sessionId),"alarm-case");
-  await page.click('.s7-timer .s7-more > summary');
+  await page.click('#s7-trigger-more');
   page.once("dialog",dialog=>dialog.accept());
   await page.click('.s7-timer [data-s7="partial"]');
   await page.waitForFunction(()=>window.OrbitaCore.state.timing.active===null);

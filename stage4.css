@@ -247,3 +247,11 @@
 .evo-review-open{padding:12px 0}
 @media(max-width:800px){.evo-finish-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.evo-finish-notes{grid-template-columns:1fr}.evo-review-item{align-items:flex-start;flex-direction:column}.evo-review-actions{justify-content:flex-start}.evo-batch-date{flex-wrap:wrap}.evo-batch-state{margin-left:auto}}
 @media(prefers-reduced-motion:reduce){.evo-batch-date,.evo-review-confirm input{transition:none}}
+
+/* v5.15: acesso compacto ao Orientador */
+.s4-mentor-top{position:relative;flex:0 0 auto}
+.s4-mentor-top svg{width:19px;height:19px;display:block;margin:auto}
+.s4-mentor-top-badge{position:absolute;right:-4px;top:-5px;min-width:15px;height:15px;padding:0 3px;display:grid;place-items:center;border-radius:10px;font-size:10px;font-weight:700;background:var(--accent);color:#fff}
+.s4-mentor-top-badge[hidden]{display:none}
+#s4-mentor-quick .evo-mentor-section{border:0;background:transparent;padding:0;box-shadow:none;margin:0}
+#s4-mentor-quick .evo-boss-diagnosis,#s4-mentor-quick .evo-boss-grid{grid-template-columns:1fr}

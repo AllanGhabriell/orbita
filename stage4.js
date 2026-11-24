@@ -642,13 +642,13 @@ function homeDecor(base){
  if(!C.availabilityReady())return base;
  const date=state.date,closed=ev.closed[date],pending=pendingDates();
  if(date<=today()&&!ev.visitedDays[date]){ev.visitedDays[date]=true;C.save();}
- let upper='<div class="evo-mentor-access"><button class="btn small ghost" data-s4="mentorOpen" title="Abrir acompanhamento geral">◉ Conversar com Orientador</button></div>';
+ let upper="";
  if(pending.length&&date===today())upper+='<div class="evo-alert evo-warning"><strong>Fechamento pendente</strong><span> Há '+pending.length+' dia(s) anteriores com planejamento ou registros. Você pode revisar e finalizar tudo de uma vez.</span><button class="btn small" data-s4="batchReview">Revisar e finalizar em lote</button><button class="btn small ghost" data-s4="reviewDate" data-date="'+A(pending[0])+'">Ver primeiro dia</button></div>';
  if(closed){
   const ct=dailyCounts(closed);
   return '<section class="hero-row"><div><div class="overline">REGISTRO DEFINITIVO</div><h1>'+E(fmt(date,true))+'</h1><p class="kicker">Histórico somente leitura; os dados abaixo foram preservados no fechamento.</p></div><div class="row">'+C.dateNavigator()+(date!==today()?'<button class="btn small ghost" data-action="goToday">Hoje</button>':"")+'<button class="btn small" data-s4="reviewDate" data-date="'+A(date)+'">Relatório diário</button></div></section>'+
   '<div class="evo-alert evo-good">✓ Dia finalizado. Os resultados mostrados pertencem ao registro preservado no fechamento.</div>'+
-  '<div class="evo-mentor-access"><button class="btn small ghost" data-s4="mentorOpen">◉ Conversar com Orientador</button></div>'+ 
+   
   '<div class="metrics-grid">'+metric("Focos",ct.doneFocus+"/"+ct.foci)+metric("Sessões",ct.studiesDone+"/"+ct.plannedStudy)+metric("Estudo real",minutes(closed.result.actualStudyMin))+metric("Carga prevista",minutes(closed.plan.totalMin))+'</div>'+
   '<section class="card"><h2 class="section-title">Atividades registradas</h2><div class="review-lines">'+(closed.activities.map(x=>reviewLine(x.title,x.status,x.estimatedMin,x.actualMin)).join("")||'<p class="note">Sem atividades.</p>')+'</div></section>'+
   '<section class="card"><h2 class="section-title">Estudos registrados</h2><div class="review-lines">'+(closed.studies.map((x,i)=>reviewStudyLine(x,i)).join("")||'<p class="note">Sem sessões.</p>')+'</div></section>';
@@ -715,8 +715,12 @@ const actions={
  backProfile(){C.go("perfil")},
  viewStats(){goView()},
  mentorOpen(){goView()},
- mentorStats(){statsExpanded=true;const node=document.getElementById?.("evo-boss-statistics");if(node){node.open=true;node.scrollIntoView?.({behavior:"smooth",block:"start"});}},
- mentorAcceptGoal(){const d=mentorVisualData(),target=Number(mentorDraftTarget===null?d.proposal??60:mentorDraftTarget);if(!Number.isInteger(target)||target<0||target>100)return C.notify("Meta inválida.");const start=add(periodStart("week",today()),7);ev.mentor.goal={target,weekStart:start,weekEnd:add(start,6),createdAt:now(),suggested:d.proposal,baseline:d.previous.score};mentorDraftTarget=target;C.save();C.render();C.notify("Compromisso semanal registrado. O Orientador vai cobrar o resultado.");},
+ mentorQuick(){
+  if(document.querySelector?.("#view .evo-boss")){document.querySelector("#view .evo-boss")?.scrollIntoView?.({block:"start"});return;}
+  markViewed();C.render();C.openModal("Conversar com Orientador",'<div id="s4-mentor-quick">'+mentorPanel()+'</div>');
+ },
+ mentorStats(){if(document.getElementById?.("s4-mentor-quick")){C.closeModal();goView();}statsExpanded=true;const node=document.getElementById?.("evo-boss-statistics");if(node){node.open=true;node.scrollIntoView?.({behavior:"smooth",block:"start"});}},
+ mentorAcceptGoal(){const d=mentorVisualData(),target=Number(mentorDraftTarget===null?d.proposal??60:mentorDraftTarget);if(!Number.isInteger(target)||target<0||target>100)return C.notify("Meta inválida.");const start=add(periodStart("week",today()),7);ev.mentor.goal={target,weekStart:start,weekEnd:add(start,6),createdAt:now(),suggested:d.proposal,baseline:d.previous.score};mentorDraftTarget=target;C.save();C.render();C.notify("Compromisso semanal registrado. O Orientador vai cobrar o resultado.");const quick=document.getElementById?.("s4-mentor-quick");if(quick)quick.innerHTML=mentorPanel();},
  mentorOptions(){mentorOptionsOpen=!mentorOptionsOpen;C.render()},
  mentorSnooze(b){const min=Number(b.dataset.min);if(![10,15,1440].includes(min))return;const until=min===1440?new Date(new Date().setHours(23,59,59,999)):new Date(Date.now()+min*60000);ev.mentor.snoozeUntil=until.toISOString();ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
  mentorDismiss(){ev.mentor.dismissedSignature=mentorAnalysis().digest;ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
@@ -751,6 +755,8 @@ document.addEventListener("change",event=>{
 window.OrbitaStage4={decorate,afterRender(){
  const unread=mentorUnreadCount();
  const showBadge=unread>0&&ev.settings.mentorNotices!==false;
+ const badge=document.getElementById?.("s4-mentor-top-badge");
+ if(badge){badge.hidden=!showBadge;badge.textContent=showBadge?String(unread):"";badge.title=showBadge?unread+" análise(s) do Orientador":"";}
  for(const node of document.querySelectorAll?.('[data-nav="perfil"]')||[]){
   const previous=node.querySelector?.(".evo-mentor-badge");
   if(!showBadge){previous?.remove?.();continue;}

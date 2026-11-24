@@ -837,18 +837,14 @@ function manageModal(id){
   return C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p>O registro foi descartado.</p><div class="row">'+undoButton+'</div></div>');
  }
  const active=timing.active?.sessionId===id;
- const controls='<button class="btn small ghost" data-s7="editStart" data-id="'+A(id)+'">Corrigir início real</button>'+
- '<button class="btn small ghost" data-s7="editTotals" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Editar tempos</button>'+
- '<button class="btn small ghost" data-s7="pauses" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Gerenciar pausas</button>'+
- '<button class="btn small ghost" data-s7="transfer" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Transferir para outra sessão</button>'+
- '<button class="btn small ghost" data-s7="split" data-id="'+A(id)+'" '+(active?"disabled":"")+'>Dividir tempo entre sessões</button>'+
- (active&&timing.active.phase==="paused"?'<button class="btn small ghost" data-s7="cancelAccidentalPause">Desfazer pausa acidental</button><button class="btn small ghost" data-s7="resetCurrentPause">Zerar apenas a pausa atual</button>':"")+
- '<button class="btn small ghost" data-s7="reset" data-id="'+A(id)+'">Zerar cronometragem</button>'+
- '<button class="btn small danger" data-s7="discard" data-id="'+A(id)+'">Descartar cronometragem</button>';
- C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p class="note">'+E(x.discipline)+' · estudo '+E(duration(studyMs(r)))+' · pausas '+E(duration(pauseMs(r)))+'</p>'+
- (active?'<p class="note">Para editar o histórico, encerre primeiro como parcial. Zerar e descartar estão disponíveis durante a contagem.</p>':"")+
- '<div class="s7-menu-actions">'+controls+'</div>'+undoButton+
- '<p class="note">O planejamento e a conclusão não são excluídos ao apagar tempos. Os dias finalizados permanecem protegidos.</p></div>');
+ const item=(act,icon,label,hint,disabled=false,tone="")=>'<button type="button" class="s7-manage-item '+tone+'" data-s7="'+act+'" data-id="'+A(id)+'" '+(disabled?'disabled title="Encerre como parcial para editar o histórico"':'')+'><span class="s7-manage-icon" aria-hidden="true">'+icon+'</span><span><strong>'+E(label)+'</strong><small>'+E(hint)+'</small></span><span aria-hidden="true">›</span></button>';
+ const group=(label,items)=>'<section class="s7-manage-group"><h3>'+E(label)+'</h3>'+items+'</section>';
+ C.openModal("Gerenciar cronometragem",'<div class="section-stack s7-manage"><strong>'+E(x.discipline)+'</strong><div class="s7-manage-totals"><div><small>Tempo estudado</small><strong data-tone="study">'+E(fmtMs(studyMs(r)))+'</strong></div><div><small>Tempo de pausa</small><strong data-tone="pause">'+E(fmtMs(pauseMs(r)))+'</strong></div></div>'+
+ group("Correções de tempo",(active?item("correct","◷","Corrigir tempo do cronômetro","Ajustar estudo e descanso da sessão ativa"):"")+item("editTotals","◷","Editar tempos","Ajustar totais registrados",active)+item("editStart","↤","Corrigir início real","Registrar o horário correto de início")+item("pauses","Ⅱ","Gerenciar pausas","Consultar ou editar intervalos",active)+(active&&timing.active.phase==="paused"?item("cancelAccidentalPause","↶","Desfazer pausa acidental","Reclassificar intervalo como estudo")+item("resetCurrentPause","↺","Zerar apenas a pausa atual","Reiniciar o contador do descanso"):""))+
+ group("Reorganizar registros",item("transfer","⇄","Transferir para outra sessão","Mover o registro",active)+item("split","⑂","Dividir tempo entre sessões","Distribuir o estudo sem duplicar",active))+
+ (active?'<p class="note">Para editar o histórico, encerre primeiro como parcial.</p>':"")+undoButton+
+ group("Ações de risco",item("reset","↺","Zerar cronometragem","Recomeçar a contagem",false,"s7-risk-warning")+item("discard","×","Descartar cronometragem","Remover o registro de tempo",false,"s7-risk-danger"))+
+ '<p class="note">O planejamento e a conclusão são preservados. Dias finalizados permanecem protegidos.</p></div>');
 }
 
 function metrics(filter){
@@ -858,6 +854,54 @@ function metrics(filter){
  const study=entries.reduce((n,r)=>n+studyMs(r),0),paused=entries.reduce((n,r)=>n+pauseMs(r),0);
  const prep=entries.reduce((n,r)=>n+(r.pauses||[]).filter(p=>p.kind==="preparation").reduce((v,p)=>v+Math.max(0,(p.endedAt||((timing.active?.sessionId===r.sessionId&&timing.active?.phase==="paused")?clock():p.startedAt))-p.startedAt),0),0);
  return {count:entries.length,studyMs:study,pauseMs:paused,preparationMs:prep,ratio:study+paused?Math.round(100*study/(study+paused)):null};
+}
+function pauseSoundEnabled(){
+ return settings().pauseReminderMode!=="off"&&!(timing.active?.phase==="paused"&&(pauseReminderSilenced||timing.active.pauseSoundSilenced));
+}
+function togglePauseSound(){
+ const q=settings();
+ if(pauseSoundEnabled()){q.lastPauseReminderMode=q.pauseReminderMode;q.pauseReminderMode="off";stopPauseReminder();}
+ else{
+  q.pauseReminderMode=q.pauseReminderMode==="off"?(q.lastPauseReminderMode==="interval"?"interval":"continuous"):q.pauseReminderMode;
+  pauseReminderSilenced=false;
+  if(timing.active?.phase==="paused"){timing.active.pauseSoundSilenced=false;audioUnlock();startPauseReminder();}
+ }
+ persist();C.render();
+}
+function hideTimerMenu(panel){
+ if(!panel)return;
+ if(typeof panel.hidePopover==="function"){if(panel.matches(":popover-open"))panel.hidePopover();}
+ panel.hidden=true;
+ document.getElementById(panel.dataset.anchor)?.setAttribute("aria-expanded","false");
+}
+function closeTimerMenus(){for(const panel of document.querySelectorAll?.(".s7-flyout")||[])hideTimerMenu(panel);}
+function openTimerMenu(name){
+ const panel=document.getElementById("s7-flyout-"+name),anchor=document.getElementById("s7-trigger-"+name);
+ if(!panel||!anchor)return;
+ const wasOpen=typeof panel.showPopover==="function"?panel.matches(":popover-open"):!panel.hidden;
+ closeTimerMenus();if(wasOpen)return;
+ panel.hidden=false;if(typeof panel.showPopover==="function")panel.showPopover();
+ const rect=anchor.getBoundingClientRect(),w=panel.offsetWidth,h=panel.offsetHeight;
+ panel.style.left=Math.max(8,Math.min(rect.right-w,window.innerWidth-w-8))+"px";
+ panel.style.top=(rect.bottom+h+8<=window.innerHeight?rect.bottom+6:Math.max(8,rect.top-h-6))+"px";
+ anchor.setAttribute("aria-expanded","true");
+}
+function timerMenus(){
+ const a=timing.active,r=activeRecord(),paused=a.phase==="paused",soundOn=pauseSoundEnabled();
+ const pauseAction=(kind,label)=>'<button type="button" class="btn small ghost" data-s7="'+(paused?"pauseKind":"pause")+'" data-kind="'+kind+'">'+E(label)+(paused&&r.pauses.at(-1)?.kind===kind?' ✓':'')+'</button>';
+ const button=(id,label,extra="")=>'<button type="button" class="btn ghost s7-menu-trigger '+extra+'" id="s7-trigger-'+id+'" data-s7-menu="'+id+'" aria-expanded="false" aria-controls="s7-flyout-'+id+'" '+(id==="pause"?'title="Modalidades de pausa" aria-label="Modalidades de pausa"':'')+'>'+label+'</button>';
+ const panel=(id,body)=>'<div id="s7-flyout-'+id+'" class="s7-flyout" popover="manual" hidden data-anchor="s7-trigger-'+id+'">'+body+'</div>';
+ return '<div class="s7-primary-actions"><div class="s7-pause-split">'+
+ (paused?'<button type="button" class="btn primary" data-s7="resume" data-s7-context>▶ Retomar estudo</button>':'<button type="button" class="btn primary" data-s7="pause" data-kind="rest" data-s7-context>Ⅱ Pausar estudo</button>')+button("pause","▾")+'</div>'+
+ '<button type="button" class="btn ghost" data-s7="finishChoices">Finalizar sessão</button>'+
+ '<button type="button" class="btn ghost s7-sound-toggle'+(soundOn?' is-on':'')+'" data-s7="togglePauseSound" aria-pressed="'+soundOn+'" title="'+(soundOn?'Desativar':'Ativar')+' lembrete sonoro nas pausas"><span aria-hidden="true">'+(soundOn?'♫':'♩')+'</span><span>Som '+(soundOn?'ligado':'desligado')+'</span></button>'+
+ button("more","⋯ Mais opções","s7-more")+'</div>'+
+ panel("pause",'<strong class="s7-flyout-title">'+(paused?"Alterar motivo da pausa":"Modalidades de pausa")+'</strong>'+pauseAction("rest","Descanso livre")+pauseAction("preparation","Preparar flashcards")+
+ '<button type="button" class="btn small ghost" data-s7="timedPause" '+(paused?'disabled title="Retome antes de programar uma nova pausa"':'')+'>◷ Pausa com timer</button>'+
+ (r.mode!=="continuous"||paused?pauseAction("scheduled","Pausa programada"):"")+pauseAction("other","Interrupção"))+
+ panel("more",'<strong class="s7-flyout-title">Cronômetro</strong><button type="button" class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button><button type="button" class="btn small ghost" data-s7="manage" data-id="'+A(a.sessionId)+'">Gerenciar cronometragem</button>'+
+ (lastUndoAvailable(a.sessionId)?'<button type="button" class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+
+ '<button type="button" class="btn small ghost" data-s7="partial">Encerrar parcial</button>');
 }
 function ring(){
  const a=timing.active,r=activeRecord();
@@ -870,21 +914,10 @@ function ring(){
  '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="idle"?"ESTUDO INTERROMPIDO":a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span>'+(Number(r.unaccountedMs)>0?'<span>Desconsiderado: <strong>'+fmtMs(r.unaccountedMs)+'</strong></span>':"")+'</div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
  (a.phase==="idle"?'<div class="s7-idle-alert"><strong>Contagem interrompida após a meta.</strong><p>O excedente não será contabilizado até você confirmar. Se estudou durante a ausência, use a correção.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo</button></div>':
- '<div class="s7-primary-actions">'+
- (a.phase==="running"?'<button class="btn primary" data-s7="pause" data-kind="rest">Ⅱ Pausar estudo</button>':'<button class="btn primary" data-s7="resume">▶ Retomar estudo</button>')+
- '<button class="btn ghost" data-s7="finishChoices">Finalizar sessão</button>'+
- '<details class="s7-more"><summary>⋯ Mais opções</summary><div class="s7-more-actions">'+
- '<button class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button>'+
- (lastUndoAvailable(a.sessionId)?'<button class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+
- (a.phase==="running"?'<button class="btn small ghost" data-s7="pause" data-kind="preparation">Preparar flashcards</button><button class="btn small ghost" data-s7="timedPause">◷ Pausa com timer</button>'+
- (r.mode!=="continuous"?'<button class="btn small ghost" data-s7="pause" data-kind="scheduled">Pausa programada</button>':""):
- '<div class="field"><label>Motivo da pausa</label><select id="s7-current-kind"><option value="rest" '+(r.pauses.at(-1)?.kind==="rest"?"selected":"")+'>Descanso</option><option value="preparation" '+(r.pauses.at(-1)?.kind==="preparation"?"selected":"")+'>Preparação de material / flashcards</option><option value="scheduled" '+(r.pauses.at(-1)?.kind==="scheduled"?"selected":"")+'>Pausa programada</option><option value="other" '+(r.pauses.at(-1)?.kind==="other"?"selected":"")+'>Interrupção</option></select></div>')+
- '<button class="btn small ghost" data-s7="partial">Encerrar parcial</button></div></details>'+
- (a.phase==="paused"&&settings().pauseReminderMode!=="off"?'<button class="btn small ghost s7-pause-sound" data-s7="'+((pauseReminderSilenced||a.pauseSoundSilenced)?"replayPauseReminder":"silencePauseReminder")+'">'+((pauseReminderSilenced||a.pauseSoundSilenced)?"▶ Reproduzir lembrete":"♪ Silenciar lembrete")+'</button>':"")+
- '</div>')+
+ timerMenus())+
  '</div></div>' +
  (r.mode!=="continuous"?'<p class="note">Modo '+E(r.mode==="pomodoro"?"Pomodoro":"personalizado")+' · Blocos sugeridos de '+E(String(r.mode==="pomodoro"?25:settings().blockMin))+' min e descanso de '+E(String(r.mode==="pomodoro"?5:settings().restMin))+' min. Pausas programadas não são penalizadas.</p>':"")+
- '<p class="note">O estudo e as pausas podem ser corrigidos em minutos e segundos. Tempo desconsiderado não conta como estudo.</p></section>';
+ '</section>';
 }
 function homeButtons(id){
  const x=session(id);
@@ -1094,13 +1127,16 @@ document.addEventListener("click",e=>{
  C.notify("Encerre o cronômetro para registrar ou concluir esta sessão.");
 },true);
 document.addEventListener("click",e=>{
- const b=e.target.closest?.("[data-s7]");if(!b)return;
+ const b=e.target.closest?.("[data-s7]");if(!b||b.disabled)return;
+ closeTimerMenus();
  e.preventDefault();
  try{
   const act=b.dataset.s7;
   if(act==="start")start(b.dataset.id);
   else if(act==="timedPause")timedPauseModal();
   else if(act==="pause")pause(b.dataset.kind||"rest");
+   else if(act==="pauseKind")changePause(b.dataset.kind||"rest");
+   else if(act==="togglePauseSound")togglePauseSound();
   else if(act==="resume")resume();
   else if(act==="silencePauseReminder")silencePauseReminder();
   else if(act==="replayPauseReminder")replayPauseReminder();
@@ -1143,6 +1179,18 @@ document.addEventListener("click",e=>{
   else if(act==="testPauseNotification")showDemoAlarm("pause");
  }catch(err){C.notify(err.message||"Não foi possível controlar o cronômetro.");console.error(err);}
 });
+document.addEventListener("click",e=>{
+ const trigger=e.target.closest?.("[data-s7-menu]");
+ if(trigger){e.preventDefault();openTimerMenu(trigger.dataset.s7Menu);return;}
+ if(!e.target.closest?.(".s7-flyout"))closeTimerMenus();
+});
+document.addEventListener("contextmenu",e=>{if(e.target.closest?.("[data-s7-context]")){e.preventDefault();openTimerMenu("pause");}});
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape")closeTimerMenus();
+ if((e.key==="ContextMenu"||(e.shiftKey&&e.key==="F10"))&&e.target.closest?.("[data-s7-context]")){e.preventDefault();openTimerMenu("pause");}
+});
+window.addEventListener("resize",closeTimerMenus);
+
 document.addEventListener("submit",e=>{
  // Um input name="id" pode sobrescrever form.id como propriedade nomeada do DOM.
  const id=e.target?.getAttribute?.("id")||e.target?.id;

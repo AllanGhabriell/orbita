@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.15 — ergonomia do cronômetro e Orientador (24/11/2026)
+
+- Controles estáveis e menus flutuantes de pausas e ações, com acesso imediato ao lembrete sonoro.
+- Gerenciamento agrupado por correções, reorganização e ações de risco; regras de registro preservadas.
+- Orientador acessível pela barra superior, sem ocupar uma linha do planejamento.
+
 
 ## Alarme em todos os lugares e importação automática de som — novembro de 2026
 

@@ -310,14 +310,16 @@ test("finalizar como não realizada só é permitido sem estudo efetivo",()=>{
  assert.throws(()=>other.stage.finishAsNotDone(),/estudo registrado/i);
  assert.equal(other.item.status,"progress");
 });
-test("timer 5.06 exibe somente três ações principais, sem botões duplicados",()=>{
+test("timer 5.15 exibe ações estáveis e menu de pausas",()=>{
  const h=harness();h.stage.start("math-1");
  const html=h.decorate("inicio",'<div class="study-daily-summary"></div>');
  assert.match(html,/s7-primary-actions/);
  assert.match(html,/data-s7="finishChoices"/);
  assert.match(html,/s7-more/);
  assert.equal((html.match(/data-s7="correct"/g)||[]).length,1,"corrigir tempo aparece somente uma vez");
- assert.equal((html.match(/data-s7="pause" data-kind="rest"/g)||[]).length,1);
+ assert.equal((html.match(/data-s7="pause" data-kind="rest" data-s7-context/g)||[]).length,1);
+ assert.match(html,/data-s7-menu="pause"/);
+ assert.match(html,/data-s7="togglePauseSound"/);
  assert.equal((html.match(/data-s7="finishChoices"/g)||[]).length,1);
  assert.equal((html.match(/data-s7="partial"/g)||[]).length,1,"parcial aparece apenas nas opções secundárias");
  h.stage.finishChoices();
@@ -334,10 +336,10 @@ test("lembrete durante pausa é opcional e não modifica os minutos estudados",(
  const savedStudy=h.state.timing.records["math-1"].studyMs;
  assert.equal(savedStudy,10*60000);
  assert.equal(h.state.timing.active.phase,"paused");
- assert.match(h.decorate("inicio",'<div class="study-daily-summary"></div>'),/silencePauseReminder/);
+ assert.match(h.decorate("inicio",'<div class="study-daily-summary"></div>'),/aria-pressed="true"/);
  h.stage.silencePauseReminder();
  assert.equal(h.state.timing.active.pauseSoundSilenced,true);
- assert.match(h.decorate("inicio",'<div class="study-daily-summary"></div>'),/replayPauseReminder/);
+ assert.match(h.decorate("inicio",'<div class="study-daily-summary"></div>'),/aria-pressed="false"/);
  h.stage.resume();
  assert.equal(h.state.timing.records["math-1"].studyMs,savedStudy,"silenciar não altera estudo");
  assert.equal(h.state.timing.active.phase,"running");
