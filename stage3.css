@@ -516,3 +516,20 @@
 .study-daily-panel .study-daily-controls>.s3-quick-status,.study-daily-panel .study-daily-controls>[data-s3=recordSession],.study-daily-panel .study-daily-controls>.orb-icon-btn[data-s3=markPending]{display:inline-flex;width:auto;height:auto;min-height:30px;padding:6px 9px!important;gap:4px}
 .study-daily-panel .study-daily-controls>.btn .orb-ui-icon{width:14px;height:14px}
 @media(max-width:700px){.study-daily-panel .study-daily-summary{gap:5px 9px}.study-daily-panel .study-summary-stat+.study-summary-stat{padding-left:9px}.study-daily-panel .study-daily-controls{flex-basis:100%;padding-left:36px;justify-content:flex-start}.study-daily-panel .study-daily-controls>.btn{padding:6px 8px}}
+
+/* v5.21 — estudos em primeiro plano, mantendo os rótulos essenciais. */
+.study-home-panel.study-daily-panel{border-color:var(--borderStrong);background:color-mix(in srgb,var(--surface) 92%,var(--accent) 8%);padding:15px;gap:10px}
+.study-daily-panel .card-head h2{font-size:19px;font-weight:750;letter-spacing:-.035em}
+.study-daily-panel .study-daily-summary{display:flex;flex-wrap:wrap;gap:8px 0;padding:4px 0 7px}
+.study-daily-panel .study-daily-summary>.study-summary-stat{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:5px;row-gap:2px;min-width:82px;padding:0 12px}
+.study-daily-panel .study-daily-summary>.study-summary-stat:first-child{padding-left:0}
+.study-daily-panel .study-summary-stat>strong{font-size:17px;font-weight:750}
+.study-daily-panel .study-summary-stat>.study-summary-label{grid-column:1/-1;font-size:10px}
+.study-daily-panel .study-daily-heading strong{font-size:11px;color:var(--muted)}
+.study-daily-panel .study-daily-label>strong{font-size:15px;font-weight:740;letter-spacing:-.015em}
+.study-daily-panel .study-daily-entry{background:var(--surface2);min-height:51px}
+.study-daily-panel .study-daily-entry.is-running{border-color:var(--good)}
+.study-daily-panel .study-daily-controls>[data-s7=start]:not(:disabled){background:color-mix(in srgb,var(--accent) 20%,var(--surface2));border-color:var(--borderStrong);color:var(--text);font-weight:700}
+.study-daily-panel .study-daily-controls>.s3-quick-status.primary{background:var(--surface2);color:var(--text);border:1px solid var(--border);box-shadow:none}
+.study-daily-panel .study-daily-controls>.s3-quick-status.primary:hover{border-color:var(--borderStrong)}
+@media(max-width:600px){.study-daily-panel .study-daily-summary>.study-summary-stat{min-width:65px;padding-inline:7px}.study-daily-panel .study-summary-stat>strong{font-size:15px}.study-daily-panel .card-head h2{font-size:17px}}

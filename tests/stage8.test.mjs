@@ -70,8 +70,9 @@ assert.doesNotMatch(read("stage3.js"),/data-s8="linkFromSession"/,"sessões não
 assert.doesNotMatch(read("stage2.js"),/data-s8="linkFromEntry"/,"atividades não oferecem criação fora do mural");
 assert.doesNotMatch(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/linkFrom|new|📌\+/,"indicador é exclusivamente de leitura");
 
-assert.match(markup,/Ver observação/,"observação acessível sem abrir edição");
-assert.match(markup,/Parte 2 - 07:55/,"texto da observação permanece no mural");
+assert.match(markup,/class="s8-fold"/,"observação acessível sem abrir edição");
+R.toggleObservation(R.notes.find(n=>n.description==="Parte 2 - 07:55").id);
+assert.match(markup,/Parte 2 - 07:55/,"texto da observação aparece ao desdobrar o papel");
 R.saveNote(form({title:"Dica ENEM",priority:"medium",icon:"idea",target:"cycle|enem|"}));
 assert.match(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}),/<svg/,"um alfinete discreto abre o lembrete do ciclo");
 assert.match(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/<span>2<\/span>/,"dois lembretes compartilham um só indicador");
@@ -115,7 +116,7 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-20-mural"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-21-mural"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
 
 R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
@@ -153,7 +154,7 @@ assert.doesNotMatch(markup,/id="s8-panel"/);
 R.openPanel();
 assert.match(markup,/id="s8-zoom-slider" type="range"/);
 assert.match(markup,/data-s8="lock"/);
-assert.match(markup,/data-s8="selectAll"/);
+assert.match(markup,/data-s8="selectMode"/);assert.doesNotMatch(markup,/data-s8="selectAll"/);
 R.setZoom(65,true);assert.equal(R.layout.zoom,65);
 R.setOpacity(84,true);assert.equal(R.layout.opacity,84);
 const snapshot=R.notes.map(n=>({title:n.title,description:n.description,link:JSON.stringify(n.link)}));
@@ -163,3 +164,14 @@ assert.ok(R.notes.every(n=>n.color==="#d6e7ff"&&n.priority==="low"&&n.pinned));
 assert.deepEqual(R.notes.map(n=>({title:n.title,description:n.description,link:JSON.stringify(n.link)})),snapshot);
 R.selectAll();assert.doesNotMatch(markup,/data-s8="bulkEdit"/);
 R.closePanel();assert.match(markup,/#f4e5ad/,"ícone original da v5.15 restaurado");
+
+R.openPanel();R.setAppearance("opacity",0);assert.equal(R.layout.opacity,0);
+R.setAppearance("spacing",9);assert.equal(R.layout.spacing,9);
+const fixed=R.notes[0],one=R.notes[1],two=R.notes[2];fixed.pinned=true;one.pinned=false;two.pinned=false;
+assert.equal(R.moveNote(one.id,two.id,true),true);
+assert.equal(R.sorted().filter(n=>!n.pinned).at(-1).id,one.id);
+assert.equal(R.moveNote(fixed.id,one.id),false);
+R.resetOrder();assert.equal(R.layout.orderMode,"auto");assert.equal(R.layout.spacing,9);
+R.selectionAction("selectAll");assert.doesNotMatch(markup,/class="s8-select-note"/);assert.match(markup,/s8-selected/);
+R.toggleSelection(one.id);assert.match(markup,/aria-checked="false"/);R.selectionAction("exitSelection");
+one.description="Observação de teste";R.toggleObservation(one.id);assert.match(markup,/s8-observation/);R.toggleObservation(one.id);assert.doesNotMatch(markup,/class="s8-observation"/);assert.match(markup,/class="s8-fold"/);

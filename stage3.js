@@ -560,7 +560,7 @@ function homePanel(){
  }).join("");
  if(!groups.length)body='<div class="study-daily-empty"><p class="note">Sem sessões planejadas.</p></div>';
  const real=summarize({from:date,to:date}),partial=daily.filter(x=>x.status==="progress"&&x.id!==active?.sessionId).length,missed=daily.filter(x=>x.status==="notdone").length;
- return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>Estudos de hoje</h2><button class="btn small ghost" data-s3="openStudies" title="Configurar estudos" aria-label="Configurar estudos">'+glyph("settings")+' Configurar</button></div>'+
+ return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>Estudos de hoje</h2><button class="btn small ghost" data-s3="openStudies" title="Configurar estudos" aria-label="Configurar estudos">Configurar</button></div>'+
   '<div class="study-daily-summary">'+stat("Planejadas",daily.length,"")+stat("Concluídas",done,"check",done?"is-good":"")+stat("Parciais",partial,"partial",partial?"is-warning":"")+stat("Não realizadas",missed,"missed",missed?"is-danger study-missed-count":"")+stat("Registrado",minuteLabel(real.actualMin),"clock")+'</div>'+
   body+(activeCycles.length&&!groups.length?'<div class="study-daily-next" title="Próxima matéria dos ciclos">↪ '+E(activeCycles.slice(0,3).map(x=>cycleProgress(x).cur?.title||"Sem matéria").join(" · "))+'</div>':"")+
   '</section>';

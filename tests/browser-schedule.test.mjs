@@ -186,6 +186,19 @@ try{
  assert.ok(moved.left>bigger.left+25&&moved.top>bigger.top+35,"o painel inteiro se move");
  await page.$eval('#s8-zoom-slider',el=>{el.value="75";el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));});
  assert.equal(await page.evaluate(()=>window.OrbitaStage8.inspect.layout.zoom),75);
+
+ await page.evaluate(()=>{const R=window.OrbitaStage8.inspect;R.saveNote({get:k=>({title:"Teste de mural",description:"Observação de teste",priority:"medium",linkScope:"none"}[k]??null)});});
+ await page.click('[data-s8="selectMode"]');
+ await page.click('.s8-note-title');
+ assert.ok(await page.$('.s8-selected'));
+ assert.equal(await page.$('.s8-select-note'),null);
+ await page.click('[data-s8="selectMode"]');
+ await page.click('.s8-fold');
+ assert.ok(await page.$('.s8-observation'));
+ await page.click('.s8-note [data-s8="noteMenu"].s8-mini');
+ await page.waitForSelector('#s8-context');
+ assert.ok(await page.$('#s8-context [data-s8="edit"]'));
+ await page.keyboard.press("Escape");
  await page.click('[data-s8="close"]');
  await page.waitForSelector('.s8-trigger');
  assert.equal(await page.$('#s8-panel'),null,"fechar restaura apenas o ícone");

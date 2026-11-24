@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.21 — mural personalizável e estudos em destaque
+
+- Seleção pelo cartão inteiro, menu de seleção no botão direito, papéis dobrados para observações e ações contextuais ancoradas.
+- Distribuição compacta, ordenação manual persistida, fixados no topo e retorno à ordem por prioridade independente da restauração de layout.
+- Aparência ajustável, transparência real, controles personalizados e destaque para Estudos de hoje sem retirar informações.
+
 ## v5.20 — mural acessível e edição coletiva
 
 - Ícone flutuante original da v5.15 restaurado; movimentação e redimensionamento mantidos.

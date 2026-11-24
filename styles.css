@@ -532,3 +532,9 @@ body[data-theme="light"] .mobile-nav{
 .orb-manage-icon{display:grid;place-items:center;font-size:17px;color:var(--muted)}
 .orb-manage-icon svg{width:17px;height:17px}
 .orb-manage-item.orb-risk-warning strong,.orb-manage-item.orb-risk-warning .orb-manage-icon{color:var(--warning)}
+
+/* Controles de formulário com a mesma linguagem visual do Órbita. */
+.modal-card .checkline input[type=checkbox]{appearance:none;-webkit-appearance:none;display:inline-grid;place-items:center;flex:none;width:17px;height:17px;margin:0 5px 0 0;padding:0;border-radius:5px;border:1px solid var(--borderStrong);background:var(--surface2);cursor:pointer}
+.modal-card .checkline input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.modal-card .checkline input[type=checkbox]:checked:after{content:"";width:8px;height:4px;border-left:2px solid var(--bg2);border-bottom:2px solid var(--bg2);transform:rotate(-45deg) translateY(-1px)}
+.modal-card select,.s8-toolbar select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239a91b5' stroke-width='1.7'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
