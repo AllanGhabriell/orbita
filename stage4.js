@@ -654,7 +654,7 @@ function homeDecor(base){
   '<section class="card"><h2 class="section-title">Estudos registrados</h2><div class="review-lines">'+(closed.studies.map((x,i)=>reviewStudyLine(x,i)).join("")||'<p class="note">Sem sessões.</p>')+'</div></section>';
  }
  if(date>today())return base;
- const closeLink='<div class="evo-footer"><button class="btn primary" data-s4="reviewDate" data-date="'+A(date)+'">Revisar e finalizar o dia</button><button class="btn small ghost" data-s4="viewStats">Ver evolução</button></div>';
+ const closeLink='<div class="evo-footer"><button class="btn primary" data-s4="reviewDate" data-date="'+A(date)+'">Finalizar dia</button><button class="btn small ghost" data-s4="viewStats">Evolução</button></div>';
  const miniWeek=lastStudyDayOfWeek(date)?'<div class="evo-alert"><span>Último dia de estudos previsto na semana. O balanço semanal já pode ser consultado como prévia; será definitivo após fechar os dias restantes.</span><button class="btn small" data-s4="viewStats">Ver semana</button></div>':"";
  const remind=reminderEligible()?'<div class="evo-alert evo-reminder"><span>Seu desempenho merece uma revisão. Há novos registros para analisar.</span><button class="btn small" data-s4="viewStats">Ver estatísticas</button><button class="btn small ghost" data-s4="dismissReminder">Depois</button><button class="btn small ghost" data-s4="disableReminder">Desativar</button></div>':"";
  return mentorNotice()+upper+remind+base+miniWeek+closeLink;

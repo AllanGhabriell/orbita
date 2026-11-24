@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.17 — refinamento visual
+
+- Início com menos textos, sessões em linhas compactas, status com símbolos e cores, informações detalhadas em dicas.
+- Gerenciamento de atividades e cronometragem com hierarquia e aparência compartilhadas.
+- Controles, avisos relevantes, registros e regras de finalização preservados.
+
 ## v5.16 — tarefas flexíveis e mural personalizável
 
 - Conversão de focos e tarefas, edição de tarefas antigas sem alterar dias encerrados e objetivo compacto.

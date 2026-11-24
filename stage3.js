@@ -514,9 +514,10 @@ function sessionRow(x,compact=false){
  '<button class="btn small ghost" data-s3="planEdit" data-id="'+A(x.id)+'">Editar</button><button class="btn small ghost" data-s3="planDuplicate" data-id="'+A(x.id)+'">Duplicar</button><button class="btn small danger" data-s3="planRemove" data-id="'+A(x.id)+'">Excluir</button>':
  '<span class="status">'+(x.status==="done"?"Concluída no Início":x.status==="notdone"?"Não realizada":x.status==="progress"?"Em andamento":"Dia fechado")+'</span>')+'</div></div>';
 }
+// Início: execução em primeiro plano, detalhes sob demanda.
 function homePanel(){
- const date=s.date,load=loadFor(date),activeCycles=db.cycles.filter(x=>!x.archived);
- const daily=planDayEntries(date),done=daily.filter(x=>x.status==="done").length;
+ const date=s.date,daily=planDayEntries(date),done=daily.filter(x=>x.status==="done").length;
+ const activeCycles=db.cycles.filter(x=>!x.archived),active=window.OrbitaStage7?.inspect?.model?.active;
  const groups=[];
  for(const x of daily){
   const c=cycle(x.cycleId),key=c?.id||"extra";
@@ -524,43 +525,48 @@ function homePanel(){
   if(!group){group={key,cycle:c,items:[]};groups.push(group);}
   group.items.push(x);
  }
- // O Início executa sessões. Ciclo/matéria são contexto, nunca a ação principal.
+ const glyph=(name)=>'<svg class="orb-ui-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4M5 5l3 3m8 8 3 3M5 19l3-3m8-8 3-3"/>',
+  check:'<path d="m5 12 4 4L19 6"/>',undo:'<path d="M9 6 4 11l5 5M4 11h10a5 5 0 0 1 5 5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  record:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',
+  partial:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',missed:'<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/>'
+ }[name]||"")+'</svg>';
+ const stat=(name,value,icon,tone="")=>'<span class="study-summary-stat '+tone+'" title="'+A(name)+'" aria-label="'+A(name+": "+value)+'">'+glyph(icon)+'<strong>'+E(value)+'</strong></span>';
  let body=groups.map(group=>{
-  const c=group.cycle,p=c&&!c.archived?cycleProgress(c):null;
-  const n=group.items.filter(x=>x.status==="done").length;
-  const flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
+  const c=group.cycle,p=c&&!c.archived?cycleProgress(c):null,n=group.items.filter(x=>x.status==="done").length;
+  const progress=group.items.length?Math.round(100*n/group.items.length):0,flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
   const entries=group.items.map(x=>{
-   const number=sessionOrdinal(x),label=plannerLabel(x);
-   const inTimer=window.OrbitaStage7?.inspect?.activeSessionId===x.id;
-   const finished=x.status==="done"||x.status==="notdone"||(x.status==="progress"&&!inTimer);
-   const registered=x.actualMin!=null&&Number.isFinite(Number(x.actualMin));
-   const timeLabel=finished?(registered?minuteLabel(x.actualMin)+" realizada(s)":x.status==="notdone"?"0min realizado":"Tempo não informado"):(x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista(s)":"Sem duração prevista");
-   const desc=[timeLabel,x.startTime||"",
-    x.status==="done"?"Concluída":x.status==="notdone"?"Não realizada":x.status==="progress"?"Em andamento":"Pendente"].filter(Boolean).join(" · ");
-   return '<div class="study-daily-entry '+(x.status==="done"?"is-done":x.status==="notdone"?"is-notdone":"")+'"><span class="study-daily-number">'+number+'</span>'+
-    '<div class="study-daily-label"><strong>Sessão '+number+'</strong><span class="study-daily-subject">'+E(label)+'</span>'+
-    '<small>'+E(desc)+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
-    (x.status==="notdone"?'<button class="btn small ghost" data-s3="markPending" data-id="'+A(x.id)+'">↶ Voltar a pendente</button>':
- '<button class="btn small s3-quick-status '+(x.status==="done"?"ghost":"primary")+'" data-s3="quickDone" data-id="'+A(x.id)+'" title="Clique direito ou segure para escolher a situação">'+(x.status==="done"?"↶ Desfazer":"✓ Concluir")+'</button>')+
-    
- '<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'">Registrar</button>'+(window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||""):
-    '<span class="status">Dia fechado</span>')+'</div></div>';
+   const number=sessionOrdinal(x),label=plannerLabel(x),inTimer=active?.sessionId===x.id;
+   const phase=inTimer?active.phase:x.status==="done"?"done":x.status==="notdone"?"notdone":x.status==="progress"?"partial":"pending";
+   const names={running:"Em estudo",paused:"Pausado",idle:"Interrompido",done:"Concluída",notdone:"Não realizada",partial:"Parcial",pending:"Pendente"};
+   const symbols={running:"▶",paused:"Ⅱ",idle:"!",done:"✓",notdone:"×",partial:"◐",pending:String(number)};
+   const registered=x.actualMin!=null&&Number.isFinite(Number(x.actualMin)),finished=["done","notdone","partial"].includes(phase);
+   const timeLabel=finished?(registered?minuteLabel(x.actualMin):""):(x.plannedMin!=null?minuteLabel(x.plannedMin):"");
+   const meta=[timeLabel,x.startTime||""].filter(Boolean).join(" · "),statusLabel="Sessão "+number+" · "+names[phase];
+   const completion=x.status==="notdone"?'<button class="btn small ghost orb-icon-btn" data-s3="markPending" data-id="'+A(x.id)+'" title="Voltar a pendente" aria-label="Voltar a pendente">'+glyph("undo")+'</button>':
+    '<button class="btn small '+(x.status==="done"?"ghost":"primary")+' s3-quick-status" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Desfazer conclusão":"Concluir · clique direito para escolher situação")+'" aria-label="'+(x.status==="done"?"Desfazer conclusão":"Concluir sessão")+'">'+glyph(x.status==="done"?"undo":"check")+'</button>';
+   return '<div class="study-daily-entry is-'+phase+'" data-session-state="'+phase+'"><span class="study-daily-number" title="'+A(statusLabel)+'" aria-label="'+A(statusLabel)+'">'+symbols[phase]+'</span>'+
+    '<div class="study-daily-label"><strong class="study-daily-subject" title="'+A("Sessão "+number+" · "+label)+'">'+E(label)+'</strong>'+
+    (meta?'<small title="'+(finished?"Tempo registrado":"Duração prevista")+'">'+E(meta)+'</small>':"")+'</div><div class="study-daily-controls">'+(!blocked(date)?
+    completion+'<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'" title="Registrar estudo" aria-label="Registrar estudo">'+glyph("record")+'</button>'+
+    (window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||""):
+    '<span class="status" title="Dia fechado" aria-label="Dia fechado">🔒</span>')+'</div></div>';
   }).join("");
-  const progress=group.items.length?Math.round(100*n/group.items.length):0;
-  return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><div><strong>'+E(c?.title||"Estudos independentes")+
-    '</strong><small>'+n+' de '+group.items.length+' sessões concluídas'+(p?.cur?' · próxima matéria do ciclo: '+E(p.cur.title):"")+
-    '</small></div></div>'+
-    '<div class="study-session-progress" role="progressbar" aria-label="Sessões concluídas em '+A(c?.title||"Estudos independentes")+
-    '" aria-valuemin="0" aria-valuemax="'+group.items.length+'" aria-valuenow="'+n+'"><div class="study-session-progress-fill" style="width:'+progress+'%"></div></div>'+
-    '<div class="study-daily-list">'+entries+'</div></div>';
+  return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><strong>'+E(c?.title||"Estudos independentes")+'</strong>'+
+   '<span class="study-cycle-count" title="'+A(n+" de "+group.items.length+" concluídas"+(p?.cur?" · Próxima: "+p.cur.title:""))+'" aria-label="'+A(n+" de "+group.items.length+" concluídas")+'">'+n+'/'+group.items.length+'</span></div>'+
+   '<div class="study-session-progress" role="progressbar" aria-label="Sessões concluídas em '+A(c?.title||"Estudos independentes")+'" aria-valuemin="0" aria-valuemax="'+group.items.length+'" aria-valuenow="'+n+'"><div class="study-session-progress-fill" style="width:'+progress+'%"></div></div>'+
+   '<div class="study-daily-list">'+entries+'</div></div>';
  }).join("");
- if(!groups.length)body='<div class="study-daily-empty"><p class="note">Nenhuma sessão planejada para esta data.</p><p class="note">Organize a quantidade de sessões e os dias da semana na área de Estudos. Depois, acompanhe e conclua tudo aqui.</p></div>';
- const real=summarize({from:date,to:date});
- return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>◉ Estudos de hoje</h2><button class="btn small ghost" data-s3="openStudies">Configurar estudos ↗</button></div>'+
-  '<div class="study-daily-summary"><span>'+daily.length+' planejada(s)</span><span>'+done+' concluída(s)</span><span>'+daily.filter(x=>x.status==="progress").length+' parcial(is)</span><span class="study-missed-count">'+daily.filter(x=>x.status==="notdone").length+' não realizada(s)</span><span>'+minuteLabel(real.actualMin)+' reais registradas</span></div>'+
-  body+(activeCycles.length&&!groups.length?'<div class="study-daily-next"><strong>Próxima matéria do ciclo</strong><span>'+E(activeCycles.slice(0,3).map(x=>x.title+" · "+(cycleProgress(x).cur?.title||"Sem matéria")).join(" | "))+'</span></div>':"")+
+ if(!groups.length)body='<div class="study-daily-empty"><p class="note">Sem sessões planejadas.</p></div>';
+ const real=summarize({from:date,to:date}),partial=daily.filter(x=>x.status==="progress"&&x.id!==active?.sessionId).length,missed=daily.filter(x=>x.status==="notdone").length;
+ return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>Estudos de hoje</h2><button class="btn small ghost orb-icon-btn" data-s3="openStudies" title="Configurar estudos" aria-label="Configurar estudos">'+glyph("settings")+'</button></div>'+
+  '<div class="study-daily-summary">'+stat("Sessões concluídas / planejadas",done+"/"+daily.length,"check",done?"is-good":"")+stat("Tempo real registrado",minuteLabel(real.actualMin),"clock")+
+  (partial?stat("Sessões parciais",partial,"partial","is-warning"):"")+(missed?stat("Sessões não realizadas",missed,"missed","is-danger study-missed-count"):"")+'</div>'+
+  body+(activeCycles.length&&!groups.length?'<div class="study-daily-next" title="Próxima matéria dos ciclos">↪ '+E(activeCycles.slice(0,3).map(x=>cycleProgress(x).cur?.title||"Sem matéria").join(" · "))+'</div>':"")+
   '</section>';
 }
+
 function loadPanel(date){
  const v=loadFor(date),base=C.resolveAvailability(date),warning=v.available>0&&v.totalPlanned>v.available;
  return '<section class="card study-load-panel"><div class="card-head"><h2>Analisador de carga</h2>'+(warning?tag("Excesso previsto","warn"):"")+'<button type="button" class="btn small ghost" title="As horas vêm das sessões cadastradas; atividades vinculadas a um foco são contadas uma única vez." aria-label="Como a carga é calculada" data-s3="loadInfo">ⓘ</button></div>'+

@@ -853,9 +853,9 @@ function manageModal(id){
   return C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p>O registro foi descartado.</p><div class="row">'+undoButton+'</div></div>');
  }
  const active=timing.active?.sessionId===id;
- const item=(act,icon,label,hint,disabled=false,tone="")=>'<button type="button" class="s7-manage-item '+tone+'" data-s7="'+act+'" data-id="'+A(id)+'" '+(disabled?'disabled title="Encerre como parcial para editar o histórico"':'')+'><span class="s7-manage-icon" aria-hidden="true">'+icon+'</span><span><strong>'+E(label)+'</strong><small>'+E(hint)+'</small></span><span aria-hidden="true">›</span></button>';
- const group=(label,items)=>'<section class="s7-manage-group"><h3>'+E(label)+'</h3>'+items+'</section>';
- C.openModal("Gerenciar cronometragem",'<div class="section-stack s7-manage"><strong>'+E(x.discipline)+'</strong><div class="s7-manage-totals"><div><small>Tempo estudado</small><strong data-tone="study">'+E(fmtMs(studyMs(r)))+'</strong></div><div><small>Tempo de pausa</small><strong data-tone="pause">'+E(fmtMs(pauseMs(r)))+'</strong></div></div>'+
+ const item=(act,icon,label,hint,disabled=false,tone="")=>'<button type="button" class="orb-manage-item s7-manage-item '+tone+'" data-s7="'+act+'" data-id="'+A(id)+'" '+(disabled?'disabled title="Encerre como parcial para editar o histórico"':'')+'><span class="orb-manage-icon s7-manage-icon" aria-hidden="true">'+icon+'</span><span><strong>'+E(label)+'</strong>'+(hint&&["correct","cancelAccidentalPause","transfer","split","discard","reset"].includes(act)?'<small>'+E(hint)+'</small>':"")+'</span><span aria-hidden="true">›</span></button>';
+ const group=(label,items)=>'<section class="orb-manage-group s7-manage-group"><h3>'+E(label)+'</h3>'+items+'</section>';
+ C.openModal("Gerenciar cronometragem",'<div class="section-stack orb-manage s7-manage"><strong>'+E(x.discipline)+'</strong><div class="s7-manage-totals"><div><small>Tempo estudado</small><strong data-tone="study">'+E(fmtMs(studyMs(r)))+'</strong></div><div><small>Tempo de pausa</small><strong data-tone="pause">'+E(fmtMs(pauseMs(r)))+'</strong></div></div>'+
  group("Correções de tempo",(active?item("correct","◷","Corrigir tempo do cronômetro","Ajustar estudo e descanso da sessão ativa"):"")+item("editTotals","◷","Editar tempos","Ajustar totais registrados",active)+item("editStart","↤","Corrigir início real","Registrar o horário correto de início")+item("pauses","Ⅱ","Gerenciar pausas","Consultar ou editar intervalos",active)+(active&&timing.active.phase==="paused"?item("cancelAccidentalPause","↶","Desfazer pausa acidental","Reclassificar intervalo como estudo")+item("resetCurrentPause","↺","Zerar apenas a pausa atual","Reiniciar o contador do descanso"):""))+
  group("Reorganizar registros",item("transfer","⇄","Transferir para outra sessão","Mover o registro",active)+item("split","⑂","Dividir tempo entre sessões","Distribuir o estudo sem duplicar",active))+
  (active?'<p class="note">Para editar o histórico, encerre primeiro como parcial.</p>':"")+undoButton+
@@ -926,9 +926,9 @@ function ring(){
  const goal=Math.max(1,Number(r.goalMin)||90)*60000;
  const studied=studyMs(r),paused=pauseMs(r),percent=Math.min(100,Math.max(0,studied/goal*100));
  const stateLabel=a.phase==="idle"?"Interrompido por inatividade":a.phase==="paused"?"Pausado":"Em estudo";
- const subtitle=a.phase==="idle"?"A contagem só volta quando você confirmar; o tempo posterior não conta como estudo.":a.phase==="paused"?"Contagem de estudo interrompida.":"Tempo efetivo em andamento.";
- return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><div class="overline">CRONÔMETRO DA SESSÃO</div><h2>'+E(stateLabel)+'</h2><p>'+E(subtitle)+'</p></div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
- '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="idle"?"ESTUDO INTERROMPIDO":a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+E(duration(studied))+' estudados · meta '+E(duration(goal))+'</span></div></div>'+
+ const subtitle=a.phase==="idle"?"Contagem interrompida. Confirme para continuar.":"";
+ return '<section class="card s7-timer '+(a.phase==="paused"?"s7-paused":"s7-running")+'"><div class="s7-head"><div><h2 title="Cronômetro da sessão">'+E(stateLabel)+'</h2>'+(subtitle?'<p>'+E(subtitle)+'</p>':"")+'</div><span class="status">'+E(session(a.sessionId)?.discipline||"Estudo")+'</span></div>'+
+ '<div class="s7-main"><div class="s7-circle" id="s7-circle" style="--s7-progress:'+percent+'%"><div class="s7-circle-inner"><small>'+(a.phase==="idle"?"ESTUDO INTERROMPIDO":a.phase==="paused"?"PAUSA ATUAL":"TEMPO RESTANTE")+'</small><strong data-s7-el="clock">'+fmtMs(a.phase==="paused"?clock()-a.since:Math.max(0,goal-studied))+'</strong><span>'+'Meta '+E(duration(goal))+'</span></div></div>'+
  '<div class="s7-controls"><div class="s7-quick"><span>Estudado: <strong data-s7-el="study">'+fmtMs(studied)+'</strong></span><span>Pausas: <strong data-s7-el="pause">'+fmtMs(paused)+'</strong></span>'+(Number(r.unaccountedMs)>0?'<span>Desconsiderado: <strong>'+fmtMs(r.unaccountedMs)+'</strong></span>':"")+'</div>'+(a.phase==="paused"&&r.pauses.at(-1)?.plannedMinutes?'<small class="note">Pausa programada · <span data-s7-el="pauseLeft">'+fmtMs(Math.max(0,r.pauses.at(-1).plannedMinutes*60000-(clock()-a.since)))+'</span> restantes'+(r.pauses.at(-1).reason?' · '+E(r.pauses.at(-1).reason):"")+'</small>':"")+
  (a.phase==="idle"?'<div class="s7-idle-alert"><strong>Contagem interrompida após a meta.</strong><p>O excedente não será contabilizado até você confirmar. Se estudou durante a ausência, use a correção.</p><button class="btn primary" data-s7="resumeIdle">▶ Continuar estudo</button><button class="btn small ghost" data-s7="correct">Corrigir tempo</button></div>':
  timerMenus())+
@@ -939,7 +939,7 @@ function ring(){
 function homeButtons(id){
  const x=session(id);
  if(!x||x.status==="done"||x.status==="notdone"||V?.isClosed?.(x.date)||x.date!==C.today())return "";
- if(timing.active?.sessionId===id)return '<span class="s7-inline-state '+(timing.active.phase==="paused"?"s7-muted":"")+'">'+(timing.active.phase==="paused"?"Ⅱ PAUSADO":"● EM ESTUDO")+'</span>';
+ if(timing.active?.sessionId===id)return "";
  return '<button class="btn small ghost" data-s7="start" data-id="'+A(id)+'" '+(timing.active?"disabled title=\"Outra sessão ativa\"":"")+'>◷ Cronometrar</button>';
 }
 function historyHtml(){
@@ -970,7 +970,7 @@ function decorate(route,html){
  if(route==="inicio"){
   html=html.replace(/(<button class="btn small [^"]*" data-s3="quickDone" data-id="([^"]+)")/g,(full,head,id)=>homeButtons(id)+head);
   // Menu de ações contextual, sem controles espalhados na página.
-  html=html.replace(/(<button class="btn small ghost" data-s3="recordSession" data-id="([^"]+)">Registrar<\/button>)/g,(whole,button,id)=>button+sessionMenu(id));
+  html=html.replace(/(<button class="btn small ghost" data-s3="recordSession" data-id="([^"]+)"[^>]*>[\s\S]*?<\/button>)/g,(whole,button,id)=>button+sessionMenu(id));
   // Cronômetro dentro do próprio quadro de estudos (nunca no topo global).
   if(timing.active&&session(timing.active.sessionId)?.date===C.state.date){
    const marker='<div class="study-daily-summary">';

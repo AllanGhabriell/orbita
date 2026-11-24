@@ -484,3 +484,37 @@ body[data-theme="light"] .mobile-nav{
   .view[data-route="inicio"] .hero-goal .orbital-icon{width:30px;height:30px;min-width:30px}
   .view[data-route="inicio"] .hero-goal h2{font-size:14px}
 }
+
+/* v5.17 — linguagem compartilhada para ações e gerenciamento. */
+.orb-ui-icon{display:block;flex:none;vertical-align:middle}
+.orb-icon-btn{display:inline-grid;place-items:center;width:30px;height:30px;padding:5px!important;flex:none}
+.orb-manage.section-stack{gap:11px}
+.orb-manage-context{display:grid;gap:3px;min-width:0}
+.orb-manage-context>strong{font-size:13px;overflow-wrap:anywhere}
+.orb-manage-context>small{font-size:11px;color:var(--muted)}
+.orb-manage-group{display:grid;gap:4px}
+.orb-manage-group h3{font-size:10px;letter-spacing:.045em;color:var(--muted);font-weight:650;text-transform:uppercase;margin:3px 0}
+.orb-manage-item{font:inherit;display:grid;grid-template-columns:23px minmax(0,1fr) 12px;gap:9px;align-items:center;width:100%;min-height:36px;padding:7px 9px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:9px;text-align:left}
+.orb-manage-item>span:nth-child(2){display:grid;gap:2px}
+.orb-manage-item strong{font-size:12px;font-weight:650;line-height:1.4}
+.orb-manage-item small{font-size:10px;color:var(--muted);line-height:1.4}
+.orb-manage-icon{font-size:17px;color:var(--muted);text-align:center}
+.orb-manage-item>span:last-child{color:var(--soft);font-size:16px}
+.orb-manage-item:hover:not(:disabled){background:var(--surface2);border-color:var(--borderStrong)}
+.orb-manage-item.orb-risk strong,.orb-manage-item.orb-risk .orb-manage-icon{color:var(--danger)}
+.modal-card:has(.orb-manage){padding:17px;max-height:89dvh;scrollbar-width:thin}
+.modal-card:has(.orb-manage) .modal-head{margin-bottom:11px}
+.modal-card:has(.orb-manage) .modal-head h2{font-size:18px}
+.view[data-route="inicio"] .view-inner{gap:12px}
+.view[data-route="inicio"] .hero-row h1{font-size:clamp(18px,2.3vw,26px)}
+.view[data-route="inicio"] .hero-goal{padding:12px 15px;gap:12px}
+.view[data-route="inicio"] .hero-goal h2{font-size:clamp(15px,1.9vw,23px);margin:3px 0 0}
+.view[data-route="inicio"] .hero-goal .orbital-icon{width:35px;height:35px;border-radius:10px;font-size:20px}
+.view[data-route="inicio"] .board{padding:12px;min-height:0}
+.view[data-route="inicio"] .board .card-head{margin-bottom:7px}
+.view[data-route="inicio"] .task-row{padding:8px;gap:7px}
+.view[data-route="inicio"] .task-mark[data-status=progress]{color:var(--warning)}
+.view[data-route="inicio"] .task-mark[data-status=notdone]{color:var(--danger)}
+.view[data-route="inicio"] .task-mark[data-status=done]{color:var(--good)}
+.view[data-route="inicio"] .task-mark[data-status=pending]~.task-main .orb-task-status,.view[data-route="inicio"] .task-mark[data-status=done]~.task-main .orb-task-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.view[data-route="inicio"] .task-meta:has(>.orb-task-status:only-child){margin-top:0}

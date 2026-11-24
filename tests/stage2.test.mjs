@@ -95,7 +95,8 @@ assert.equal(S.kindOn(C.addDays(today,2),"task").length,0,"tarefa concluída dei
 submit("s2-entry",{type:"habit",title:"Correr",date:today,estimatedMin:"30",repeat:"weekdays",repeatEnd:C.addDays(today,28),weekday:[String(C.parse(today).getDay())],numbered:"on"});
 const habit=S.model.entries.find(x=>x.type==="habit");
 assert.ok(S.occurrence(habit,C.addDays(today,7)),"rotina semanal no dia equivalente");
-assert.equal(S.occurrence(habit,C.addDays(today,7)).displayTitle,"Correr 2");
+const nextHabitDate=C.addDays(today,7);
+assert.equal(S.occurrence(habit,nextHabitDate).displayTitle,"Correr "+(today.slice(0,7)===nextHabitDate.slice(0,7)?2:1),"numeração mensal reinicia ao mudar de mês");
 assert.ok(S.occurrence(habit,C.addDays(today,1))===null,"rotina semanal não aparece em dia não selecionado");
 submit("s2-entry",{type:"habit",title:"Ler todos os dias",date:today,repeat:"daily",repeatTermination:"never"});
 const daily=S.model.entries.find(x=>x.title==="Ler todos os dias");
