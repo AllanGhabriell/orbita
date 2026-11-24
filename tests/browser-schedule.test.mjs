@@ -167,7 +167,7 @@ try{
  await page.click('.s8-trigger');
  await page.waitForSelector('#s8-panel');
  assert.equal(await page.$('.s8-trigger'),null,"ícone desaparece quando painel está aberto");
- assert.equal(await page.$eval('.s8-head-tools button',els=>els.length),3);
+ assert.equal(await page.evaluate(()=>document.querySelectorAll('.s8-head-tools button').length),4);
  await page.evaluate(()=>{
   const R=window.OrbitaStage8.inspect;
   Object.assign(R.layout,{width:250,height:260,panelX:300,panelY:120,locked:false});
@@ -184,10 +184,7 @@ try{
  await page.mouse.move(header.x,header.y);await page.mouse.down();await page.mouse.move(header.x+35,header.y+45,{steps:8});await page.mouse.up();
  const moved=await getPanel();
  assert.ok(moved.left>bigger.left+25&&moved.top>bigger.top+35,"o painel inteiro se move");
- await page.click('[data-s8="settings"]');
- await page.waitForSelector('#s8-layout-form');
- await page.$eval('#s8-layout-form [name="zoom"]',el=>el.value="75");
- await page.click('#s8-layout-form button[type="submit"]');
+ await page.$eval('#s8-zoom-slider',el=>{el.value="75";el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));});
  assert.equal(await page.evaluate(()=>window.OrbitaStage8.inspect.layout.zoom),75);
  await page.click('[data-s8="close"]');
  await page.waitForSelector('.s8-trigger');

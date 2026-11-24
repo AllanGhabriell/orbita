@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.20 — mural acessível e edição coletiva
+
+- Ícone flutuante original da v5.15 restaurado; movimentação e redimensionamento mantidos.
+- Cadeado, seleção individual/total, filtros, restauração e zoom deslizante no próprio mural; sem campos de dimensão em pixels.
+- Edição em lote de cor, prioridade e fixação sem substituir textos ou vínculos. Opacidade do fundo ajustável com desfoque.
+
 ## v5.19 — consistência e equilíbrio visual
 
 - Estudos de hoje: contadores com rótulos, número e situação de cada sessão, tempo previsto/registrado e ações explícitas de concluir e registrar.

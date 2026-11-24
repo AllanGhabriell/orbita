@@ -11,7 +11,7 @@ const $=id=>document.getElementById(id);
 const labels={high:"Alta",medium:"Média",low:"Baixa"};
 const rank={high:0,medium:1,low:2};
 let opened=false,drag=null,skipClickUntil=0,highlightIds=[],selecting=false,selectedNotes=new Set();
-const defaults={x:null,y:null,width:340,height:430,locked:false,zoom:100,keepOpen:false,filter:"all",panelX:null,panelY:null};
+const defaults={x:null,y:null,width:340,height:430,locked:false,zoom:100,keepOpen:false,filter:"all",panelX:null,panelY:null,opacity:92};
 if(!root.reminderUi||typeof root.reminderUi!=="object")root.reminderUi={...defaults};
 const ui=root.reminderUi;
  opened=ui.keepOpen===true;
@@ -44,7 +44,7 @@ function place(){
  Object.assign(floater.style,{left:rect.left+"px",top:rect.top+"px",width:rect.width+"px",height:rect.height+"px"});
 }
 function toggleLock(){ui.locked=!ui.locked;C.save();redraw();}
-function resetLayout(){const b=bounds();ui.x=b.width-(b.width<=760?46:49)-18;ui.y=b.height-(b.width<=760?46:49)-b.bottom-18;ui.width=340;ui.height=430;ui.panelX=null;ui.panelY=null;ui.zoom=100;C.save();redraw();}
+function resetLayout(){const b=bounds();ui.x=b.width-(b.width<=760?46:49)-18;ui.y=b.height-(b.width<=760?46:49)-b.bottom-18;ui.width=340;ui.height=430;ui.panelX=null;ui.panelY=null;ui.zoom=100;ui.opacity=92;C.save();redraw();}
 function openPanel(){
  opened=true;
  const r=panelRect();ui.panelX=r.left;ui.panelY=r.top;
@@ -119,7 +119,7 @@ function age(created){
 }
 const icons={pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"};
 function glyph(name){
- const paths={pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
+ const paths={unlock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>',reset:'<path d="M5 9a8 8 0 1 1 0 6M5 4v5h5"/>',all:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 12 3 3 7-7M2 7V2h5"/>',minus:'<path d="M5 12h14"/>',pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||"")+'</svg>';
 }
 function smallButton(action,icon,label,extra=""){return '<button type="button" class="s8-mini" data-s8="'+action+'" title="'+A(label)+'" aria-label="'+A(label)+'" '+extra+'>'+glyph(icon)+'</button>';}
@@ -270,11 +270,58 @@ function noteColor(n){return safeColor(n.color)||palette[n.priority]||palette.me
 function contrastColor(hex){const rgb=[1,3,5].map(i=>{const c=parseInt(hex.slice(i,i+2),16)/255;return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);});return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.179?"#202020":"#ffffff";}
 function sorted(){return [...notes].sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||(rank[a.priority]??1)-(rank[b.priority]??1)||String(b.createdAt).localeCompare(String(a.createdAt)));}
 function togglePin(idValue){const n=note(idValue);if(!n)return;n.pinned=!n.pinned;C.save();redraw();}
-function zoomBy(delta){ui.zoom=clamp((Number(ui.zoom)||100)+delta,50,200);C.save();redraw();}
+function setZoom(value,commit=false){
+ ui.zoom=clamp(Number(value)||100,50,200);
+ const list=document.querySelector?.("#s8-panel .s8-note-list"),out=$("s8-zoom-value"),slider=$("s8-zoom-slider");
+ list?.style?.setProperty?.("--s8-z",String(ui.zoom/100));
+ list?.style?.setProperty?.("--s8-card-width",Math.round(212*ui.zoom/100)+"px");
+ if(out)out.textContent=ui.zoom+"%";if(slider)slider.value=String(ui.zoom);
+ if(commit)C.save();
+}
+function zoomBy(delta){setZoom((Number(ui.zoom)||100)+delta,true);redraw();}
+function setOpacity(value,commit=false){
+ ui.opacity=clamp(Number(value)||92,55,100);
+ document.querySelector?.("#s8-panel")?.style?.setProperty?.("--s8-opacity",ui.opacity+"%");
+ const out=$("s8-opacity-value");if(out)out.textContent=ui.opacity+"%";
+ if(commit)C.save();
+}
 function selectColor(idValue,value){const n=note(idValue);if(!n)return;const color=safeColor(value);if(!color)throw Error("Cor inválida.");n.color=color;C.save();redraw();}
 function pinPanel(){ui.keepOpen=!ui.keepOpen;opened=true;C.save();redraw();}
 function visibleNotes(){return sorted().filter(n=>ui.filter==="pinned"?n.pinned:ui.filter==="all"||n.priority===ui.filter);}
-function bulkPin(value){for(const n of notes)if(selectedNotes.has(n.id))n.pinned=value;selectedNotes.clear();selecting=false;C.save();redraw();}
+function syncSelection(){
+ const total=notes.filter(n=>selectedNotes.has(n.id)).length;
+ const count=$("s8-selection-count");if(count)count.textContent=total+" selecionado"+(total===1?"":"s");
+ for(const b of document.querySelectorAll?.("[data-s8=bulkEdit]")||[])b.disabled=total===0;
+ const all=document.querySelector?.("[data-s8=selectAll]");all?.setAttribute("aria-pressed",String(notes.length>0&&total===notes.length));
+}
+function selectAll(){
+ if(selecting&&notes.length&&notes.every(n=>selectedNotes.has(n.id))){selectedNotes.clear();selecting=false;}
+ else{selecting=true;ui.filter="all";selectedNotes=new Set(notes.map(n=>n.id));C.save();}
+ redraw();
+}
+function bulkPin(value){if(!selectedNotes.size)return;for(const n of notes)if(selectedNotes.has(n.id))n.pinned=value;C.save();redraw();}
+function bulkEdit(data){
+ const chosen=notes.filter(n=>selectedNotes.has(n.id));if(!chosen.length)throw Error("Selecione ao menos um lembrete.");
+ const mode=String(data.get("colorMode")||"keep"),color=safeColor(data.get("color")),priority=String(data.get("priority")||"keep"),pin=String(data.get("pin")||"keep");
+ if(!["keep","custom","auto"].includes(mode)||mode==="custom"&&!color)throw Error("Escolha uma cor válida.");
+ if(priority!=="keep"&&!labels[priority])throw Error("Prioridade inválida.");
+ if(!["keep","pin","unpin"].includes(pin))throw Error("Fixação inválida.");
+ for(const n of chosen){
+  if(mode==="custom")n.color=color;else if(mode==="auto")n.color=null;
+  if(priority!=="keep")n.priority=priority;
+  if(pin!=="keep")n.pinned=pin==="pin";
+ }
+ C.save();C.closeModal();redraw();C.notify(chosen.length+" lembrete(s) atualizado(s).");
+}
+function bulkEditMenu(){
+ const chosen=notes.filter(n=>selectedNotes.has(n.id));if(!chosen.length){C.notify("Selecione ao menos um lembrete.");return;}
+ C.openModal("Editar "+chosen.length+" lembrete"+(chosen.length===1?"":"s"),'<form id="s8-bulk-form" class="section-stack">'+
+ '<label class="field"><span>Cor dos papéis</span><select name="colorMode" id="s8-bulk-color-mode"><option value="keep">Manter cores atuais</option><option value="custom">Mesma cor para os selecionados</option><option value="auto">Cor automática da prioridade</option></select></label>'+
+ '<div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="bulkPreset" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-bulk-color" value="#f5eecb" aria-label="Escolher qualquer cor"></div>'+
+ '<label class="field"><span>Prioridade</span><select name="priority"><option value="keep">Manter atuais</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option></select></label>'+
+ '<label class="field"><span>Fixação</span><select name="pin"><option value="keep">Manter atual</option><option value="pin">Fixar no topo</option><option value="unpin">Desafixar</option></select></label>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Aplicar aos selecionados</button></div></form>');
+}
 
 
 function noteMenu(idValue){
@@ -287,17 +334,13 @@ function noteMenu(idValue){
  '<section class="orb-manage-group">'+item("edit","edit","Editar / cor / prioridade")+item("pinNote","pin",n.pinned?"Desafixar":"Fixar no topo")+item("convert","arrow","Transformar em atividade")+item("remove","trash","Excluir","orb-risk")+'</section></div>');
 }
 function settingsMenu(){
- const b=bounds(),r=panelRect();
- const field=(label,name,value,min,max)=>'<label class="field"><span>'+label+'</span><input type="number" name="'+name+'" min="'+min+'" max="'+max+'" value="'+Math.round(value)+'" required></label>';
- C.openModal("Mural de lembretes",'<form id="s8-layout-form" class="section-stack"><div class="grid-2">'+field("Largura (px)","width",r.width,Math.min(210,b.width-16),b.width-16)+field("Altura (px)","height",r.height,Math.min(160,b.height-b.bottom-16),b.height-b.bottom-16)+'</div>'+
- field("Zoom (%)","zoom",Number(ui.zoom)||100,50,200)+
- '<label class="field"><span>Mostrar</span><select name="filter">'+[["all","Todos"],["pinned","Fixados"],["high","Alta"],["medium","Média"],["low","Baixa"]].map(([k,l])=>'<option value="'+k+'" '+(ui.filter===k?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'+
- '<label class="checkline"><input type="checkbox" name="locked" '+(ui.locked?"checked":"")+'> Travar posição e tamanho</label><label class="checkline"><input type="checkbox" name="keepOpen" '+(ui.keepOpen?"checked":"")+'> Manter aberto ao voltar ao Início</label>'+
- '<div class="row"><button type="button" class="btn small ghost" data-s8="selectMode">Selecionar vários</button><button type="button" class="btn small ghost" data-s8="reset">Restaurar layout</button></div>'+
- '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Aplicar</button></div></form>');
+ C.openModal("Aparência do mural",'<div class="section-stack"><label class="field"><span>Opacidade do fundo <output id="s8-opacity-value">'+Math.round(Number(ui.opacity)||92)+'%</output></span><input type="range" id="s8-opacity-slider" min="55" max="100" step="1" value="'+(Number(ui.opacity)||92)+'" aria-label="Opacidade do fundo"></label>'+
+ '<label class="checkline"><input type="checkbox" id="s8-keep-open" '+(ui.keepOpen?"checked":"")+'> Manter mural aberto ao voltar ao Início</label>'+
+ '<div class="modal-footer"><button type="button" class="btn primary" data-action="closeModal">Fechar</button></div></div>');
 }
+
 function markup(){
- if(!opened)return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes"><button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="false" title="Abrir lembretes" aria-label="Abrir lembretes">'+glyph("note")+(notes.length?'<span class="s8-count">'+notes.length+'</span>':"")+'</button></div>';
+ if(!opened)return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes"><button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="false" title="Abrir lembretes" aria-label="Abrir lembretes">'+"<svg width=\"27\" height=\"27\" viewBox=\"0 0 28 28\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 7h18v17H5z\" fill=\"#f4e5ad\" stroke=\"#aa9860\" stroke-width=\"1.5\"/><path d=\"M7 11h14M7 15h14M7 19h10\" stroke=\"#b4a675\" stroke-width=\"1.3\" stroke-linecap=\"round\"/><path d=\"m15 4 4 5\" stroke=\"#a44950\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"14\" cy=\"5\" r=\"4\" fill=\"#d96874\" stroke=\"#a44950\" stroke-width=\"1\"/><circle cx=\"13\" cy=\"4\" r=\"1.1\" fill=\"#ffe2e5\"/></svg>"+(notes.length?'<span class="s8-count">'+notes.length+'</span>':"")+'</button></div>';
  const list=visibleNotes().map(n=>{
   const p=labels[n.priority]?n.priority:"medium",link=n.link?linkLabel(n.link):n.lastLinkLabel?"Vínculo encerrado · "+n.lastLinkLabel:"";
   return '<article id="s8-note-'+A(n.id)+'" data-s8-card="'+A(n.id)+'" class="s8-note s8-priority-'+p+(highlightIds.includes(n.id)?' s8-highlight':'')+'" style="--s8-note-bg:'+noteColor(n)+';--s8-note-fg:'+contrastColor(noteColor(n))+'">'+
@@ -310,10 +353,12 @@ function markup(){
    (n.description?'<details class="s8-note-details"><summary>Ver observação</summary><p>'+E(n.description)+'</p></details>':"")+'</article>';
  }).join("");
  const z=clamp((Number(ui.zoom)||100)/100,.5,2);
- return '<div id="s8-floating-root" class="s8-float s8-open" aria-label="Lembretes"><section id="s8-panel" class="s8-panel" aria-label="Mural de lembretes"><header class="s8-panel-head"><div data-s8="movePanel" title="'+(ui.locked?"Mural travado":"Arraste para mover o mural")+'"><strong>Lembretes <small>'+visibleNotes().length+(visibleNotes().length!==notes.length?"/"+notes.length:"")+'</small></strong>'+(ui.locked?glyph("lock"):"")+'</div><div class="s8-head-tools">'+
- smallButton("new","plus","Novo lembrete")+smallButton("settings","more","Configurar mural")+smallButton("close","close","Fechar mural")+'</div></header>'+
- (selecting?'<div class="s8-bulk-tools"><span>Selecionar</span>'+smallButton("bulkPin","pin","Fixar selecionados")+smallButton("bulkUnpin","pin","Desafixar selecionados")+smallButton("selectMode","close","Sair da seleção")+'</div>':"")+
+ return '<div id="s8-floating-root" class="s8-float s8-open" aria-label="Lembretes"><section id="s8-panel" class="s8-panel" style="--s8-opacity:'+clamp(Number(ui.opacity)||92,55,100)+'%" aria-label="Mural de lembretes"><header class="s8-panel-head"><div data-s8="movePanel" title="'+(ui.locked?"Mural travado":"Arraste para mover o mural")+'"><strong>Lembretes <small>'+visibleNotes().length+(visibleNotes().length!==notes.length?"/"+notes.length:"")+'</small></strong>'+'</div><div class="s8-head-tools">'+
+ smallButton("new","plus","Novo lembrete")+smallButton("lock",ui.locked?"lock":"unlock",ui.locked?"Destravar mural":"Travar posição e tamanho",'aria-pressed="'+!!ui.locked+'"')+smallButton("settings","more","Aparência do mural")+smallButton("close","close","Fechar mural")+'</div></header>'+
+ '<div class="s8-toolbar"><div class="s8-toolbar-group">'+smallButton("selectMode","select","Selecionar individualmente",'aria-pressed="'+selecting+'"')+smallButton("selectAll","all","Selecionar todos",'aria-pressed="'+(selecting&&notes.length>0&&notes.every(n=>selectedNotes.has(n.id)))+'"')+smallButton("reset","reset","Restaurar layout")+'</div><select id="s8-filter" aria-label="Filtrar lembretes">'+[["all","Todos"],["pinned","Fixados"],["high","Alta"],["medium","Média"],["low","Baixa"]].map(([k,l])=>'<option value="'+k+'" '+(ui.filter===k?"selected":"")+'>'+l+'</option>').join("")+'</select></div>'+
+ (selecting?'<div class="s8-bulk-tools"><span id="s8-selection-count">'+selectedNotes.size+' selecionado'+(selectedNotes.size===1?"":"s")+'</span><button type="button" class="s8-bulk-edit" data-s8="bulkEdit" '+(!selectedNotes.size?"disabled":"")+'>'+glyph("edit")+' Editar</button>'+smallButton("selectMode","close","Sair da seleção")+'</div>':"")+
  '<div class="s8-note-list" style="--s8-z:'+z+';--s8-card-width:'+Math.round(212*z)+'px">'+(list||'<p class="s8-empty">'+(notes.length?"Sem lembretes neste filtro.":"Nenhum lembrete.")+'</p>')+'</div>'+
+ '<div class="s8-zoom-bar">'+smallButton("zoomOut","minus","Diminuir zoom")+'<input id="s8-zoom-slider" type="range" min="50" max="200" step="5" value="'+(Number(ui.zoom)||100)+'" aria-label="Zoom dos lembretes"><output id="s8-zoom-value">'+Math.round(Number(ui.zoom)||100)+'%</output>'+smallButton("zoomIn","plus","Aumentar zoom")+'</div>'+
  (!ui.locked?["nw","n","ne","e","se","s","sw","w"].map(edge=>'<div class="s8-resize-handle s8-edge-'+edge+'" data-s8="resize" data-edge="'+edge+'" title="Redimensionar mural" aria-hidden="true"></div>').join(""):"")+'</section></div>';
 }
 
@@ -448,6 +493,9 @@ document.addEventListener("click",ev=>{
   else if(action==="pinNote"){if(b.closest?.(".modal-card"))C.closeModal();togglePin(b.dataset.id);}
   else if(action==="pinPanel")pinPanel();
   else if(action==="selectMode"){if(b.closest?.(".modal-card"))C.closeModal();selecting=!selecting;selectedNotes.clear();redraw();}
+  else if(action==="selectAll")selectAll();
+  else if(action==="bulkEdit")bulkEditMenu();
+  else if(action==="bulkPreset"){const input=$("s8-bulk-color"),mode=$("s8-bulk-color-mode");if(input)input.value=b.dataset.color;if(mode)mode.value="custom";}
   else if(action==="bulkPin")bulkPin(true);
   else if(action==="bulkUnpin")bulkPin(false);
   else if(action==="zoomOut")zoomBy(-10);
@@ -464,7 +512,11 @@ document.addEventListener("contextmenu",ev=>{
 });
 document.addEventListener("change",event=>{
  const t=event.target;
- if(t?.dataset?.s8Select){if(t.checked)selectedNotes.add(t.dataset.s8Select);else selectedNotes.delete(t.dataset.s8Select);return;}
+ if(t?.dataset?.s8Select){if(t.checked)selectedNotes.add(t.dataset.s8Select);else selectedNotes.delete(t.dataset.s8Select);syncSelection();return;}
+ if(t?.id==="s8-zoom-slider"){setZoom(t.value,true);return;}
+ if(t?.id==="s8-opacity-slider"){setOpacity(t.value,true);return;}
+ if(t?.id==="s8-keep-open"){ui.keepOpen=!!t.checked;C.save();return;}
+ if(t?.id==="s8-bulk-color"){const mode=$("s8-bulk-color-mode");if(mode)mode.value="custom";return;}
  if(t?.dataset?.s8Color){selectColor(t.dataset.s8Color,t.value);return;}
  if(t?.id==="s8-filter"){ui.filter=["all","pinned","high","medium","low"].includes(t.value)?t.value:"all";C.save();redraw();return;}
  if(t?.id==="s8-note-color"){const auto=t.closest("form")?.querySelector('[name="autoColor"]');if(auto)auto.checked=false;}
@@ -472,6 +524,8 @@ document.addEventListener("change",event=>{
  if(event.target?.id==="s8-future-date")updateTargetSelect($("s8-link-scope")?.value||"future");
 });
 document.addEventListener("input",event=>{
+ if(event.target?.id==="s8-zoom-slider"){setZoom(event.target.value);return;}
+ if(event.target?.id==="s8-opacity-slider"){setOpacity(event.target.value);return;}
  if(event.target?.id==="s8-target-search")updateTargetSelect($("s8-link-scope")?.value||"today",true);
 });
 document.addEventListener("pointerdown",pointerStart);
@@ -481,12 +535,13 @@ document.addEventListener("pointercancel",pointerEnd);
 window.addEventListener?.("resize",()=>{if($("s8-floating-root"))place();});
 document.addEventListener("submit",ev=>{
  const formId=ev.target?.getAttribute?.("id")||ev.target?.id;
- if(!["s8-note-form","s8-convert-form","s8-layout-form"].includes(formId))return;
+ if(!["s8-note-form","s8-convert-form","s8-layout-form","s8-bulk-form"].includes(formId))return;
  ev.preventDefault();
  try{
   const data=new FormData(ev.target);
   if(formId==="s8-note-form")saveNote(data);
   else if(formId==="s8-layout-form")applyLayout(data);
+  else if(formId==="s8-bulk-form")bulkEdit(data);
   else convertSubmit(data);
  }catch(err){C.notify(err.message||"Verifique os dados informados.");}
 });
@@ -500,6 +555,6 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
   document.body.appendChild(incoming);
  }
  place();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,togglePin,zoomBy,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,togglePin,zoomBy,setZoom,setOpacity,selectAll,bulkEdit,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
 C.render();
 })();

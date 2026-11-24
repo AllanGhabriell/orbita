@@ -51,7 +51,7 @@ listeners.pointerdown[0](event("toggle",3,50,50));
 listeners.pointermove[0](event("toggle",3,250,300));
 listeners.pointerup[0](event("toggle",3,250,300));
 assert.equal(R.layout.x,lockedX,"trava impede arraste");
-assert.match(read("stage8.js"),/name="locked"/,"controle de bloqueio presente");
+assert.match(read("stage8.js"),/smallButton\("lock"/,"controle de bloqueio presente");
 assert.equal(R.layout.locked,true,"estado travado fica persistido");
 R.toggleLock();
 R.resetLayout();
@@ -115,7 +115,7 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-19-consistency"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-20-mural"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
 
 R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
@@ -149,3 +149,17 @@ assert.ok(R.panelRect().top>grown.top,"painel inteiro se move pelo cabeçalho");
 R.closePanel();
 assert.match(markup,/class="s8-trigger"/);
 assert.doesNotMatch(markup,/id="s8-panel"/);
+
+R.openPanel();
+assert.match(markup,/id="s8-zoom-slider" type="range"/);
+assert.match(markup,/data-s8="lock"/);
+assert.match(markup,/data-s8="selectAll"/);
+R.setZoom(65,true);assert.equal(R.layout.zoom,65);
+R.setOpacity(84,true);assert.equal(R.layout.opacity,84);
+const snapshot=R.notes.map(n=>({title:n.title,description:n.description,link:JSON.stringify(n.link)}));
+R.selectAll();assert.match(markup,/data-s8="bulkEdit"/);
+R.bulkEdit(form({colorMode:"custom",color:"#d6e7ff",priority:"low",pin:"pin"}));
+assert.ok(R.notes.every(n=>n.color==="#d6e7ff"&&n.priority==="low"&&n.pinned));
+assert.deepEqual(R.notes.map(n=>({title:n.title,description:n.description,link:JSON.stringify(n.link)})),snapshot);
+R.selectAll();assert.doesNotMatch(markup,/data-s8="bulkEdit"/);
+R.closePanel();assert.match(markup,/#f4e5ad/,"ícone original da v5.15 restaurado");
