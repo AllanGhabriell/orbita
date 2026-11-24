@@ -159,6 +159,9 @@ try{
  assert.ok(sessionView.subjects.every(x=>x.includes("Matemática")),"matéria mantida como contexto");
  assert.equal(sessionView.progressBars,1,"progresso compacto por ciclo");
  assert.equal(sessionView.oldRails,0,"não duplicar matérias em trilha enorme");
+ assert.ok(await page.$eval('.study-daily-summary',el=>["Planejadas","Concluídas","Parciais","Não realizadas","Registrado"].every(x=>el.textContent.includes(x))));
+ assert.ok(await page.$eval('.study-daily-entry [data-s3="quickDone"]',el=>el.textContent.includes("Concluir")));
+ assert.ok(await page.$eval('.study-daily-entry [data-s3="recordSession"]',el=>el.textContent.includes("Registrar")));
  // Mural: um único elemento móvel, controles mínimos e crescimento pela esquerda.
  await page.setViewport({width:1180,height:850,deviceScaleFactor:1});
  await page.click('.s8-trigger');

@@ -259,6 +259,10 @@ assert.match(homeVisual,/aria-label="Sessão \d+ · /,"número e situação aces
 assert.match(homeVisual,/study-summary-stat/,"resumo visual compacto");
 assert.doesNotMatch(homeVisual,/Tempo não informado|planejada\(s\)|reais registradas/,"sem textos redundantes no painel diário");
 assert.match(homeVisual,/study-daily-subject/,"matéria como contexto da sessão");
+assert.match(homeVisual,/Concluir<\/button>/,"ação de conclusão permanece explícita");
+assert.match(homeVisual,/Registrar<\/button>/,"ação de registro permanece explícita");
+for(const label of ["Planejadas","Concluídas","Parciais","Não realizadas","Registrado"])assert.ok(homeVisual.includes(label),"resumo mantém "+label);
+assert.match(homeVisual,/study-session-status/,"estado da sessão é legível sem hover");
 C.go("estudos");
 T.actions.openPlanner();
 const plannerVisual=element("view").innerHTML;

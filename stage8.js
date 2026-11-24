@@ -280,7 +280,7 @@ function bulkPin(value){for(const n of notes)if(selectedNotes.has(n.id))n.pinned
 function noteMenu(idValue){
  const n=note(idValue);if(!n)return;
  const item=(act,ic,label,tone="")=>'<button type="button" class="orb-manage-item '+tone+'" data-s8="'+act+'" data-id="'+A(n.id)+'"><span class="orb-manage-icon">'+glyph(ic)+'</span><span><strong>'+E(label)+'</strong></span><span aria-hidden="true">›</span></button>';
- C.openModal("Lembrete",'<div class="section-stack orb-manage"><strong>'+E(n.title)+'</strong>'+
+ C.openModal("Lembrete",'<div class="section-stack orb-manage"><div class="orb-manage-context"><strong>'+E(n.title)+'</strong></div>'+
  (n.description?'<p style="white-space:pre-wrap;margin:0">'+E(n.description)+'</p>':"")+
  '<small class="note">'+E(labels[n.priority]||"Média")+' · '+E(age(n.createdAt))+'</small>'+
  (n.link||n.lastLinkLabel?'<small class="note">'+E(n.link?linkLabel(n.link):"Vínculo encerrado · "+n.lastLinkLabel)+'</small>':"")+

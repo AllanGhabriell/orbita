@@ -532,7 +532,7 @@ function homePanel(){
   record:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',
   partial:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',missed:'<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/>'
  }[name]||"")+'</svg>';
- const stat=(name,value,icon,tone="")=>'<span class="study-summary-stat '+tone+'" title="'+A(name)+'" aria-label="'+A(name+": "+value)+'">'+glyph(icon)+'<strong>'+E(value)+'</strong></span>';
+ const stat=(name,value,icon,tone="")=>'<span class="study-summary-stat '+tone+'" aria-label="'+A(name+": "+value)+'">'+(icon?glyph(icon):"")+'<strong>'+E(value)+'</strong><span class="study-summary-label">'+E(name)+'</span></span>';
  let body=groups.map(group=>{
   const c=group.cycle,p=c&&!c.archived?cycleProgress(c):null,n=group.items.filter(x=>x.status==="done").length;
   const progress=group.items.length?Math.round(100*n/group.items.length):0,flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
@@ -543,26 +543,25 @@ function homePanel(){
    const symbols={running:"▶",paused:"Ⅱ",idle:"!",done:"✓",notdone:"×",partial:"◐",pending:String(number)};
    const registered=x.actualMin!=null&&Number.isFinite(Number(x.actualMin)),finished=["done","notdone","partial"].includes(phase);
    const timeLabel=finished?(registered?minuteLabel(x.actualMin):""):(x.plannedMin!=null?minuteLabel(x.plannedMin):"");
-   const meta=[timeLabel,x.startTime||""].filter(Boolean).join(" · "),statusLabel="Sessão "+number+" · "+names[phase];
-   const completion=x.status==="notdone"?'<button class="btn small ghost orb-icon-btn" data-s3="markPending" data-id="'+A(x.id)+'" title="Voltar a pendente" aria-label="Voltar a pendente">'+glyph("undo")+'</button>':
-    '<button class="btn small '+(x.status==="done"?"ghost":"primary")+' s3-quick-status" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Desfazer conclusão":"Concluir · clique direito para escolher situação")+'" aria-label="'+(x.status==="done"?"Desfazer conclusão":"Concluir sessão")+'">'+glyph(x.status==="done"?"undo":"check")+'</button>';
-   return '<div class="study-daily-entry is-'+phase+'" data-session-state="'+phase+'"><span class="study-daily-number" title="'+A(statusLabel)+'" aria-label="'+A(statusLabel)+'">'+symbols[phase]+'</span>'+
+   const meta=[timeLabel?timeLabel+(finished?" registrada":" prevista"):"",finished&&registered&&x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista":"",x.startTime||""].filter(Boolean).join(" · "),statusLabel="Sessão "+number+" · "+names[phase];
+   const completion=x.status==="notdone"?'<button class="btn small ghost orb-icon-btn" data-s3="markPending" data-id="'+A(x.id)+'" title="Voltar a pendente" aria-label="Voltar a pendente">'+glyph("undo")+' Reabrir</button>':
+    '<button class="btn small '+(x.status==="done"?"ghost":"primary")+' s3-quick-status" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Desfazer conclusão":"Concluir · clique direito para escolher situação")+'" aria-label="'+(x.status==="done"?"Desfazer conclusão":"Concluir sessão")+'">'+glyph(x.status==="done"?"undo":"check")+(x.status==="done"?" Desfazer":" Concluir")+'</button>';
+   return '<div class="study-daily-entry is-'+phase+'" data-session-state="'+phase+'"><span class="study-daily-number" title="'+A(statusLabel)+'" aria-label="'+A(statusLabel)+'">'+number+'</span>'+
     '<div class="study-daily-label"><strong class="study-daily-subject" title="'+A("Sessão "+number+" · "+label)+'">'+E(label)+'</strong>'+
-    (meta?'<small title="'+(finished?"Tempo registrado":"Duração prevista")+'">'+E(meta)+'</small>':"")+'</div><div class="study-daily-controls">'+(!blocked(date)?
-    completion+'<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'" title="Registrar estudo" aria-label="Registrar estudo">'+glyph("record")+'</button>'+
+    '<small class="study-session-meta"><span class="study-session-status is-'+phase+'"><span aria-hidden="true">'+(phase==="pending"?"·":symbols[phase])+'</span> '+E(names[phase])+'</span>'+(meta?'<span class="study-session-time">'+E(meta)+'</span>':"")+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
+    completion+'<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'" title="Registrar estudo" aria-label="Registrar estudo">'+glyph("record")+' Registrar</button>'+
     (window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||""):
     '<span class="status" title="Dia fechado" aria-label="Dia fechado">🔒</span>')+'</div></div>';
   }).join("");
   return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><strong>'+E(c?.title||"Estudos independentes")+'</strong>'+
-   '<span class="study-cycle-count" title="'+A(n+" de "+group.items.length+" concluídas"+(p?.cur?" · Próxima: "+p.cur.title:""))+'" aria-label="'+A(n+" de "+group.items.length+" concluídas")+'">'+n+'/'+group.items.length+'</span></div>'+
+   '<span class="study-cycle-count" title="'+A(n+" de "+group.items.length+" concluídas"+(p?.cur?" · Próxima: "+p.cur.title:""))+'" aria-label="'+A(n+" de "+group.items.length+" concluídas")+'">'+n+'/'+group.items.length+' concluídas</span></div>'+
    '<div class="study-session-progress" role="progressbar" aria-label="Sessões concluídas em '+A(c?.title||"Estudos independentes")+'" aria-valuemin="0" aria-valuemax="'+group.items.length+'" aria-valuenow="'+n+'"><div class="study-session-progress-fill" style="width:'+progress+'%"></div></div>'+
    '<div class="study-daily-list">'+entries+'</div></div>';
  }).join("");
  if(!groups.length)body='<div class="study-daily-empty"><p class="note">Sem sessões planejadas.</p></div>';
  const real=summarize({from:date,to:date}),partial=daily.filter(x=>x.status==="progress"&&x.id!==active?.sessionId).length,missed=daily.filter(x=>x.status==="notdone").length;
- return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>Estudos de hoje</h2><button class="btn small ghost orb-icon-btn" data-s3="openStudies" title="Configurar estudos" aria-label="Configurar estudos">'+glyph("settings")+'</button></div>'+
-  '<div class="study-daily-summary">'+stat("Sessões concluídas / planejadas",done+"/"+daily.length,"check",done?"is-good":"")+stat("Tempo real registrado",minuteLabel(real.actualMin),"clock")+
-  (partial?stat("Sessões parciais",partial,"partial","is-warning"):"")+(missed?stat("Sessões não realizadas",missed,"missed","is-danger study-missed-count"):"")+'</div>'+
+ return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>Estudos de hoje</h2><button class="btn small ghost" data-s3="openStudies" title="Configurar estudos" aria-label="Configurar estudos">'+glyph("settings")+' Configurar</button></div>'+
+  '<div class="study-daily-summary">'+stat("Planejadas",daily.length,"")+stat("Concluídas",done,"check",done?"is-good":"")+stat("Parciais",partial,"partial",partial?"is-warning":"")+stat("Não realizadas",missed,"missed",missed?"is-danger study-missed-count":"")+stat("Registrado",minuteLabel(real.actualMin),"clock")+'</div>'+
   body+(activeCycles.length&&!groups.length?'<div class="study-daily-next" title="Próxima matéria dos ciclos">↪ '+E(activeCycles.slice(0,3).map(x=>cycleProgress(x).cur?.title||"Sem matéria").join(" · "))+'</div>':"")+
   '</section>';
 }

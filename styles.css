@@ -518,3 +518,17 @@ body[data-theme="light"] .mobile-nav{
 .view[data-route="inicio"] .task-mark[data-status=done]{color:var(--good)}
 .view[data-route="inicio"] .task-mark[data-status=pending]~.task-main .orb-task-status,.view[data-route="inicio"] .task-mark[data-status=done]~.task-main .orb-task-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .view[data-route="inicio"] .task-meta:has(>.orb-task-status:only-child){margin-top:0}
+
+/* v5.19 — mesmo componente de menu em atividade, cronômetro e lembrete. */
+.orb-manage.section-stack{gap:10px}
+.orb-manage-group{gap:4px}
+.orb-manage-group h3{font-size:10px;margin:3px 0;letter-spacing:.045em}
+.orb-manage-item{min-height:37px;padding:8px 10px;border-radius:9px;grid-template-columns:23px minmax(0,1fr) 12px;gap:9px;background:transparent;transition:background .18s,border-color .18s,color .18s;transform:none}
+.orb-manage-item:hover:not(:disabled){background:var(--surface3);border-color:var(--borderStrong);transform:none}
+.orb-manage-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.orb-manage-item:disabled{opacity:.45;cursor:not-allowed}
+.orb-manage-item strong{font-size:12px;font-weight:650}
+.orb-manage-item small{font-size:10px}
+.orb-manage-icon{display:grid;place-items:center;font-size:17px;color:var(--muted)}
+.orb-manage-icon svg{width:17px;height:17px}
+.orb-manage-item.orb-risk-warning strong,.orb-manage-item.orb-risk-warning .orb-manage-icon{color:var(--warning)}

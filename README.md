@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.19 — consistência e equilíbrio visual
+
+- Estudos de hoje: contadores com rótulos, número e situação de cada sessão, tempo previsto/registrado e ações explícitas de concluir e registrar.
+- Menus de atividade, cronometragem e lembrete usam o mesmo estilo, hover, foco e hierarquia. Removidas as regras duplicadas do cronômetro.
+- Corrigido seletor de contagem dos botões no teste Chromium do mural.
+
 ## v5.18 — mural de lembretes compacto
 
 - O botão é substituído pelo painel ao abrir; arraste o cabeçalho para mover a janela inteira.

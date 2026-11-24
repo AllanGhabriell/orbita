@@ -844,6 +844,7 @@ function editStart(id,start){
  if(timing.active?.sessionId!==id)updateActual(x,r);
  persist();C.closeModal();C.render();tick();C.notify("Início corrigido; pausas preservadas.");
 }
+function manageGlyph(name){const paths={"clock":"<circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 2'/>","edit":"<path d='m4 16 11-11 4 4L8 20H4z'/>","target":"<circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='5'/><circle cx='12' cy='12' r='1'/>","swap":"<path d='M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4'/>","arrow":"<path d='M5 12h14m-6-6 6 6-6 6'/>","copy":"<rect x='8' y='8' width='12' height='12' rx='2'/><path d='M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2'/>","archive":"<path d='M4 4h16v4H4zM6 8v12h12V8m-9 4h6'/>","trash":"<path d='M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14'/>","pause":"<path d='M9 5v14m6-14v14'/>","undo":"<path d='M9 6 4 11l5 5M4 11h10a5 5 0 0 1 5 5'/>","reset":"<path d='M5 9a8 8 0 1 1 0 6M5 4v5h5'/>","split":"<path d='M12 20v-8m0 0L6 6m6 6 6-6M6 10V6h4m4 0h4v4'/>","pin":"<path d='m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6'/>"};return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||paths.clock)+'</svg>';}
 function manageModal(id){
  const x=session(id),r=record(id);
  if(!x||V?.isClosed?.(x.date))throw Error("Sessão inexistente ou dia finalizado.");
@@ -853,14 +854,14 @@ function manageModal(id){
   return C.openModal("Gerenciar cronometragem",'<div class="section-stack"><p>O registro foi descartado.</p><div class="row">'+undoButton+'</div></div>');
  }
  const active=timing.active?.sessionId===id;
- const item=(act,icon,label,hint,disabled=false,tone="")=>'<button type="button" class="orb-manage-item s7-manage-item '+tone+'" data-s7="'+act+'" data-id="'+A(id)+'" '+(disabled?'disabled title="Encerre como parcial para editar o histórico"':'')+'><span class="orb-manage-icon s7-manage-icon" aria-hidden="true">'+icon+'</span><span><strong>'+E(label)+'</strong>'+(hint&&["correct","cancelAccidentalPause","transfer","split","discard","reset"].includes(act)?'<small>'+E(hint)+'</small>':"")+'</span><span aria-hidden="true">›</span></button>';
- const group=(label,items)=>'<section class="orb-manage-group s7-manage-group"><h3>'+E(label)+'</h3>'+items+'</section>';
- C.openModal("Gerenciar cronometragem",'<div class="section-stack orb-manage s7-manage"><strong>'+E(x.discipline)+'</strong><div class="s7-manage-totals"><div><small>Tempo estudado</small><strong data-tone="study">'+E(fmtMs(studyMs(r)))+'</strong></div><div><small>Tempo de pausa</small><strong data-tone="pause">'+E(fmtMs(pauseMs(r)))+'</strong></div></div>'+
- group("Correções de tempo",(active?item("correct","◷","Corrigir tempo do cronômetro","Ajustar estudo e descanso da sessão ativa"):"")+item("editTotals","◷","Editar tempos","Ajustar totais registrados",active)+item("editStart","↤","Corrigir início real","Registrar o horário correto de início")+item("pauses","Ⅱ","Gerenciar pausas","Consultar ou editar intervalos",active)+(active&&timing.active.phase==="paused"?item("cancelAccidentalPause","↶","Desfazer pausa acidental","Reclassificar intervalo como estudo")+item("resetCurrentPause","↺","Zerar apenas a pausa atual","Reiniciar o contador do descanso"):""))+
- group("Reorganizar registros",item("transfer","⇄","Transferir para outra sessão","Mover o registro",active)+item("split","⑂","Dividir tempo entre sessões","Distribuir o estudo sem duplicar",active))+
- (active?'<p class="note">Para editar o histórico, encerre primeiro como parcial.</p>':"")+undoButton+
- group("Ações de risco",item("reset","↺","Zerar cronometragem","Recomeçar a contagem",false,"s7-risk-warning")+item("discard","×","Descartar cronometragem","Remover o registro de tempo",false,"s7-risk-danger"))+
- '<p class="note">O planejamento e a conclusão são preservados. Dias finalizados permanecem protegidos.</p></div>');
+ const item=(act,icon,label,hint,disabled=false,tone="")=>'<button type="button" class="orb-manage-item '+tone+'" data-s7="'+act+'" data-id="'+A(id)+'" '+(disabled?'disabled title="Encerre como parcial para editar o histórico"':'')+'><span class="orb-manage-icon" aria-hidden="true">'+manageGlyph(icon)+'</span><span><strong>'+E(label)+'</strong>'+(hint&&["correct","cancelAccidentalPause","transfer","split","discard","reset"].includes(act)?'<small>'+E(hint)+'</small>':"")+'</span><span aria-hidden="true">›</span></button>';
+ const group=(label,items)=>'<section class="orb-manage-group"><h3>'+E(label)+'</h3>'+items+'</section>';
+ C.openModal("Gerenciar cronometragem",'<div class="section-stack orb-manage"><div class="orb-manage-context"><strong>'+E(x.discipline)+'</strong></div><div class="s7-manage-totals"><div><small>Tempo estudado</small><strong data-tone="study">'+E(fmtMs(studyMs(r)))+'</strong></div><div><small>Tempo de pausa</small><strong data-tone="pause">'+E(fmtMs(pauseMs(r)))+'</strong></div></div>'+
+ group("Correções de tempo",(active?item("correct","clock","Corrigir tempo do cronômetro","Ajustar estudo e descanso da sessão ativa"):"")+item("editTotals","clock","Editar tempos","Ajustar totais registrados",active)+item("editStart","undo","Corrigir início real","Registrar o horário correto de início")+item("pauses","pause","Gerenciar pausas","Consultar ou editar intervalos",active)+(active&&timing.active.phase==="paused"?item("cancelAccidentalPause","undo","Desfazer pausa acidental","Reclassificar intervalo como estudo")+item("resetCurrentPause","reset","Zerar apenas a pausa atual","Reiniciar o contador do descanso"):""))+
+ group("Reorganizar registros",item("transfer","swap","Transferir para outra sessão","Mover o registro",active)+item("split","split","Dividir tempo entre sessões","Distribuir o estudo sem duplicar",active))+
+ (active?'<p class="note">Para editar registros bloqueados, encerre a sessão como parcial.</p>':"")+undoButton+
+ group("Ações de risco",item("reset","reset","Zerar cronometragem","Recomeçar a contagem",false,"orb-risk-warning")+item("discard","trash","Descartar cronometragem","Remover o registro de tempo",false,"orb-risk"))+
+ '</div>');
 }
 
 function metrics(filter){

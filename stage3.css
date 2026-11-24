@@ -493,3 +493,26 @@
 .study-daily-panel .study-daily-next{padding:4px 0 0;border:0;color:var(--muted);font-size:11px}
 @media(max-width:700px){.study-daily-panel .study-daily-entry{flex-wrap:wrap;align-items:center}.study-daily-panel .study-daily-controls{flex-basis:auto;justify-content:flex-end;margin-left:auto}.study-daily-panel .study-daily-label{min-width:80px}.study-daily-panel .study-daily-controls>.btn{flex:0 0 auto}}
 @media(max-width:390px){.study-daily-panel .study-daily-controls{flex-basis:100%;padding-left:33px}}
+
+/* v5.19 — leitura rápida com rótulos essenciais, sem depender de dicas. */
+.study-daily-panel .study-daily-summary{gap:5px 12px;padding:4px 0;align-items:center}
+.study-daily-panel .study-daily-summary>.study-summary-stat{border:0;background:transparent;border-radius:0;padding:2px 0;gap:4px;font-size:11px}
+.study-daily-panel .study-summary-stat+.study-summary-stat{border-left:1px solid var(--border);padding-left:12px}
+.study-daily-panel .study-summary-stat>.study-summary-label{background:none;border:0;padding:0;border-radius:0;color:inherit;font-size:inherit}
+.study-daily-panel .study-summary-stat .orb-ui-icon{width:13px;height:13px}
+.study-daily-panel .study-daily-heading strong{font-size:12px;color:var(--text)}
+.study-daily-panel .study-cycle-count{font-size:11px}
+.study-daily-panel .study-daily-entry{padding:8px 9px;min-height:48px;gap:9px}
+.study-daily-panel .study-daily-number{width:27px;height:27px}
+.study-daily-panel .study-daily-label{display:grid;gap:3px;flex:1;min-width:0}
+.study-daily-panel .study-daily-label>strong{font-size:13px;font-weight:680}
+.study-daily-panel .study-daily-label>.study-session-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;white-space:normal}
+.study-session-status{display:inline-flex;align-items:center;gap:3px;font-weight:650;color:var(--muted)}
+.study-session-status.is-running,.study-session-status.is-done{color:var(--good)}
+.study-session-status.is-paused,.study-session-status.is-partial,.study-session-status.is-idle{color:var(--warning)}
+.study-session-status.is-notdone{color:var(--danger)}
+.study-session-time{color:var(--muted)}
+.study-session-time:before{content:"·";margin-right:6px}
+.study-daily-panel .study-daily-controls>.s3-quick-status,.study-daily-panel .study-daily-controls>[data-s3=recordSession],.study-daily-panel .study-daily-controls>.orb-icon-btn[data-s3=markPending]{display:inline-flex;width:auto;height:auto;min-height:30px;padding:6px 9px!important;gap:4px}
+.study-daily-panel .study-daily-controls>.btn .orb-ui-icon{width:14px;height:14px}
+@media(max-width:700px){.study-daily-panel .study-daily-summary{gap:5px 9px}.study-daily-panel .study-summary-stat+.study-summary-stat{padding-left:9px}.study-daily-panel .study-daily-controls{flex-basis:100%;padding-left:36px;justify-content:flex-start}.study-daily-panel .study-daily-controls>.btn{padding:6px 8px}}

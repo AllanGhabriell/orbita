@@ -311,15 +311,16 @@ function convertEntry(id,sourceDate,targetDate,priority,dueDate){
  p.events.push({kind:"entry_converted",id,date:sourceDate,newId:next.id,targetDate,from:x.type,to:type,at:new Date().toISOString()});
  save();C.closeModal();render();notify(type==="focus"?"Transformada em foco do dia.":"Transformado em tarefa secundária.");return next;
 }
+function manageGlyph(name){const paths={"clock":"<circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 2'/>","edit":"<path d='m4 16 11-11 4 4L8 20H4z'/>","target":"<circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='5'/><circle cx='12' cy='12' r='1'/>","swap":"<path d='M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4'/>","arrow":"<path d='M5 12h14m-6-6 6 6-6 6'/>","copy":"<rect x='8' y='8' width='12' height='12' rx='2'/><path d='M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2'/>","archive":"<path d='M4 4h16v4H4zM6 8v12h12V8m-9 4h6'/>","trash":"<path d='M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14'/>","pause":"<path d='M9 5v14m6-14v14'/>","undo":"<path d='M9 6 4 11l5 5M4 11h10a5 5 0 0 1 5 5'/>","reset":"<path d='M5 9a8 8 0 1 1 0 6M5 4v5h5'/>","split":"<path d='M12 20v-8m0 0L6 6m6 6 6-6M6 10V6h4m4 0h4v4'/>","pin":"<path d='m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6'/>"};return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||paths.clock)+'</svg>';}
 function moreModal(id,date){
  const x=find(id);if(!x)return;
  const o=allOn(date).find(y=>y.id===id)||x,closed=locked(date);
- const item=(act,icon,label,hint="",tone="")=>'<button type="button" class="orb-manage-item '+tone+'" data-s2="'+act+'" data-id="'+a(id)+'" data-date="'+a(date)+'"><span class="orb-manage-icon" aria-hidden="true">'+icon+'</span><span><strong>'+e(label)+'</strong>'+(hint?'<small>'+e(hint)+'</small>':"")+'</span><span aria-hidden="true">›</span></button>';
+ const item=(act,icon,label,hint="",tone="")=>'<button type="button" class="orb-manage-item '+tone+'" data-s2="'+act+'" data-id="'+a(id)+'" data-date="'+a(date)+'"><span class="orb-manage-icon" aria-hidden="true">'+manageGlyph(icon)+'</span><span><strong>'+e(label)+'</strong>'+(hint?'<small>'+e(hint)+'</small>':"")+'</span><span aria-hidden="true">›</span></button>';
  const group=(label,items)=>items?'<section class="orb-manage-group"><h3>'+e(label)+'</h3>'+items+'</section>':"";
  C.openModal("Gerenciar atividade",'<div class="section-stack orb-manage"><div class="orb-manage-context"><strong>'+e(o.title)+'</strong><small>'+e(({focus:"Foco do dia",task:"Tarefa secundária",habit:"Rotina"})[x.type]||"Atividade")+' · '+e(fmt(date,false))+'</small></div>'+
- group("Gerenciamento",item("recordDetail","◷","Registro de execução")+item("editEntry","✎","Editar")+(!closed&&["focus","task"].includes(x.type)?item("linkGoal","◎","Vincular objetivo"):""))+
- group("Organização",(!closed&&["focus","task"].includes(x.type)?item("convertEntry","⇄",x.type==="focus"?"Transformar em tarefa secundária":"Transformar em foco do dia"):"")+(x.type==="focus"?item("moveFocus","↗","Remanejar foco"):"")+item("duplicateEntry","▣","Copiar")+item("archiveEntry","▤",x.archivedAt?"Reativar":"Arquivar"))+
- group("Ações de risco",item("deleteEntry","×","Excluir atividade","","orb-risk"))+'</div>',"");
+ group("Gerenciamento",item("recordDetail","clock","Registro de execução")+item("editEntry","edit","Editar")+(!closed&&["focus","task"].includes(x.type)?item("linkGoal","target","Vincular objetivo"):""))+
+ group("Organização",(!closed&&["focus","task"].includes(x.type)?item("convertEntry","swap",x.type==="focus"?"Transformar em tarefa secundária":"Transformar em foco do dia"):"")+(x.type==="focus"?item("moveFocus","arrow","Remanejar foco"):"")+item("duplicateEntry","copy","Copiar")+item("archiveEntry","archive",x.archivedAt?"Reativar":"Arquivar"))+
+ group("Ações de risco",item("deleteEntry","trash","Excluir atividade","","orb-risk"))+'</div>',"");
 }
 
 function linkGoalModal(id,date){
