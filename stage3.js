@@ -563,13 +563,13 @@ function homePanel(){
 }
 function loadPanel(date){
  const v=loadFor(date),base=C.resolveAvailability(date),warning=v.available>0&&v.totalPlanned>v.available;
- return '<section class="card study-load-panel"><div class="card-head"><h2>Analisador de carga</h2>'+tag(warning?"Excesso previsto":"Carga do dia",warning?"warn":"")+'</div>'+
+ return '<section class="card study-load-panel"><div class="card-head"><h2>Analisador de carga</h2>'+(warning?tag("Excesso previsto","warn"):"")+'<button type="button" class="btn small ghost" title="As horas vêm das sessões cadastradas; atividades vinculadas a um foco são contadas uma única vez." aria-label="Como a carga é calculada" data-s3="loadInfo">ⓘ</button></div>'+
  '<div class="study-load-numbers">'+statCard("Estudos previstos",minuteLabel(v.studyPlanned))+statCard("Outros compromissos",minuteLabel(v.otherPlanned))+statCard("Carga total",minuteLabel(v.totalPlanned))+statCard("Disponibilidade",base?.mode==="rest"?"Descanso":base?minuteLabel(v.available):"Não definida")+'</div>'+
  (base&&v.available>0?'<div class="study-progress"><div style="width:'+Math.min(100,Math.round(v.totalPlanned/v.available*100))+'%"></div></div>':"")+
  (warning?'<p class="study-notice">Sua carga excede a disponibilidade informada em '+minuteLabel(v.totalPlanned-v.available)+'. Nada será remarcado automaticamente.</p>':"")+
  (base?.mode==="rest"&&v.totalPlanned?'<p class="study-notice">Há atividades planejadas num dia de descanso. Confirme se isso foi intencional.</p>':"")+
  (v.overlap.length?'<p class="study-notice">'+v.overlap.length+' conflito(s) de horários previstos: '+E(v.overlap.slice(0,2).map(x=>x.join(" / ")).join("; "))+'.</p>':"")+
- '<p class="note">As horas vêm das sessões cadastradas. Atividades vinculadas a um foco são contadas uma única vez.</p></section>';
+ '</section>';
 }
 function studyView(){
  if(!C.availabilityReady())return '<div class="hero-row"><div><div class="overline">SEQUÊNCIA E APRENDIZAGEM</div><h1>Meus estudos</h1></div></div><section class="card empty-state"><div class="empty-symbol">◷</div><h2>Configure sua disponibilidade</h2><p>Para planejar ciclos e sessões, informe quando você tem tempo livre.</p><button class="btn primary" data-action="openAvailability">Definir disponibilidade</button></section>';
@@ -947,6 +947,7 @@ function ask(title,description,action,extra=""){
  modal(title,'<p class="note">'+E(description)+'</p><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="button" class="btn danger" data-s3="'+action+'" '+extra+'>Confirmar</button></div>');
 }
 const actions={
+ loadInfo(){C.openModal("Analisador de carga",'<p class="note">As horas vêm das sessões cadastradas. Atividades vinculadas a um foco são contadas uma única vez.</p>');},
  openPlanner(){screen="planner";plannerWeek=s.date;plannerSelectedDate=s.date;plannerSelection.clear();C.go("estudos");},
  openLibrary(){screen="library";C.go("estudos");},
  planPreviewDay(el){plannerSelectedDate=el.dataset.date;render();},

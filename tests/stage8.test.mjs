@@ -115,5 +115,12 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261119-reminder-readonly-v5-02"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-16-organize"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
+
+R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
+R.saveNote(form({title:"Alta sem fixar",priority:"high"}));
+assert.equal(R.sorted()[0].title,"Baixa fixada");
+assert.equal(R.sorted()[0].color,"#123456");
+R.togglePin(R.sorted()[0].id);assert.equal(R.sorted()[0].priority,"high");
+const z=R.layout.zoom;R.zoomBy(-10);assert.equal(R.layout.zoom,Math.max(65,z-10));

@@ -193,3 +193,14 @@ assert.equal(JSON.stringify(S.model.records[recurringFocus.id+"@"+today]),before
 assert.equal(S.model.closedDays.includes(today),true,"dia original continua finalizado");
 
 console.log("Etapa 2: verificações de tarefas, focos, conclusão, blocos, recorrência, continuidade, pausa, remanejamento, tempo real e cópias passaram.");
+
+// Edição e conversão de tarefa carregada de uma data encerrada.
+{
+ const old=C.addDays(today,20),open=C.addDays(today,21),id="carried-conversion-regression";
+ S.model.entries.push({id,type:"task",title:"Antiga",date:old,createdAt:old+"T12:00:00",priority:"medium",recurrence:{kind:"none"}});
+ S.model.closedDays.push(old);
+ submit("s2-entry",{id,type:"task",title:"Editada",date:old,editDate:open,priority:"high",repeat:"none"});
+ assert.equal(S.model.entries.find(x=>x.id===id).title,"Editada");
+ const next=S.convertEntry(id,open,open,"high","");assert.equal(next.type,"focus");assert.equal(S.allOn(open).some(x=>x.id===id),false);
+ const back=S.convertEntry(next.id,open,open,"low","");assert.equal(back.type,"task");assert.equal(back.createdAt,old+"T12:00:00");assert.equal(S.model.closedDays.includes(old),true);
+}

@@ -24,7 +24,7 @@ function addMonths(date,n){const q=C.parse(date);return iso(new Date(q.getFullYe
 function monthName(date){return C.parse(date).toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}
 function uidKey(id,date){return id+"@"+date}
 function firstUse(){return s.firstAccess||day()}
-function locked(date){return p.closedDays.includes(date)}
+function locked(date){return p.closedDays.includes(date)||!!s.evolution?.closed?.[date]}
 function notify(m){C.notify(m)}
 function save(){C.save()}
 function render(){C.render()}
@@ -100,24 +100,26 @@ function itemRow(o,date,compact=false){
  const st=rec?.status||o.status||"pending";
  const color=block(o.blockId)?.color||"transparent";
  const taskAge=o.type==="task"&&dueAge(o,date)>=4?'<span class="age-chip" title="Dias desde a criação">'+dueAge(o,date)+'d</span>':"";
- const desc=[o.goalId?s.goals.find(g=>g.id===o.goalId)?.title||"": "",o.type==="habit"?recurLabel(o.recurrence):"",o.startTime?o.startTime:"",o.estimatedMin?C.hoursLabel(o.estimatedMin/60):"",o.type==="task"&&o.dueDate?"Prazo "+o.dueDate.split("-").reverse().join("/"):""].filter(Boolean).join(" · ");
+ const goal=o.goalId?s.goals.find(g=>g.id===o.goalId):null;
+ const goalIcon=goal?'<button type="button" class="s2-goal-icon" data-s2="showGoal" data-id="'+a(goal.id)+'" title="'+a(goal.title)+'" aria-label="Objetivo vinculado: '+a(goal.title)+'">◎</button>':"";
+ const desc=[o.type==="habit"?recurLabel(o.recurrence):"",o.startTime?o.startTime:"",o.estimatedMin?C.hoursLabel(o.estimatedMin/60):"",o.type==="task"&&o.dueDate?"Prazo "+o.dueDate.split("-").reverse().join("/"):""].filter(Boolean).join(" · ");
  // Prioridade visível apenas nas tarefas secundárias; nenhuma ação de conclusão muda.
  const priority=o.type==="task"?(["high","medium","low"].includes(o.priority)?o.priority:"medium"):null;
  const priorityText={high:"Alta",medium:"Média",low:"Baixa"};
  const priorityBadge=priority?'<span class="task-priority task-priority-'+priority+'" title="Prioridade '+priorityText[priority]+'" aria-label="Prioridade '+priorityText[priority]+'"><span class="task-priority-dot" aria-hidden="true"></span>'+priorityText[priority]+'</span>':"";
  const controls=(locked(date)?"":'<button class="btn small ghost s2-quick-status" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="'+(st==="done"?"pending":"done")+'" title="'+(st==="done"?"Desmarcar":"Concluir")+'">'+(st==="done"?"↶":"✓")+'</button><button class="btn small ghost" data-s2="status" data-id="'+a(o.id)+'" data-date="'+date+'" data-value="progress" title="Em andamento">◷</button>');
- return '<div class="task-row '+(st==="done"?"task-done":"")+'" style="--task-color:'+a(color)+'"><div class="task-mark">'+(st==="done"?"✓":st==="progress"?"◷":st==="notdone"?"×":st==="moved"?"↷":"·")+'</div><div class="task-main"><div class="task-title">'+e(entryTitle(o))+' '+taskAge+'</div><div class="task-meta">'+priorityBadge+blockLabel(o.blockId)+(desc?'<span>'+e(desc)+'</span>':"")+'<span>'+e(statusText(st))+'</span></div></div><div class="task-actions">'+controls+(window.OrbitaStage8?.indicatorFor?.({kind:"entry",id:o.id,date,status:st})||"")+'<button class="btn small ghost" data-s2="editEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Editar">✎</button><button class="btn small ghost" data-s2="moreEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Mais ações">⋯</button></div></div>';
+ return '<div class="task-row '+(st==="done"?"task-done":"")+'" style="--task-color:'+a(color)+'"><div class="task-mark">'+(st==="done"?"✓":st==="progress"?"◷":st==="notdone"?"×":st==="moved"?"↷":"·")+'</div><div class="task-main"><div class="task-title">'+e(entryTitle(o))+' '+goalIcon+(o.reminderDescription?'<span class="s2-goal-icon" title="'+a(o.reminderDescription)+'" aria-label="Observação: '+a(o.reminderDescription)+'">ⓘ</span>':"")+taskAge+'</div><div class="task-meta">'+priorityBadge+blockLabel(o.blockId)+(desc?'<span>'+e(desc)+'</span>':"")+'<span>'+e(statusText(st))+'</span></div></div><div class="task-actions">'+controls+(window.OrbitaStage8?.indicatorFor?.({kind:"entry",id:o.id,date,status:st})||"")+'<button class="btn small ghost" data-s2="editEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Editar">✎</button><button class="btn small ghost" data-s2="moreEntry" data-id="'+a(o.id)+'" data-date="'+a(o.occurrenceDate||date)+'" title="Mais ações">⋯</button></div></div>';
 }
 function emptyList(message){return '<p class="note empty-inline">'+e(message)+'</p>';}
 function listFor(date,type){const hidden=s.settings?.hideCompletedEntries?.[type]===true;const items=kindOn(date,type).filter(x=>!hidden||x.status!=="done");return items.length?'<div class="task-list">'+items.map(x=>itemRow(x,date)).join("")+'</div>':emptyList(({focus:"Nenhum foco definido.",task:"Nenhuma tarefa secundária.",habit:"Nenhuma rotina cadastrada."})[type]);}
 function decorateHome(){
  const goal=C.activeGoal(),rest=restInfo(s.date),avail=C.resolveAvailability(s.date),ready=C.availabilityReady();
- let html='<section class="hero-row"><div><div class="overline">PLANEJAMENTO DO DIA</div><h1>'+e(fmt(s.date,true))+'</h1></div><div class="row">'+C.dateNavigator()+(s.date!==day()?button("Hoje","goToday","small ghost"):"")+'</div></section>';
+ let html='<section class="hero-row"><div><div class="overline">PLANEJAMENTO DO DIA</div><h1>'+e(fmt(s.date,true))+'</h1></div><div class="row">'+C.dateNavigator()+(s.date!==day()?button("Hoje","goToday","small ghost"):"")+(ready?'<button type="button" class="btn small ghost s2-rest-shortcut" data-s2="pause" data-date="'+a(s.date)+'" title="Descanso ou pausa do dia">'+(rest?'☾ '+(p.dayPauses[s.date]?"Editar pausa":"Descanso"):"☾ Descanso")+'</button>':"")+'</div></section>';
  if(goal)html+='<section class="card hero-goal"><div class="orbital-icon">◎</div><div class="hero-content"><div class="overline">OBJETIVO PRINCIPAL</div><h2>'+e(goal.title)+'</h2></div>'+button("Ver","openProfile","small ghost")+'</section>';
  else if(ready)html+='<div class="action-strip"><span class="icon">◎</span><p>Você ainda não definiu seu objetivo principal.</p>'+button("Definir","addGoal","small")+'</div>';
  if(!ready)return null; // preserva o bloqueio contextual original
  const pauses=Object.keys(p.dayPauses).length;
- html+='<div class="action-strip"><span class="icon">'+(rest?"☾":"◷")+'</span><p>'+e(rest?(rest.kind==="planejado"?"Dia de descanso planejado":rest.kind==="imprevisto"?"Pausa por imprevisto":"Pausa registrada no dia"):(avail?availabilityStatus(s.date):"Configure o tempo disponível para esta data"))+'. Não apaga compromissos registrados.</p><button class="btn small" data-s2="pause" data-date="'+s.date+'">'+(rest&&p.dayPauses[s.date]?"Editar pausa":"Descanso / pausa")+'</button></div>';
+ if(rest)html+='<div class="s2-rest-status"><span>☾ '+e(rest.kind==="planejado"?"Descanso planejado":rest.kind==="imprevisto"?"Pausa por imprevisto":"Pausa registrada")+'</span>'+(rest.reason?'<span title="'+a(rest.reason)+'"> · '+e(rest.reason)+'</span>':"")+'</div>';
  const estimated=hoursFor(s.date),available=C.availabilityMinutes(avail);
  if(overlapsFor(s.date).length)html+='<div class="action-strip warning-strip"><span class="icon">◷</span><p>Há '+overlapsFor(s.date).length+' sobreposição(ões) de horário. Elas são permitidas, mas convém revisar o dia.</p></div>';
  if(estimated&&available&&estimated>available)html+='<div class="action-strip warning-strip"><span class="icon">!</span><p>Você planejou '+C.hoursLabel(estimated/60)+' e informou '+C.hoursLabel(available/60)+' disponíveis. Revise se a carga é viável.</p></div>';
@@ -128,7 +130,7 @@ function decorateHome(){
   html+='<section class="card board"><div class="card-head"><h2>'+title+'</h2><div class="row"><button class="btn small ghost" data-s2="toggleDoneVisibility" data-type="'+type+'" aria-label="'+(hidden?'Mostrar':'Ocultar')+' itens concluídos" title="'+(hidden?'Mostrar':'Ocultar')+' itens concluídos" aria-pressed="'+hidden+'">'+eye+'</button><button class="btn small ghost" data-s2="newEntry" data-type="'+type+'">+ Adicionar</button></div></div>'+listFor(s.date,type)+'</section>';
  }
  html+='</div><section class="card board"><div class="card-head"><h2>Rotinas e hábitos</h2><button class="btn small ghost" data-s2="newEntry" data-type="habit">+ Adicionar</button></div>'+listFor(s.date,"habit")+'</section>';
- html+='<div class="row-between"><p class="note">Duração planejada nesta data: <strong>'+C.hoursLabel(estimated/60)+'</strong>. Horas efetivas só serão computadas quando informadas.</p><button class="btn small" data-s2="newEntry" data-type="focus">Novo foco</button></div>';
+
  return html;
 }
 function studyCountOn(date){
@@ -193,23 +195,25 @@ function nextOpenOccurrence(original,from){
  }
  return null;
 }
+function isFlexible(x){return x?.type==="task"&&(!x.recurrence||x.recurrence.kind==="none");}
 function entryModal(type,id,date){
  let original=id?find(id):null;
  if(!original&&!C.availabilityReady())return notify("Configure sua disponibilidade antes de planejar.");
- const recurring=!!original&&original.recurrence?.kind!=="none";
+ const recurring=!!original&&!!original.recurrence?.kind&&original.recurrence.kind!=="none";
  let selected=date||original?.date||s.date;
+ if(isFlexible(original)&&locked(selected)){selected=day()>original.date?day():original.date;}
  // Organizar abre modelos antigos: buscar a próxima ocorrência não finalizada.
  if(recurring&&(selected<day()||locked(selected)||s.evolution?.closed?.[selected])){
   selected=nextOpenOccurrence(original,day());
   if(!selected)return notify("Não há ocorrências abertas para editar; o histórico permanece protegido.");
  }
  if(locked(selected)||s.evolution?.closed?.[selected])return notify("O dia "+fmt(selected,false)+" já foi finalizado.");
- const x=id?(occurrence(original,selected)||original):baseEntry({type,date:selected,recurrence:type==="habit"?{kind:"daily"}:{kind:"none"}});
+ const x=id?(allOn(selected).find(o=>o.id===id)||occurrence(original,selected)||original):baseEntry({type,date:selected,recurrence:type==="habit"?{kind:"daily"}:{kind:"none"}});
  const editing=!!original;
  const form='<form id="s2-entry" class="section-stack"><input type="hidden" name="id" value="'+a(id||"")+'"><input type="hidden" name="editDate" value="'+a(selected)+'"><input type="hidden" name="type" value="'+a(type||x.type)+'">'+
  formField("Nome da atividade","title",x.title,"text",'required maxlength="140"')+
  '<div class="field"><label>Objetivo relacionado (opcional)</label><select name="goalId"><option value="">Sem objetivo</option>'+s.goals.filter(g=>!g.archived).map(g=>'<option value="'+a(g.id)+'" '+(x.goalId===g.id?"selected":"")+'>'+e(g.title)+'</option>').join("")+'</select></div>'+
- '<div class="form-grid">'+formField(recurring?"A partir da ocorrência":"Data inicial","date",recurring?selected:x.date,"date",'required min="'+(recurring?selected:firstUse())+'" '+(recurring?'readonly title="Histórico anterior preservado"':""))+
+ '<div class="form-grid">'+formField(recurring?"A partir da ocorrência":"Data inicial","date",recurring?selected:x.date,"date",'required min="'+(recurring?selected:firstUse())+'" '+(recurring||isFlexible(original)&&locked(original.date)?'readonly title="Histórico anterior preservado"':""))+
  '<div class="field"><label>Bloco</label><select name="blockId">'+blockOptions(x.blockId)+'</select></div></div>'+
  (type==="task"?'<div class="form-grid"><div class="field"><label>Prioridade</label><select name="priority"><option value="high" '+(x.priority==="high"?"selected":"")+'>Alta</option><option value="medium" '+(x.priority==="medium"?"selected":"")+'>Média</option><option value="low" '+(x.priority==="low"?"selected":"")+'>Baixa</option></select></div>'+formField("Prazo opcional","dueDate",x.dueDate,"date")+'</div>':"")+
  '<div class="form-grid">'+formField(type==="habit"?"Horário-alvo (opcional)":"Horário (opcional)","startTime",x.startTime||"","time")+
@@ -276,9 +280,45 @@ function blockModal(id){const b=block(id)||{};C.openModal(id?"Editar bloco":"Nov
 function statusModal(id,date){if(locked(date))return notify("Dia finalizado: registro em modo de consulta.");const x=find(id),r=p.records[uidKey(id,date)]||{};
  if(!x)return;
  C.openModal("Registrar execução",'<form id="s2-record" class="section-stack"><input type="hidden" name="id" value="'+a(id)+'"><input type="hidden" name="date" value="'+a(date)+'"><div class="field"><label>Situação</label><select name="status">'+[["pending","Pendente"],["progress","Em andamento"],["done","Concluída"],["notdone","Não realizada"]].map(([key,label])=>'<option value="'+key+'" '+(r.status===key?"selected":"")+'>'+label+'</option>').join("")+'</select></div>'+formField("Duração real (minutos, opcional)","actualMin",r.actualMin||"","number",'min="1" max="1440"')+(x.type==="habit"?formField("Horário real (opcional)","actualTime",r.actualTime||"","time"):"")+'<p class="note">A duração real não será preenchida automaticamente com a previsão.</p><div class="modal-footer"><button type="button" data-action="closeModal" class="btn ghost">Cancelar</button><button type="submit" class="btn primary">Salvar registro</button></div></form>',"");}
+function conversionSource(id,date){
+ const x=find(id);
+ if(!x||!["focus","task"].includes(x.type)||locked(date))throw Error("Atividade indisponível ou dia finalizado.");
+ const o=allOn(date).find(y=>y.id===id);
+ if(!o||!["pending","progress"].includes(o.status))throw Error("Somente atividades pendentes ou em andamento podem ser convertidas.");
+ return {x,o};
+}
+function conversionModal(id,date){
+ const {x,o}=conversionSource(id,date),to=x.type==="focus"?"task":"focus";
+ C.openModal(to==="focus"?"Transformar em foco do dia":"Transformar em tarefa secundária",'<form id="s2-convert" class="section-stack"><input type="hidden" name="id" value="'+a(id)+'"><input type="hidden" name="sourceDate" value="'+a(date)+'"><p><strong>'+e(o.title)+'</strong></p>'+
+ formField(to==="focus"?"Data do foco":"Disponível a partir de","date",date,"date",'required min="'+a(firstUse())+'"')+
+ (to==="task"?'<div class="field"><label>Prioridade</label><select name="priority">'+[["high","Alta"],["medium","Média"],["low","Baixa"]].map(([v,l])=>'<option value="'+v+'" '+(o.priority===v?"selected":"")+'>'+l+'</option>').join("")+'</select></div>'+formField("Prazo (opcional)","dueDate",o.dueDate||"","date"):"")+
+ '<p class="note">'+(x.recurrence?.kind&&x.recurrence.kind!=="none"?"Apenas esta ocorrência será convertida. As demais serão preservadas.":"O item sai da categoria original; o histórico encerrado é preservado.")+'</p><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Converter</button></div></form>');
+}
+function convertEntry(id,sourceDate,targetDate,priority,dueDate){
+ const {x,o}=conversionSource(id,sourceDate),type=x.type==="focus"?"task":"focus";
+ if(!validDate(targetDate)||targetDate<firstUse()||locked(targetDate))throw Error("Escolha uma data aberta.");
+ if(type==="task"&&!["high","medium","low"].includes(priority))throw Error("Prioridade inválida.");
+ if(dueDate&&!validDate(dueDate))throw Error("Prazo inválido.");
+ if(x.type==="focus"&&(s.studies?.sessions||[]).some(z=>!z.archived&&z.focusId===id&&z.date===sourceDate))throw Error("Este foco está vinculado a uma sessão de estudo. Desvincule a sessão antes de converter.");
+ const recurring=x.recurrence?.kind&&x.recurrence.kind!=="none",key=uidKey(id,sourceDate),oldRecord=p.records[key];
+ const next=baseEntry({...o,type,date:targetDate,priority:type==="task"?priority:o.priority,dueDate:type==="task"?dueDate:o.dueDate,recurrence:{kind:"none"},origin:{type:"converted",fromId:id,fromDate:sourceDate}});
+ next.createdAt=x.createdAt||next.createdAt;
+ for(const field of ["reminderDescription","reminderSourceId","description","notes"])if(o[field]!==undefined)next[field]=clone(o[field]);
+ if(recurring)p.overrides[key]={removed:true};else x.archivedAt=sourceDate;
+ if(oldRecord){p.records[uidKey(next.id,targetDate)]=clone(oldRecord);delete p.records[key];}
+ p.entries.push(next);
+ for(const n of s.reminders||[])if(n.link?.scope==="entry"&&n.link.id===id&&n.link.date===sourceDate){n.link.id=next.id;n.link.date=targetDate;}
+ p.events.push({kind:"entry_converted",id,date:sourceDate,newId:next.id,targetDate,from:x.type,to:type,at:new Date().toISOString()});
+ save();C.closeModal();render();notify(type==="focus"?"Transformada em foco do dia.":"Transformado em tarefa secundária.");return next;
+}
 function moreModal(id,date){
  const x=find(id);if(!x)return;
- C.openModal("Gerenciar atividade",'<p class="note">'+e(x.title)+' · '+e(fmt(date,false))+'</p><div class="action-cards"><button class="btn" data-s2="recordDetail" data-id="'+a(id)+'" data-date="'+date+'">Registro de execução</button><button class="btn" data-s2="editEntry" data-id="'+a(id)+'" data-date="'+date+'">Editar</button><button class="btn" data-s2="duplicateEntry" data-id="'+a(id)+'">Copiar</button>'+(x.type==="focus"?'<button class="btn" data-s2="moveFocus" data-id="'+a(id)+'" data-date="'+date+'">Remanejar foco</button>':"")+'<button class="btn" data-s2="archiveEntry" data-id="'+a(id)+'">'+(x.archivedAt?"Reativar":"Arquivar")+'</button><button class="btn danger" data-s2="deleteEntry" data-id="'+a(id)+'" data-date="'+date+'">Excluir</button></div>',"");
+ C.openModal("Gerenciar atividade",'<p class="note">'+e(x.title)+' · '+e(fmt(date,false))+'</p><div class="action-cards"><button class="btn" data-s2="recordDetail" data-id="'+a(id)+'" data-date="'+date+'">Registro de execução</button><button class="btn" data-s2="editEntry" data-id="'+a(id)+'" data-date="'+date+'">Editar</button><button class="btn" data-s2="duplicateEntry" data-id="'+a(id)+'">Copiar</button>'+(!locked(date)&&["focus","task"].includes(x.type)?'<button class="btn" data-s2="convertEntry" data-id="'+a(id)+'" data-date="'+a(date)+'">'+(x.type==="focus"?"Transformar em tarefa secundária":"Transformar em foco do dia")+'</button><button class="btn" data-s2="linkGoal" data-id="'+a(id)+'" data-date="'+a(date)+'">Vincular objetivo</button>':"")+(x.type==="focus"?'<button class="btn" data-s2="moveFocus" data-id="'+a(id)+'" data-date="'+date+'">Remanejar foco</button>':"")+'<button class="btn" data-s2="archiveEntry" data-id="'+a(id)+'">'+(x.archivedAt?"Reativar":"Arquivar")+'</button><button class="btn danger" data-s2="deleteEntry" data-id="'+a(id)+'" data-date="'+date+'">Excluir</button></div>',"");
+}
+function linkGoalModal(id,date){
+ const x=find(id),o=allOn(date).find(y=>y.id===id);
+ if(!x||!o||locked(date))throw Error("Dia finalizado ou atividade indisponível.");
+ C.openModal("Vincular objetivo",'<form id="s2-goal-link" class="section-stack"><input type="hidden" name="id" value="'+a(id)+'"><input type="hidden" name="date" value="'+a(date)+'"><p><strong>'+e(o.title)+'</strong></p><div class="field"><label>Objetivo relacionado</label><select name="goalId"><option value="">Sem objetivo</option>'+s.goals.filter(g=>!g.archived||g.id===o.goalId).map(g=>'<option value="'+a(g.id)+'" '+(o.goalId===g.id?"selected":"")+'>'+e(g.title)+'</option>').join("")+'</select></div><div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form>');
 }
 function moveModal(id,date){
  const o=find(id);if(!o)return;
@@ -397,6 +437,9 @@ const actions={
  closeStatusMenu(){closeStatusMenu()},
  newEntry(b){entryModal(b.dataset.type||"focus")},editEntry(b){const x=find(b.dataset.id);if(x)entryModal(x.type,x.id,b.dataset.date||x.date)},
  moreEntry(b){moreModal(b.dataset.id,b.dataset.date||s.date)},
+ convertEntry(b){conversionModal(b.dataset.id,b.dataset.date||s.date)},
+ linkGoal(b){linkGoalModal(b.dataset.id,b.dataset.date||s.date)},
+ showGoal(b){const g=s.goals.find(x=>x.id===b.dataset.id);if(g)C.openModal("Objetivo vinculado",'<h3>'+e(g.title)+'</h3>'+(g.description?'<p>'+e(g.description)+'</p>':""));},
  recordDetail(b){statusModal(b.dataset.id,b.dataset.date||s.date)},
  status(b){quickRecord(b.dataset.id,b.dataset.date,b.dataset.value)},
  organizeTab(b){organizing=b.dataset.type;render()},
@@ -420,16 +463,26 @@ const actions={
  copyPlan(){copyModal()},confirmCopy(){performCopy()}
 };
 function submission(id,data){
+ if(id==="s2-convert"){convertEntry(String(data.get("id")),ds(data.get("sourceDate")),ds(data.get("date")),String(data.get("priority")||"medium"),ds(data.get("dueDate")));return;}
+ if(id==="s2-goal-link"){
+  const item=String(data.get("id")),date=ds(data.get("date")),goalId=String(data.get("goalId")||""),x=find(item);
+  if(!x||!allOn(date).some(y=>y.id===item)||!canChange(date))return;
+  if(goalId&&!s.goals.some(g=>g.id===goalId))throw Error("Objetivo inválido.");
+  if(x.recurrence?.kind&&x.recurrence.kind!=="none"){const k=uidKey(item,date);p.overrides[k]={...p.overrides[k],fields:{...p.overrides[k]?.fields,goalId}};}
+  else x.goalId=goalId;
+  save();C.closeModal();render();notify("Objetivo atualizado.");return;
+ }
  if(id==="s2-entry"){
   const origin=find(String(data.get("id")||"")),date=ds(data.get("editDate")||"");
   const payload=readForm(data,origin);
   const scope=String(data.get("scope")||"single");
-  const recurring=!!origin&&origin.recurrence?.kind!=="none";
+  const recurring=!!origin&&!!origin.recurrence?.kind&&origin.recurrence.kind!=="none";
   if(recurring&&payload.date!==date)throw Error("A data da ocorrência não pode ser alterada nesta edição.");
   // A data original da sequência pode estar fechada; validar somente a
   // ocorrência efetiva. Nunca salvar em uma data finalizada.
-  if(!canChange(date||payload.date)||(!recurring&&!canChange(payload.date)))return;
-  if(s.evolution?.closed?.[date||payload.date]||(!recurring&&s.evolution?.closed?.[payload.date]))throw Error("O dia escolhido já foi finalizado.");
+  const carried=isFlexible(origin)&&payload.date===origin.date&&date>=origin.date;
+  if(!canChange(date||payload.date)||(!recurring&&!carried&&!canChange(payload.date)))return;
+  if(isFlexible(origin)&&locked(origin.date)&&payload.date!==origin.date)throw Error("A data inicial pertence ao histórico e não pode ser alterada.");
   if(payload.recurrence.kind!=="none"&&payload.recurrence.end&&payload.recurrence.end>D(payload.date,3650))throw Error("O período máximo por sequência é de dez anos.");
   if(origin)updateEntry(payload,origin,date,scope);
   else {const added=baseEntry(payload);p.entries.push(added);p.events.push({kind:"entry_created",id:added.id,date:added.date,at:added.createdAt});}
@@ -523,6 +576,6 @@ window.OrbitaStage2={decorate(route,base){
  if(route==="planejamento")return decoratePlan();
  if(route==="organizar")return decorateOrganize();
  return base;
-},inspect:{get model(){return p},occurrence,allOn,kindOn,hoursFor,copyPlanDraft,performCopy,quickRecord,quickStatusMenu,updateEntry,deleteEntry,submission}};
+},inspect:{get model(){return p},occurrence,allOn,kindOn,hoursFor,copyPlanDraft,performCopy,quickRecord,quickStatusMenu,updateEntry,deleteEntry,convertEntry,submission}};
 render();
 })();

@@ -63,3 +63,19 @@ body[data-theme="light"] .s8-panel,body[data-theme="light"] .s8-trigger{backgrou
 #s8-future-date-wrap input,#s8-target-search{width:100%;max-width:100%;min-height:41px;box-sizing:border-box}
 .s8-search-label{font-size:11px;color:var(--muted)}
 .s8-link-complete{color:#74663c;opacity:.8}
+
+/* v5.16: papéis independentes da prioridade, zoom e grade responsiva. */
+.s8-panel{gap:8px;padding:11px}.s8-panel-options{gap:4px}.s8-panel-options select{width:auto;min-height:28px;font-size:11px;padding:3px 5px}
+.s8-zoom{display:flex;align-items:center;gap:3px;font-size:11px}.s8-zoom .s8-option{padding:3px 8px}
+.s8-note-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--s8-card-width,235px)),1fr));align-content:start;align-items:start;gap:calc(7px * var(--s8-z,1))}
+.s8-note{background:var(--s8-note-bg,#f5eecb);color:var(--s8-note-fg,#202020);padding:calc(9px * var(--s8-z,1));min-width:0;border-radius:8px}
+.s8-note-top{gap:4px;margin:0 0 calc(5px * var(--s8-z,1))}.s8-note-top small{font-size:calc(10px * var(--s8-z,1));margin-left:auto}
+.s8-note-priority{flex:0 0 auto;font-size:calc(9px * var(--s8-z,1));border-radius:99px;padding:3px 5px;background:#fff;color:#202020;border:1px solid #aaa}
+.s8-note-priority[data-priority=high]{background:#ffe0df;color:#872323;border-color:#dc8282}.s8-note-priority[data-priority=medium]{background:#fff0be;color:#715000;border-color:#d8b658}.s8-note-priority[data-priority=low]{background:#d7f4e2;color:#205d39;border-color:#8cc5a1}
+.s8-pin-note{background:transparent;border:0;color:inherit;font-size:calc(15px * var(--s8-z,1));cursor:pointer;min-width:20px;padding:0}.s8-pin-note[aria-pressed=true]{filter:drop-shadow(0 1px 1px #0005)}
+.s8-note>strong{font-size:calc(14px * var(--s8-z,1))}.s8-link-label,.s8-note-details summary{font-size:calc(10px * var(--s8-z,1))}.s8-note-details p{font-size:calc(12px * var(--s8-z,1))}
+.s8-note-actions{margin-top:calc(6px * var(--s8-z,1));gap:3px}.s8-note-actions button{font-size:calc(11px * var(--s8-z,1));padding:calc(4px * var(--s8-z,1)) calc(6px * var(--s8-z,1));background:transparent;color:inherit;border:1px solid currentColor}.s8-note-actions .s8-danger{color:inherit}
+.s8-note-hover{display:none}.s8-color-quick{position:relative;display:grid;place-items:center;width:24px;border:1px solid currentColor;border-radius:7px;cursor:pointer;overflow:hidden}.s8-color-quick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.s8-swatches{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.s8-swatch{width:26px;height:26px;border-radius:50%;border:1px solid var(--borderStrong);background:var(--swatch);cursor:pointer}.s8-swatches input[type=color]{width:40px;height:30px;padding:2px}
+
+.s8-panel-head [data-s8=movePanel]{cursor:move;touch-action:none;user-select:none}.s8-bulk-tools{display:flex;flex-wrap:wrap;gap:4px;flex:none}.s8-select-note{width:14px;height:14px;flex:none;margin:0}

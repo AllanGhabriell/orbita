@@ -460,3 +460,5 @@
 .s3-quick-status-menu{display:flex;flex-direction:column;gap:8px}
 .s3-quick-status-menu>.btn{text-align:left;justify-content:flex-start;width:100%;min-height:40px}
 .s3-quick-status-menu>.s3-notdone-option{border-color:rgba(214,82,88,.55);color:#dc757c}
+
+.study-load-panel{gap:8px;padding-block:12px}.study-load-panel .study-stat{padding:8px 11px;gap:3px}.study-load-panel .study-stat>strong{font-size:clamp(17px,2vw,22px)}.study-load-panel .study-notice{margin:3px 0}

@@ -15,7 +15,7 @@ const clock=()=>Date.now();
 const titleBase=document.title;
 let audioContext=null,previousTitle="",flashTimeout=0,lastUndo=null,alarmAudio=null,alarmSource=null,alarmGain=null,demoAlarm=null,activityAt=clock(),inactivityPrompt=false,alarmTimeout=null,lastActivityPersist=0;
 const uploadBusy={finish:false,pause:false},presetSound="./assets/orbita-alarm.wav";
-let pauseReminderAudio=null,pauseReminderInterval=null,pauseReminderSilenced=false;
+let pauseReminderAudio=null,pauseReminderInterval=null,pauseReminderSilenced=false,pauseReminderSource=null,pauseReminderGain=null;
 const iconLink=document.querySelector('link[rel="icon"]'),originalIcon=iconLink?.getAttribute("href")||"./assets/orbita.svg";
 const alarmIcon="data:image/svg+xml,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#201535"/><path d="M17 45c5-5 6-10 6-19 0-13 18-13 18 0 0 9 1 14 6 19H17zm10 6h10" stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" fill="none"/><circle cx="48" cy="15" r="9" fill="#f05f73"/></svg>');
 const fmtMs=ms=>{const secs=Math.max(0,Math.floor(ms/1000));return String(Math.floor(secs/3600)).padStart(2,"0")+":"+String(Math.floor(secs%3600/60)).padStart(2,"0")+":"+String(secs%60).padStart(2,"0");};
@@ -60,8 +60,22 @@ function tone(kind){
 }
 // Lembrete opt-in que acompanha a pausa, sem interferir no alarme de meta.
 function stopPauseReminder(){
+ if(pauseReminderSource){try{pauseReminderSource.stop();pauseReminderSource.disconnect();}catch{}pauseReminderSource=null;}
+ if(pauseReminderGain){try{pauseReminderGain.disconnect();}catch{}pauseReminderGain=null;}
  if(pauseReminderInterval!==null){if(typeof clearInterval==="function")clearInterval(pauseReminderInterval);pauseReminderInterval=null;}
  if(pauseReminderAudio){try{pauseReminderAudio.pause();pauseReminderAudio.currentTime=0;}catch{}pauseReminderAudio=null;}
+}
+function pauseSynthLoop(){
+ const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
+ try{
+  audioUnlock();audioContext=audioContext||new AC();
+  const rate=audioContext.sampleRate||22050,buffer=audioContext.createBuffer(1,Math.round(rate*1.5),rate),samples=buffer.getChannelData(0),selected=settings().pauseSound;
+  const freq=selected==="soft"?440:selected==="bell"?659:784;
+  for(let i=0;i<samples.length;i++){const t=i/rate,part=t%0.5;if(part<.16)samples[i]=Math.sin(2*Math.PI*freq*t)*Math.min(1,part*60)*Math.max(0,1-part/.16)*.35;}
+  pauseReminderSource=audioContext.createBufferSource();pauseReminderSource.buffer=buffer;pauseReminderSource.loop=true;
+  pauseReminderGain=audioContext.createGain();pauseReminderGain.gain.value=Math.max(0,Math.min(1,Number(settings().volume)/100));
+  pauseReminderSource.connect(pauseReminderGain);pauseReminderGain.connect(audioContext.destination);pauseReminderSource.start();return true;
+ }catch{return false;}
 }
 function startPauseReminder(){
  stopPauseReminder();
@@ -77,12 +91,14 @@ function startPauseReminder(){
   return;
  }
  if(mode==="continuous"){
+  audioUnlock();
+  if(["digital","soft","bell"].includes(settings().pauseSound)&&pauseSynthLoop())return;
   try{
    const source=settings().pauseSound==="custom"&&settings().pauseUpload?settings().pauseUpload:presetSound;
    const audio=new Audio(source);
    audio.loop=true;audio.volume=Math.max(0,Math.min(1,Number(settings().volume)/100));
    pauseReminderAudio=audio;
-   audio.play()?.catch(()=>C.notify("O navegador impediu o áudio da pausa. Toque em Reproduzir lembrete."));
+   audio.play()?.catch(()=>{if(pauseReminderAudio!==audio)return;pauseReminderAudio=null;if(!pauseSynthLoop())C.notify("O navegador bloqueou o som. Desative e reative no menu de pausa.");});
   }catch{C.notify("Não foi possível iniciar o lembrete sonoro da pausa.");}
  }
 }
@@ -374,7 +390,7 @@ function pause(kind="rest"){
  const at=clock();r.studyMs=studyMs(r,at);
  r.pauses.push({startedAt:at,endedAt:null,kind,corrected:false});
  timing.active={sessionId:a.sessionId,phase:"paused",since:at,alertIndex:0};
- pauseReminderSilenced=false;startPauseReminder();
+ pauseReminderSilenced=false;audioUnlock();startPauseReminder();
  persist();C.render();tick();
 }
 function resume(){
@@ -862,15 +878,16 @@ function togglePauseSound(){
  const q=settings();
  if(pauseSoundEnabled()){q.lastPauseReminderMode=q.pauseReminderMode;q.pauseReminderMode="off";stopPauseReminder();}
  else{
-  q.pauseReminderMode=q.pauseReminderMode==="off"?(q.lastPauseReminderMode==="interval"?"interval":"continuous"):q.pauseReminderMode;
+  q.pauseReminderMode="continuous";
   pauseReminderSilenced=false;
   if(timing.active?.phase==="paused"){timing.active.pauseSoundSilenced=false;audioUnlock();startPauseReminder();}
  }
  persist();C.render();
+ C.notify(pauseSoundEnabled()?(timing.active?.phase==="paused"?"Som da pausa ativado.":"Som ativado para a próxima pausa."):"Som da pausa desativado.");
 }
 function hideTimerMenu(panel){
  if(!panel)return;
- if(typeof panel.hidePopover==="function"){if(panel.matches(":popover-open"))panel.hidePopover();}
+ try{if(typeof panel.hidePopover==="function"&&panel.matches(":popover-open"))panel.hidePopover();}catch{}
  panel.hidden=true;
  document.getElementById(panel.dataset.anchor)?.setAttribute("aria-expanded","false");
 }
@@ -894,11 +911,11 @@ function timerMenus(){
  return '<div class="s7-primary-actions"><div class="s7-pause-split">'+
  (paused?'<button type="button" class="btn primary" data-s7="resume" data-s7-context>▶ Retomar estudo</button>':'<button type="button" class="btn primary" data-s7="pause" data-kind="rest" data-s7-context>Ⅱ Pausar estudo</button>')+button("pause","▾")+'</div>'+
  '<button type="button" class="btn ghost" data-s7="finishChoices">Finalizar sessão</button>'+
- '<button type="button" class="btn ghost s7-sound-toggle'+(soundOn?' is-on':'')+'" data-s7="togglePauseSound" aria-pressed="'+soundOn+'" title="'+(soundOn?'Desativar':'Ativar')+' lembrete sonoro nas pausas"><span aria-hidden="true">'+(soundOn?'♫':'♩')+'</span><span>Som '+(soundOn?'ligado':'desligado')+'</span></button>'+
  button("more","⋯ Mais opções","s7-more")+'</div>'+
  panel("pause",'<strong class="s7-flyout-title">'+(paused?"Alterar motivo da pausa":"Modalidades de pausa")+'</strong>'+pauseAction("rest","Descanso livre")+pauseAction("preparation","Preparar flashcards")+
  '<button type="button" class="btn small ghost" data-s7="timedPause" '+(paused?'disabled title="Retome antes de programar uma nova pausa"':'')+'>◷ Pausa com timer</button>'+
- (r.mode!=="continuous"||paused?pauseAction("scheduled","Pausa programada"):"")+pauseAction("other","Interrupção"))+
+ (r.mode!=="continuous"||paused?pauseAction("scheduled","Pausa programada"):"")+pauseAction("other","Interrupção")+'<hr class="s7-menu-divider">'+
+ '<button type="button" class="btn small ghost s7-sound-toggle'+(soundOn?' is-on':'')+'" data-s7="togglePauseSound" aria-pressed="'+soundOn+'"><span aria-hidden="true">'+(soundOn?'♫':'♩')+'</span> Som durante a pausa: <strong>'+(soundOn?'Ligado':'Desligado')+'</strong></button>')+
  panel("more",'<strong class="s7-flyout-title">Cronômetro</strong><button type="button" class="btn small ghost" data-s7="correct">Corrigir tempo do cronômetro</button><button type="button" class="btn small ghost" data-s7="manage" data-id="'+A(a.sessionId)+'">Gerenciar cronometragem</button>'+
  (lastUndoAvailable(a.sessionId)?'<button type="button" class="btn small ghost" data-s7="undo">↶ Desfazer última correção</button>':"")+
  '<button type="button" class="btn small ghost" data-s7="partial">Encerrar parcial</button>');
@@ -1023,6 +1040,7 @@ function settingsPanel(){
  '</div></section>';
 }
 function tick(){
+ if(timing.active?.phase!=="paused"&&(pauseReminderAudio||pauseReminderSource||pauseReminderInterval!==null))stopPauseReminder();
  autoPauseForInactivity();
  autoSilenceAlarm();
  const a=timing.active,r=activeRecord();
@@ -1128,7 +1146,7 @@ document.addEventListener("click",e=>{
 },true);
 document.addEventListener("click",e=>{
  const b=e.target.closest?.("[data-s7]");if(!b||b.disabled)return;
- closeTimerMenus();
+ if(b.dataset.s7!=="togglePauseSound")closeTimerMenus();
  e.preventDefault();
  try{
   const act=b.dataset.s7;
@@ -1136,7 +1154,7 @@ document.addEventListener("click",e=>{
   else if(act==="timedPause")timedPauseModal();
   else if(act==="pause")pause(b.dataset.kind||"rest");
    else if(act==="pauseKind")changePause(b.dataset.kind||"rest");
-   else if(act==="togglePauseSound")togglePauseSound();
+   else if(act==="togglePauseSound"){togglePauseSound();openTimerMenu("pause");}
   else if(act==="resume")resume();
   else if(act==="silencePauseReminder")silencePauseReminder();
   else if(act==="replayPauseReminder")replayPauseReminder();

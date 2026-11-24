@@ -214,3 +214,13 @@ body[data-theme=light] .s7-alarm-card{background:#fff;box-shadow:0 16px 46px rgb
 .s7-risk-danger strong,.s7-risk-danger .s7-manage-icon{color:var(--bad,#ef6377)}
 @media(max-width:900px){.s7-primary-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.s7-primary-actions>.btn,.s7-pause-split>.btn{font-size:11px}.s7-manage-item{padding:7px}}
+
+/* v5.16: três ações compactas, sem preencher a largura do cronômetro. */
+.s7-primary-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:8px;width:100%}
+.s7-primary-actions>.btn,.s7-pause-split>.btn{width:auto;min-height:38px;padding:8px 12px;white-space:nowrap;flex:0 0 auto;font-size:12px}
+.s7-pause-split{display:inline-flex;align-items:stretch;gap:3px;flex:0 0 auto}
+.s7-pause-split>.btn:first-child{min-width:133px}
+.s7-pause-split>.s7-menu-trigger{min-width:29px;padding:5px 8px}
+.s7-menu-trigger.s7-more{min-width:0}
+.s7-menu-divider{border:0;border-top:1px solid var(--border);margin:3px 0}
+@media(max-width:600px){.s7-primary-actions{gap:6px}.s7-primary-actions>.btn,.s7-pause-split>.btn{padding:7px 9px;font-size:11px}.s7-pause-split>.btn:first-child{min-width:116px}}

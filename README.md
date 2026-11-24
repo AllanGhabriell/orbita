@@ -1,5 +1,12 @@
 # Órbita
 
+## v5.16 — tarefas flexíveis e mural personalizável
+
+- Conversão de focos e tarefas, edição de tarefas antigas sem alterar dias encerrados e objetivo compacto.
+- Cronômetro com três ações compactas e som no menu de pausas.
+- Mural redimensionável, zoom, cores livres, filtros e fixação de lembretes no topo.
+- Tela inicial mais compacta, com avisos relevantes preservados.
+
 ## v5.15 — ergonomia do cronômetro e Orientador (24/11/2026)
 
 - Controles estáveis e menus flutuantes de pausas e ações, com acesso imediato ao lembrete sonoro.

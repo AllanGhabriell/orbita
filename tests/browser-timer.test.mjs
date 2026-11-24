@@ -52,6 +52,7 @@ test("cronômetro integrado: iniciar, pausar, recuperar da atualização e final
   assert.match(await page.$eval(".study-home-panel .s7-timer",el=>el.textContent),/Pausado/);
   const stateBefore=await page.evaluate(()=>window.OrbitaCore.state.timing.active?.phase);
   assert.equal(stateBefore,"paused");
+  await page.click('#s7-trigger-pause');
   await page.click('[data-s7="togglePauseSound"]');
   assert.equal(await page.evaluate(()=>window.OrbitaCore.state.timing.settings.pauseReminderMode),"continuous");
   await page.click('[data-s7="togglePauseSound"]');
