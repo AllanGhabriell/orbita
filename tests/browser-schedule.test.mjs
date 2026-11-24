@@ -150,7 +150,7 @@ try{
  assert.equal(await page.evaluate(()=>document.querySelectorAll(".study-daily-entry").length),3);
 
  const sessionView=await page.evaluate(()=>({
-  titles:[...document.querySelectorAll(".study-daily-entry .study-daily-label > strong")].map(e=>e.textContent.trim()),
+  titles:[...document.querySelectorAll(".study-daily-entry .study-daily-number")].map(e=>e.getAttribute("aria-label").split(" · ")[0]),
   subjects:[...document.querySelectorAll(".study-daily-entry .study-daily-subject")].map(e=>e.textContent.trim()),
   progressBars:document.querySelectorAll(".study-session-progress").length,
   oldRails:document.querySelectorAll(".study-daily-track").length
@@ -159,6 +159,38 @@ try{
  assert.ok(sessionView.subjects.every(x=>x.includes("Matemática")),"matéria mantida como contexto");
  assert.equal(sessionView.progressBars,1,"progresso compacto por ciclo");
  assert.equal(sessionView.oldRails,0,"não duplicar matérias em trilha enorme");
+ // Mural: um único elemento móvel, controles mínimos e crescimento pela esquerda.
+ await page.setViewport({width:1180,height:850,deviceScaleFactor:1});
+ await page.click('.s8-trigger');
+ await page.waitForSelector('#s8-panel');
+ assert.equal(await page.$('.s8-trigger'),null,"ícone desaparece quando painel está aberto");
+ assert.equal(await page.$eval('.s8-head-tools button',els=>els.length),3);
+ await page.evaluate(()=>{
+  const R=window.OrbitaStage8.inspect;
+  Object.assign(R.layout,{width:250,height:260,panelX:300,panelY:120,locked:false});
+  window.OrbitaCore.render();
+ });
+ const getPanel=()=>page.$eval('#s8-panel',el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height,right:r.right};});
+ const oldPanel=await getPanel();
+ const handle=await page.$eval('.s8-edge-w',el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
+ await page.mouse.move(handle.x,handle.y);await page.mouse.down();await page.mouse.move(handle.x-80,handle.y,{steps:8});await page.mouse.up();
+ const bigger=await getPanel();
+ assert.ok(bigger.width>=oldPanel.width+70,"redimensionamento esquerdo real no Chromium");
+ assert.ok(Math.abs(bigger.right-oldPanel.right)<2,"borda oposta estável");
+ const header=await page.$eval('[data-s8="movePanel"]',el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};});
+ await page.mouse.move(header.x,header.y);await page.mouse.down();await page.mouse.move(header.x+35,header.y+45,{steps:8});await page.mouse.up();
+ const moved=await getPanel();
+ assert.ok(moved.left>bigger.left+25&&moved.top>bigger.top+35,"o painel inteiro se move");
+ await page.click('[data-s8="settings"]');
+ await page.waitForSelector('#s8-layout-form');
+ await page.$eval('#s8-layout-form [name="zoom"]',el=>el.value="75");
+ await page.click('#s8-layout-form button[type="submit"]');
+ assert.equal(await page.evaluate(()=>window.OrbitaStage8.inspect.layout.zoom),75);
+ await page.click('[data-s8="close"]');
+ await page.waitForSelector('.s8-trigger');
+ assert.equal(await page.$('#s8-panel'),null,"fechar restaura apenas o ícone");
+ await page.setViewport({width:390,height:850,deviceScaleFactor:1});
+
 
  for(let i=0;i<3;i++){
   await page.click('.study-daily-entry:nth-child('+(i+1)+') [data-s3="quickDone"]');

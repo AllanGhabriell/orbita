@@ -30,55 +30,80 @@ function position(){
  return {size,width,height,bottom};
 }
 function panelRect(){
- const b=position(),margin=10;
- const w=clamp(Number(ui.width)||340,Math.min(230,b.width-20),Math.max(230,b.width-20));
- const h=clamp(Number(ui.height)||430,Math.min(170,b.height-32),Math.max(170,b.height-32));
- // Preferir abrir acima do botão, mas alternar para baixo quando falta espaço.
- const top=b.height-(ui.y+b.size)>=h+16?ui.y+b.size+10:ui.y>=h+16?ui.y-h-10:clamp(ui.y+((b.height-ui.y)>ui.y?b.size+10:-h-10),8,Math.max(8,b.height-h-8));
- const left=clamp(ui.x+b.size-w,8,Math.max(8,b.width-w-8));
- return {width:w,height:h,left:clamp(Number.isFinite(ui.panelX)?ui.panelX:left,8,Math.max(8,b.width-w-8)),top:clamp(Number.isFinite(ui.panelY)?ui.panelY:top,8,Math.max(8,b.height-h-8))};
+ const b=position(),m=8;
+ const maxW=Math.max(1,b.width-2*m),maxH=Math.max(1,b.height-b.bottom-2*m);
+ const w=clamp(Number(ui.width)||340,Math.min(210,maxW),maxW);
+ const h=clamp(Number(ui.height)||430,Math.min(160,maxH),maxH);
+ const left=clamp(Number.isFinite(ui.panelX)?ui.panelX:ui.x+b.size-w,m,Math.max(m,b.width-w-m));
+ const top=clamp(Number.isFinite(ui.panelY)?ui.panelY:ui.y+b.size-h,m,Math.max(m,b.height-b.bottom-h-m));
+ return {width:w,height:h,left,top};
 }
 function place(){
  const floater=$("s8-floating-root");if(!floater)return;
- const b=position();
- floater.style.left=ui.x+"px";floater.style.top=ui.y+"px";
- const panel=$("s8-panel");if(panel){
-  const rect=panelRect();
-  panel.style.left=rect.left+"px";panel.style.top=rect.top+"px";panel.style.width=rect.width+"px";panel.style.height=rect.height+"px";
- }
+ const b=position(),rect=opened?panelRect():{left:ui.x,top:ui.y,width:b.size,height:b.size};
+ Object.assign(floater.style,{left:rect.left+"px",top:rect.top+"px",width:rect.width+"px",height:rect.height+"px"});
 }
-function toggleLock(){ui.locked=!ui.locked;C.save();redraw();C.notify(ui.locked?"Posição e tamanho travados.":"Agora você pode mover e redimensionar o mural.");}
+function toggleLock(){ui.locked=!ui.locked;C.save();redraw();}
 function resetLayout(){const b=bounds();ui.x=b.width-(b.width<=760?46:49)-18;ui.y=b.height-(b.width<=760?46:49)-b.bottom-18;ui.width=340;ui.height=430;ui.panelX=null;ui.panelY=null;ui.zoom=100;C.save();redraw();}
+function openPanel(){
+ opened=true;
+ const r=panelRect();ui.panelX=r.left;ui.panelY=r.top;
+ C.save();redraw();
+}
+function closePanel(){
+ const r=panelRect(),b=position();
+ ui.x=r.left+r.width-b.size;ui.y=r.top;
+ position();opened=false;ui.keepOpen=false;highlightIds=[];selecting=false;selectedNotes.clear();
+ C.save();redraw();
+}
 function pointerStart(ev){
  const target=ev.target.closest?.('[data-s8="toggle"],[data-s8="resize"],[data-s8="movePanel"]');
  if(!target||ui.locked||ev.button!==undefined&&ev.button!==0)return;
  const kind=target.dataset.s8==="resize"?"resize":target.dataset.s8==="movePanel"?"panel":"move",p=panelRect();
- drag={id:ev.pointerId,kind,startX:ev.clientX,startY:ev.clientY,x:ui.x,y:ui.y,w:p.width,h:p.height,left:p.left,top:p.top,moved:false};
- // Evitar capturar clique: só considerar arrasto depois de 7 px.
+ drag={id:ev.pointerId,kind,edge:target.dataset.edge||"se",target,startX:ev.clientX,startY:ev.clientY,x:ui.x,y:ui.y,w:p.width,h:p.height,left:p.left,top:p.top,moved:false};
+ if(kind!=="move")ev.preventDefault?.();
+ try{target.setPointerCapture?.(ev.pointerId);}catch{}
 }
 function pointerMove(ev){
  if(!drag||ev.pointerId!==drag.id)return;
  const dx=ev.clientX-drag.startX,dy=ev.clientY-drag.startY;
- if(!drag.moved&&Math.hypot(dx,dy)<7)return;
+ if(!drag.moved&&Math.hypot(dx,dy)<4)return;
  drag.moved=true;ev.preventDefault?.();
- const b=bounds();
+ const b=bounds(),m=8,maxR=b.width-m,maxB=b.height-b.bottom-m;
  if(drag.kind==="move"){
   const size=b.width<=760?46:49;
-  ui.x=clamp(drag.x+dx,8,Math.max(8,b.width-size-8));
-  ui.y=clamp(drag.y+dy,8,Math.max(8,b.height-size-b.bottom));
+  ui.x=clamp(drag.x+dx,m,Math.max(m,b.width-size-m));
+  ui.y=clamp(drag.y+dy,m,Math.max(m,b.height-size-b.bottom));
+  ui.panelX=null;ui.panelY=null;
  }else if(drag.kind==="panel"){
-  ui.panelX=clamp(drag.left+dx,8,Math.max(8,b.width-drag.w-8));ui.panelY=clamp(drag.top+dy,8,Math.max(8,b.height-drag.h-8));
+  ui.panelX=clamp(drag.left+dx,m,Math.max(m,maxR-drag.w));
+  ui.panelY=clamp(drag.top+dy,m,Math.max(m,maxB-drag.h));
  }else{
-  ui.panelX=drag.left;ui.panelY=drag.top;
-  ui.width=clamp(drag.w+dx,Math.min(230,b.width-20),Math.max(230,b.width-drag.left-8));
-  ui.height=clamp(drag.h+dy,Math.min(170,b.height-32),Math.max(170,b.height-drag.top-8));
+  const minW=Math.min(210,maxR-m),minH=Math.min(160,maxB-m);
+  let l=drag.left,t=drag.top,r=l+drag.w,bot=t+drag.h;
+  if(drag.edge.includes("w"))l=clamp(l+dx,m,r-minW);
+  if(drag.edge.includes("e"))r=clamp(r+dx,l+minW,maxR);
+  if(drag.edge.includes("n"))t=clamp(t+dy,m,bot-minH);
+  if(drag.edge.includes("s"))bot=clamp(bot+dy,t+minH,maxB);
+  ui.panelX=l;ui.panelY=t;ui.width=r-l;ui.height=bot-t;
  }
  place();
 }
 function pointerEnd(ev){
  if(!drag||ev.pointerId!==drag.id)return;
- if(drag.moved){skipClickUntil=Date.now()+600;C.save();}
+ if(drag.moved){skipClickUntil=Date.now()+350;C.save();}
+ try{drag.target.releasePointerCapture?.(ev.pointerId);}catch{}
  drag=null;
+}
+function applyLayout(data){
+ const b=bounds();
+ ui.width=clamp(Number(data.get("width"))||340,Math.min(210,b.width-16),b.width-16);
+ ui.height=clamp(Number(data.get("height"))||430,Math.min(160,b.height-b.bottom-16),b.height-b.bottom-16);
+ ui.zoom=clamp(Number(data.get("zoom"))||100,50,200);
+ ui.locked=data.get("locked")!==null;ui.keepOpen=data.get("keepOpen")!==null;
+ const filter=String(data.get("filter")||"all");ui.filter=["all","pinned","high","medium","low"].includes(filter)?filter:"all";
+ const r=panelRect();ui.panelX=r.left;ui.panelY=r.top;
+ C.save();C.closeModal();redraw();
 }
 
 const note=id=>notes.find(x=>x.id===id);
@@ -92,7 +117,13 @@ function age(created){
  if(days<30){const weeks=Math.floor(days/7);return "Há "+weeks+(weeks===1?" semana":" semanas");}
  const months=Math.floor(days/30);return "Há "+months+(months===1?" mês":" meses");
 }
-const icons={pin:"📌",bookmark:"🔖",alert:"❗",idea:"💡"};
+const icons={pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"};
+function glyph(name){
+ const paths={pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
+ return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||"")+'</svg>';
+}
+function smallButton(action,icon,label,extra=""){return '<button type="button" class="s8-mini" data-s8="'+action+'" title="'+A(label)+'" aria-label="'+A(label)+'" '+extra+'>'+glyph(icon)+'</button>';}
+
 function encodedTarget(n){
  const l=n?.link;if(!l)return "none";
  return [l.scope,encodeURIComponent(l.id||""),encodeURIComponent(l.scope==="next"?l.cycleId||"":l.date||"")].join("|");
@@ -229,7 +260,7 @@ function indicators(ctx){
  bindNextNotes();
  const linked=notes.filter(n=>matches(n,ctx));
  if(!linked.length)return "";
- const symbol=icons.pin; // Área de estudos apenas informa: as ações ficam exclusivamente no mural.
+ const symbol=glyph("pin"); // Área de estudos apenas informa: as ações ficam exclusivamente no mural.
  return '<button type="button" class="s8-linked-pin" data-s8="jump" data-note-ids="'+A(linked.map(x=>x.id).join(","))+'" title="'+A(linked.length+" lembrete(s) vinculado(s). Abrir no mural.")+'" aria-label="Abrir '+linked.length+' lembrete(s) vinculado(s)">'+symbol+(linked.length>1?'<span>'+linked.length+'</span>':"")+'</button>';
 }
 const palette={high:"#f5dad1",medium:"#f5eecb",low:"#dcf0e3"};
@@ -239,34 +270,58 @@ function noteColor(n){return safeColor(n.color)||palette[n.priority]||palette.me
 function contrastColor(hex){const rgb=[1,3,5].map(i=>{const c=parseInt(hex.slice(i,i+2),16)/255;return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);});return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.179?"#202020":"#ffffff";}
 function sorted(){return [...notes].sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||(rank[a.priority]??1)-(rank[b.priority]??1)||String(b.createdAt).localeCompare(String(a.createdAt)));}
 function togglePin(idValue){const n=note(idValue);if(!n)return;n.pinned=!n.pinned;C.save();redraw();}
-function zoomBy(delta){ui.zoom=clamp((Number(ui.zoom)||100)+delta,65,150);C.save();redraw();}
+function zoomBy(delta){ui.zoom=clamp((Number(ui.zoom)||100)+delta,50,200);C.save();redraw();}
 function selectColor(idValue,value){const n=note(idValue);if(!n)return;const color=safeColor(value);if(!color)throw Error("Cor inválida.");n.color=color;C.save();redraw();}
 function pinPanel(){ui.keepOpen=!ui.keepOpen;opened=true;C.save();redraw();}
 function visibleNotes(){return sorted().filter(n=>ui.filter==="pinned"?n.pinned:ui.filter==="all"||n.priority===ui.filter);}
 function bulkPin(value){for(const n of notes)if(selectedNotes.has(n.id))n.pinned=value;selectedNotes.clear();selecting=false;C.save();redraw();}
 
 
-function markup(){
- const list=visibleNotes().map(n=>'<article id="s8-note-'+A(n.id)+'" class="s8-note s8-priority-'+A(n.priority)+(highlightIds.includes(n.id)?' s8-highlight':'')+'" style="--s8-note-bg:'+noteColor(n)+';--s8-note-fg:'+contrastColor(noteColor(n))+'" title="'+A(n.description||n.title)+'">'+
- '<div class="s8-note-top">'+(selecting?'<input type="checkbox" class="s8-select-note" data-s8-select="'+A(n.id)+'" aria-label="Selecionar '+A(n.title)+'" '+(selectedNotes.has(n.id)?"checked":"")+'>':"")+'<span class="s8-note-priority" data-priority="'+A(labels[n.priority]?n.priority:"medium")+'">● '+E(labels[n.priority]||"Média")+'</span><small>'+E(age(n.createdAt))+'</small><button type="button" class="s8-pin-note" data-s8="pinNote" data-id="'+A(n.id)+'" aria-pressed="'+!!n.pinned+'" title="'+(n.pinned?"Desafixar lembrete":"Fixar no topo")+'">'+(n.pinned?'📌':'♧')+'</button></div>'+
- '<strong>'+E(n.title)+'</strong>'+(n.link?'<small class="s8-link-label">⌁ '+E(linkLabel(n.link))+'</small>':n.lastLinkLabel?'<small class="s8-link-label s8-link-complete">✓ Vínculo encerrado · '+E(n.lastLinkLabel)+'</small>':"")+(n.description?'<details class="s8-note-details"><summary>Ver observação</summary><p>'+E(n.description)+'</p></details><div class="s8-note-hover" role="tooltip">'+E(n.description)+'</div>':"")+
- '<div class="s8-note-actions"><label class="s8-color-quick" title="Cor do lembrete"><span aria-hidden="true">◉</span><input type="color" aria-label="Cor do lembrete" data-s8-color="'+A(n.id)+'" value="'+noteColor(n)+'"></label><button type="button" data-s8="edit" data-id="'+A(n.id)+'">Editar</button><button type="button" data-s8="convert" data-id="'+A(n.id)+'">Planejar ↗</button><button type="button" class="s8-danger" data-s8="remove" data-id="'+A(n.id)+'">Excluir</button></div></article>').join("");
- return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes">'+
- '<button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="'+opened+'" aria-controls="s8-panel" title="Mural de lembretes" aria-label="'+(opened?"Fechar":"Abrir")+' lembretes">'+
- '<svg width="27" height="27" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 7h18v17H5z" fill="#f4e5ad" stroke="#aa9860" stroke-width="1.5"/><path d="M7 11h14M7 15h14M7 19h10" stroke="#b4a675" stroke-width="1.3" stroke-linecap="round"/><path d="m15 4 4 5" stroke="#a44950" stroke-width="2.5" stroke-linecap="round"/><circle cx="14" cy="5" r="4" fill="#d96874" stroke="#a44950" stroke-width="1"/><circle cx="13" cy="4" r="1.1" fill="#ffe2e5"/></svg>'+
- (notes.length?'<span class="s8-count">'+notes.length+'</span>':"")+'</button>'+
- (opened?'<section id="s8-panel" class="s8-panel" aria-label="Mural de lembretes"><header class="s8-panel-head"><div data-s8="movePanel" title="Arraste para mover o mural"><strong>📌 Lembretes</strong><small>'+visibleNotes().length+' de '+notes.length+' lembretes</small></div><button type="button" class="s8-close" data-s8="toggle" aria-label="Fechar lembretes">×</button></header>'+
- '<div class="s8-panel-options"><button type="button" class="s8-option" data-s8="lock" aria-pressed="'+!!ui.locked+'" title="'+(ui.locked?"Destravar tamanho e posição":"Travar tamanho e posição")+'">'+(ui.locked?"🔒 Travado":"🔓 Travar")+'</button><button type="button" class="s8-option" data-s8="pinPanel" aria-pressed="'+!!ui.keepOpen+'" title="Manter mural aberto">'+(ui.keepOpen?"📌 Aberto":"Fixar mural")+'</button><button type="button" class="s8-option" data-s8="reset" title="Restaurar tamanho, posição e zoom">↺</button><div class="s8-zoom"><button type="button" class="s8-option" data-s8="zoomOut" aria-label="Diminuir zoom">−</button><span>'+Math.round(Number(ui.zoom)||100)+'%</span><button type="button" class="s8-option" data-s8="zoomIn" aria-label="Aumentar zoom">+</button></div><select id="s8-filter" aria-label="Filtrar lembretes">'+[["all","Todos"],["pinned","Fixados"],["high","Alta"],["medium","Média"],["low","Baixa"]].map(([k,l])=>'<option value="'+k+'" '+(ui.filter===k?"selected":"")+'>'+l+'</option>').join("")+'</select></div>'+
- '<div class="s8-bulk-tools"><button type="button" class="s8-option" data-s8="selectMode">'+(selecting?"Cancelar seleção":"Selecionar vários")+'</button>'+(selecting?'<button type="button" class="s8-option" data-s8="bulkPin">Fixar selecionados</button><button type="button" class="s8-option" data-s8="bulkUnpin">Desafixar selecionados</button>':"")+'</div>'+
- '<div class="s8-note-list" style="--s8-z:'+clamp((Number(ui.zoom)||100)/100,.65,1.5)+';--s8-card-width:'+Math.round(235*clamp((Number(ui.zoom)||100)/100,.65,1.5))+'px">'+(list||'<p class="s8-empty">'+(notes.length?"Nenhum lembrete neste filtro.":"Seu mural está vazio.")+'</p>')+'</div>'+
- '<button type="button" class="btn small primary s8-add" data-s8="new">+ Novo lembrete</button>'+
- (!ui.locked?'<div class="s8-resize-handle" data-s8="resize" role="separator" aria-label="Arraste para ajustar largura e altura do mural" title="Arraste para redimensionar">◢</div>':"")+'</section>':"")+'</div>';
+function noteMenu(idValue){
+ const n=note(idValue);if(!n)return;
+ const item=(act,ic,label,tone="")=>'<button type="button" class="orb-manage-item '+tone+'" data-s8="'+act+'" data-id="'+A(n.id)+'"><span class="orb-manage-icon">'+glyph(ic)+'</span><span><strong>'+E(label)+'</strong></span><span aria-hidden="true">›</span></button>';
+ C.openModal("Lembrete",'<div class="section-stack orb-manage"><strong>'+E(n.title)+'</strong>'+
+ (n.description?'<p style="white-space:pre-wrap;margin:0">'+E(n.description)+'</p>':"")+
+ '<small class="note">'+E(labels[n.priority]||"Média")+' · '+E(age(n.createdAt))+'</small>'+
+ (n.link||n.lastLinkLabel?'<small class="note">'+E(n.link?linkLabel(n.link):"Vínculo encerrado · "+n.lastLinkLabel)+'</small>':"")+
+ '<section class="orb-manage-group">'+item("edit","edit","Editar / cor / prioridade")+item("pinNote","pin",n.pinned?"Desafixar":"Fixar no topo")+item("convert","arrow","Transformar em atividade")+item("remove","trash","Excluir","orb-risk")+'</section></div>');
 }
+function settingsMenu(){
+ const b=bounds(),r=panelRect();
+ const field=(label,name,value,min,max)=>'<label class="field"><span>'+label+'</span><input type="number" name="'+name+'" min="'+min+'" max="'+max+'" value="'+Math.round(value)+'" required></label>';
+ C.openModal("Mural de lembretes",'<form id="s8-layout-form" class="section-stack"><div class="grid-2">'+field("Largura (px)","width",r.width,Math.min(210,b.width-16),b.width-16)+field("Altura (px)","height",r.height,Math.min(160,b.height-b.bottom-16),b.height-b.bottom-16)+'</div>'+
+ field("Zoom (%)","zoom",Number(ui.zoom)||100,50,200)+
+ '<label class="field"><span>Mostrar</span><select name="filter">'+[["all","Todos"],["pinned","Fixados"],["high","Alta"],["medium","Média"],["low","Baixa"]].map(([k,l])=>'<option value="'+k+'" '+(ui.filter===k?"selected":"")+'>'+l+'</option>').join("")+'</select></label>'+
+ '<label class="checkline"><input type="checkbox" name="locked" '+(ui.locked?"checked":"")+'> Travar posição e tamanho</label><label class="checkline"><input type="checkbox" name="keepOpen" '+(ui.keepOpen?"checked":"")+'> Manter aberto ao voltar ao Início</label>'+
+ '<div class="row"><button type="button" class="btn small ghost" data-s8="selectMode">Selecionar vários</button><button type="button" class="btn small ghost" data-s8="reset">Restaurar layout</button></div>'+
+ '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Aplicar</button></div></form>');
+}
+function markup(){
+ if(!opened)return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes"><button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="false" title="Abrir lembretes" aria-label="Abrir lembretes">'+glyph("note")+(notes.length?'<span class="s8-count">'+notes.length+'</span>':"")+'</button></div>';
+ const list=visibleNotes().map(n=>{
+  const p=labels[n.priority]?n.priority:"medium",link=n.link?linkLabel(n.link):n.lastLinkLabel?"Vínculo encerrado · "+n.lastLinkLabel:"";
+  return '<article id="s8-note-'+A(n.id)+'" data-s8-card="'+A(n.id)+'" class="s8-note s8-priority-'+p+(highlightIds.includes(n.id)?' s8-highlight':'')+'" style="--s8-note-bg:'+noteColor(n)+';--s8-note-fg:'+contrastColor(noteColor(n))+'">'+
+   '<div class="s8-note-top">'+(selecting?'<input type="checkbox" class="s8-select-note" data-s8-select="'+A(n.id)+'" aria-label="Selecionar '+A(n.title)+'" '+(selectedNotes.has(n.id)?"checked":"")+'>':"")+
+   '<span class="s8-note-priority" data-priority="'+p+'" title="Prioridade '+E(labels[p])+'">'+E(labels[p])+'</span><div class="s8-note-tools">'+
+   (link?'<span class="s8-link-symbol" title="'+A(link)+'" aria-label="'+A(link)+'">'+glyph("link")+'</span>':"")+
+   smallButton("pinNote","pin",n.pinned?"Desafixar lembrete":"Fixar no topo",'data-id="'+A(n.id)+'" aria-pressed="'+!!n.pinned+'"')+
+   smallButton("noteMenu","more","Mais opções",'data-id="'+A(n.id)+'"')+'</div></div>'+
+   '<button class="s8-note-title" type="button" data-s8="noteMenu" data-id="'+A(n.id)+'" title="'+A(n.description||n.title)+'">'+E(n.title)+'</button>'+
+   (n.description?'<details class="s8-note-details"><summary>Ver observação</summary><p>'+E(n.description)+'</p></details>':"")+'</article>';
+ }).join("");
+ const z=clamp((Number(ui.zoom)||100)/100,.5,2);
+ return '<div id="s8-floating-root" class="s8-float s8-open" aria-label="Lembretes"><section id="s8-panel" class="s8-panel" aria-label="Mural de lembretes"><header class="s8-panel-head"><div data-s8="movePanel" title="'+(ui.locked?"Mural travado":"Arraste para mover o mural")+'"><strong>Lembretes <small>'+visibleNotes().length+(visibleNotes().length!==notes.length?"/"+notes.length:"")+'</small></strong>'+(ui.locked?glyph("lock"):"")+'</div><div class="s8-head-tools">'+
+ smallButton("new","plus","Novo lembrete")+smallButton("settings","more","Configurar mural")+smallButton("close","close","Fechar mural")+'</div></header>'+
+ (selecting?'<div class="s8-bulk-tools"><span>Selecionar</span>'+smallButton("bulkPin","pin","Fixar selecionados")+smallButton("bulkUnpin","pin","Desafixar selecionados")+smallButton("selectMode","close","Sair da seleção")+'</div>':"")+
+ '<div class="s8-note-list" style="--s8-z:'+z+';--s8-card-width:'+Math.round(212*z)+'px">'+(list||'<p class="s8-empty">'+(notes.length?"Sem lembretes neste filtro.":"Nenhum lembrete.")+'</p>')+'</div>'+
+ (!ui.locked?["nw","n","ne","e","se","s","sw","w"].map(edge=>'<div class="s8-resize-handle s8-edge-'+edge+'" data-s8="resize" data-edge="'+edge+'" title="Redimensionar mural" aria-hidden="true"></div>').join(""):"")+'</section></div>';
+}
+
 function redraw(){C.render();}
 function jump(raw){
  highlightIds=String(raw||"").split(",").filter(id=>notes.some(n=>n.id===id));
  if(!highlightIds.length)return;
- opened=true;ui.filter="all";C.save();C.render();
+ ui.filter="all";openPanel();
  const element=$("s8-note-"+highlightIds[0]);
  element?.scrollIntoView?.({behavior:"smooth",block:"nearest"});
 }
@@ -287,7 +342,7 @@ function edit(idValue,preselected){
  '<div class="field"><label>Observações (opcional)</label><textarea name="description" maxlength="1200" rows="3" placeholder="Detalhes para organizar depois">'+E(n?.description||"")+'</textarea></div>'+
  '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Cor do papel</label><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="presetColor" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-note-color" aria-label="Escolher qualquer cor" value="'+noteColor(n||{priority:"medium"})+'"></div><label class="checkline"><input type="checkbox" name="autoColor" '+(!safeColor(n?.color)?"checked":"")+'> Cor automática da prioridade</label><label class="checkline"><input type="checkbox" name="pinned" '+(n?.pinned?"checked":"")+'> Fixar este lembrete no topo</label></div>'+
- '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+value+" "+({pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"}[key])+'</option>').join("")+'</select></div>'+
+ '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+E(value)+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Onde este lembrete deve aparecer?</label><select name="linkScope" id="s8-link-scope">'+Object.entries(scopeLabel).filter(([k])=>k!=="legacy").map(([k,v])=>'<option value="'+k+'" '+((preselected? (preselected.scope===k) : initialScope(n)===k)?"selected":"")+'>'+E(v)+'</option>').join("")+(initialScope(n)==="legacy"?'<option value="legacy" selected>Vínculo anterior</option>':"")+'</select></div>'+
  '<div class="field" id="s8-target-wrap" '+(scope==="none"?"hidden":"")+'><label id="s8-target-label">Escolher vínculo</label>'+
  '<div id="s8-future-date-wrap" '+(scope==="future"?"":"hidden")+'><label for="s8-future-date">Data da atividade</label><input type="date" id="s8-future-date" value="'+A(targetDate)+'" min="'+A(C.today())+'"></div>'+
@@ -376,30 +431,36 @@ function convertSubmit(data){
  if(n.createdAt)created.createdAt=n.createdAt;
  created.reminderSourceId=n.id;
  notes.splice(notes.indexOf(n),1);
- opened=!!ui.keepOpen;C.save();redraw();C.notify("Lembrete transformado em "+(type==="focus"?"foco do dia.":"tarefa secundária."));
+ C.save();redraw();C.notify("Lembrete transformado em "+(type==="focus"?"foco do dia.":"tarefa secundária."));
 }
 document.addEventListener("click",ev=>{
  const b=ev.target.closest?.("[data-s8]");if(!b)return;
  ev.preventDefault();
  const action=b.dataset.s8;
  try{
-  if(action==="toggle"){if(Date.now()<skipClickUntil){ev.stopPropagation?.();return;}opened=!opened;if(!opened){highlightIds=[];ui.keepOpen=false;C.save();}redraw();}
+  if(action==="toggle"){if(Date.now()<skipClickUntil){ev.stopPropagation?.();return;}openPanel();}
+  else if(action==="close")closePanel();
+  else if(action==="settings")settingsMenu();
+  else if(action==="noteMenu")noteMenu(b.dataset.id);
   else if(action==="new")edit();
   else if(action==="lock")toggleLock();
-  else if(action==="reset")resetLayout();
-  else if(action==="pinNote")togglePin(b.dataset.id);
+  else if(action==="reset"){C.closeModal();resetLayout();}
+  else if(action==="pinNote"){if(b.closest?.(".modal-card"))C.closeModal();togglePin(b.dataset.id);}
   else if(action==="pinPanel")pinPanel();
-  else if(action==="selectMode"){selecting=!selecting;selectedNotes.clear();redraw();}
+  else if(action==="selectMode"){if(b.closest?.(".modal-card"))C.closeModal();selecting=!selecting;selectedNotes.clear();redraw();}
   else if(action==="bulkPin")bulkPin(true);
   else if(action==="bulkUnpin")bulkPin(false);
   else if(action==="zoomOut")zoomBy(-10);
   else if(action==="zoomIn")zoomBy(10);
   else if(action==="presetColor"){const input=$("s8-note-color");if(input){input.value=b.dataset.color;const auto=input.closest("form")?.querySelector('[name="autoColor"]');if(auto)auto.checked=false;}}
   else if(action==="edit")edit(b.dataset.id);
-  else if(action==="remove")remove(b.dataset.id);
+  else if(action==="remove"){C.closeModal();remove(b.dataset.id);}
   else if(action==="convert")convert(b.dataset.id);
   else if(action==="jump")jump(b.dataset.noteIds);
  }catch(err){C.notify(err.message||"Não foi possível executar a ação.");}
+});
+document.addEventListener("contextmenu",ev=>{
+ const card=ev.target.closest?.("[data-s8-card]");if(!card)return;ev.preventDefault();noteMenu(card.dataset.s8Card);
 });
 document.addEventListener("change",event=>{
  const t=event.target;
@@ -420,15 +481,16 @@ document.addEventListener("pointercancel",pointerEnd);
 window.addEventListener?.("resize",()=>{if($("s8-floating-root"))place();});
 document.addEventListener("submit",ev=>{
  const formId=ev.target?.getAttribute?.("id")||ev.target?.id;
- if(!["s8-note-form","s8-convert-form"].includes(formId))return;
+ if(!["s8-note-form","s8-convert-form","s8-layout-form"].includes(formId))return;
  ev.preventDefault();
  try{
   const data=new FormData(ev.target);
   if(formId==="s8-note-form")saveNote(data);
+  else if(formId==="s8-layout-form")applyLayout(data);
   else convertSubmit(data);
  }catch(err){C.notify(err.message||"Verifique os dados informados.");}
 });
-document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&opened&&!$("modal-host")?.querySelector?.(".modal-layer")){opened=false;ui.keepOpen=false;C.save();redraw();}});
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&opened&&!$("modal-host")?.querySelector?.(".modal-layer"))closePanel();});
 window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return base+markup();}return base},indicatorFor:indicators,afterRender(route){
  const incoming=document.querySelector?.('#view #s8-floating-root');
  const detached=document.querySelectorAll?.('body > #s8-floating-root')||[];
@@ -438,6 +500,6 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
   document.body.appendChild(incoming);
  }
  place();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,togglePin,zoomBy,selectColor,panelRect,position,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,togglePin,zoomBy,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
 C.render();
 })();

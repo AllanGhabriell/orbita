@@ -51,7 +51,7 @@ listeners.pointerdown[0](event("toggle",3,50,50));
 listeners.pointermove[0](event("toggle",3,250,300));
 listeners.pointerup[0](event("toggle",3,250,300));
 assert.equal(R.layout.x,lockedX,"trava impede arraste");
-assert.match(read("stage8.js"),/data-s8="lock"/,"controle de bloqueio presente");
+assert.match(read("stage8.js"),/name="locked"/,"controle de bloqueio presente");
 assert.equal(R.layout.locked,true,"estado travado fica persistido");
 R.toggleLock();
 R.resetLayout();
@@ -73,7 +73,7 @@ assert.doesNotMatch(R.indicators({kind:"session",id:"math-1",discipline:"Matemá
 assert.match(markup,/Ver observação/,"observação acessível sem abrir edição");
 assert.match(markup,/Parte 2 - 07:55/,"texto da observação permanece no mural");
 R.saveNote(form({title:"Dica ENEM",priority:"medium",icon:"idea",target:"cycle|enem|"}));
-assert.match(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}),/📌/,"um alfinete discreto abre o lembrete do ciclo");
+assert.match(R.indicators({kind:"session",id:"phys-1",discipline:"Física",cycleId:"enem",status:"pending"}),/<svg/,"um alfinete discreto abre o lembrete do ciclo");
 assert.match(R.indicators({kind:"session",id:"math-1",discipline:"Matemática",cycleId:"enem",status:"pending"}),/<span>2<\/span>/,"dois lembretes compartilham um só indicador");
 sessions[0].status="done";
 R.prune();
@@ -115,7 +115,7 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-17-clean"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261124-v5-18-reminders"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
 
 R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
@@ -123,4 +123,29 @@ R.saveNote(form({title:"Alta sem fixar",priority:"high"}));
 assert.equal(R.sorted()[0].title,"Baixa fixada");
 assert.equal(R.sorted()[0].color,"#123456");
 R.togglePin(R.sorted()[0].id);assert.equal(R.sorted()[0].priority,"high");
-const z=R.layout.zoom;R.zoomBy(-10);assert.equal(R.layout.zoom,Math.max(65,z-10));
+const z=R.layout.zoom;R.zoomBy(-10);assert.equal(R.layout.zoom,Math.max(50,z-10));
+
+// O ícone e o painel são mutuamente exclusivos, e o mural cresce a partir da borda esquerda.
+R.openPanel();
+assert.doesNotMatch(markup,/class="s8-trigger"/);
+assert.match(markup,/id="s8-panel"/);
+assert.match(markup,/data-edge="nw"/);
+assert.match(markup,/data-edge="se"/);
+assert.doesNotMatch(markup,/📌|🔒|🔓/);
+R.applyLayout(form({width:240,height:260,zoom:75,filter:"all"}));
+R.layout.panelX=150;R.layout.panelY=180;
+const oldRect=R.panelRect();
+const edgeEvent=(id,x,y)=>({pointerId:id,clientX:x,clientY:y,button:0,preventDefault(){},target:{closest(){return {dataset:{s8:"resize",edge:"w"}}}}});
+listeners.pointerdown[0](edgeEvent(8,150,200));
+listeners.pointermove[0](edgeEvent(8,40,200));
+listeners.pointerup[0](edgeEvent(8,40,200));
+const grown=R.panelRect();
+assert.ok(grown.width>oldRect.width,"borda esquerda aumenta a largura");
+assert.equal(grown.left+grown.width,oldRect.left+oldRect.width,"borda oposta permanece ancorada");
+listeners.pointerdown[0](event("movePanel",9,100,200));
+listeners.pointermove[0](event("movePanel",9,110,240));
+listeners.pointerup[0](event("movePanel",9,110,240));
+assert.ok(R.panelRect().top>grown.top,"painel inteiro se move pelo cabeçalho");
+R.closePanel();
+assert.match(markup,/class="s8-trigger"/);
+assert.doesNotMatch(markup,/id="s8-panel"/);

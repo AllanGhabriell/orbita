@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.18 — mural de lembretes compacto
+
+- O botão é substituído pelo painel ao abrir; arraste o cabeçalho para mover a janela inteira.
+- Redimensionamento por oito bordas/cantos, dimensões exatas, zoom de 50 a 200% e trava nas opções.
+- Conteúdo prioritário, indicadores compactos, ícones SVG e menus contextuais; dados, cores e vínculos preservados.
+
 ## v5.17 — refinamento visual
 
 - Início com menos textos, sessões em linhas compactas, status com símbolos e cores, informações detalhadas em dicas.
