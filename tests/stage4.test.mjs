@@ -133,11 +133,12 @@ V.actions.mentorOpen();
 assert.equal(V.model.mentor.lastReadSignature,V.mentorAnalysis().digest,"ler orientação marca análise como vista");
 V.model.mentor.lastReadSignature=oldRead;
 V.model.mentor.lastViewed="2020-01-01T12:00:00.000Z";
+C.state.firstAccess=C.addDays(date,-30);
 P.model.events.push(...Array.from({length:4},(_,i)=>({kind:"entry_deleted",id:"synthetic-"+i,at:new Date().toISOString()})));
 P.model.events.push(...Array.from({length:4},(_,i)=>({kind:"entry_created",id:"new-"+i,at:new Date().toISOString()})));
 assert.ok(V.mentorAnalysis().items.some(x=>x.key==="deleted"),"exclusões repetidas geram aviso contextual");
 assert.equal(V.mentorNoticeEligible(),true,"alerta importante aparece após ausência prolongada");
-assert.ok(V.mentorUnreadCount()>=1,"contador de observações indica análises importantes");
+assert.equal(V.mentorUnreadCount(),1,"um único lembrete, independente das análises");
 assert.match(V.mentorPanel(),/Meu Orientador/,"painel permanece disponível");
 V.actions.mentorSnooze({dataset:{min:"10"}});
 assert.equal(V.mentorNoticeEligible(),false,"adiamento silencia recado");
@@ -152,3 +153,36 @@ V.model.settings.mentorEnabled=false;
 assert.ok(V.mentorPanel().includes("Orientador desativado"),"orientador também pode ser desativado por inteiro");
 V.model.settings.mentorEnabled=true;
 console.log("Etapa 4: snapshots, irreversibilidade, precedência de fechamento, feedback por amostra, descanso e bloqueio.");
+
+V.model.settings.mentorNotices=true;
+V.actions.mentorOpen();
+assert.equal(V.mentorUnreadCount(),0);
+P.model.events.push({kind:"entry_created",at:new Date().toISOString()});
+assert.equal(V.mentorUnreadCount(),0,"criar atividade não gera aviso após consulta");
+const savedClosed=V.model.closed;const savedEntries=P.model.entries;const savedRecords=P.model.records;
+const day=C.addDays(C.firstDayOfWeek(date),-7),end=C.addDays(day,6);
+const mk=(d,studied=120,habit="done",available=480)=>({date:d,availability:{mode:"hours",hours:available/60},availableMin:available,pause:null,activities:[{id:"h",title:"Organizar material",type:"habit",status:habit},{id:"f",type:"focus",title:"Foco",status:"done"}],studies:[{id:"s"+d,status:"done",actualMin:studied,plannedMin:studied}],plan:{studyMin:studied,otherMin:0,totalMin:studied},result:{actualStudyMin:studied,actualOtherMin:0}});
+V.model.closed={};
+for(let i=0;i<35;i++){const d=C.addDays(end,-i);V.model.closed[d]=mk(d);}
+C.state.firstAccess=C.addDays(end,-35);
+V.model.settings.strictness="strict";
+const before=V.mentorWeek(end);
+assert.equal(before.load.kind,"stagnation");
+V.model.closed[day].activities[0].status="notdone";
+const after=V.mentorWeek(end);assert.ok(after.score<before.score,"rotina não realizada afeta nota");
+assert.equal(after.habitsMiss,1);
+for(const snap of Object.values(V.model.closed)){snap.result.actualStudyMin=360;snap.plan.studyMin=360;snap.studies[0].actualMin=360;snap.studies[0].plannedMin=360;}
+assert.equal(V.loadAssessment(end).kind,"sustain","carga elevada estável não exige aumento");
+for(const snap of Object.values(V.model.closed)){snap.result.actualStudyMin=480;snap.plan.studyMin=480;snap.studies[0].actualMin=480;snap.studies[0].plannedMin=480;}
+assert.equal(V.loadAssessment(end).kind,"overload","sobrecarga recorrente identificada");
+const taskDate=C.addDays(todayForTest(),-12);
+function todayForTest(){return C.today();}
+P.model.entries=[{id:"low",type:"task",title:"Baixa antiga",date:taskDate,priority:"low",dueDate:"",recurrence:{kind:"none"}},{id:"high",type:"task",title:"Alta antiga",date:taskDate,priority:"high",dueDate:"",recurrence:{kind:"none"}},{id:"future",type:"task",title:"Prazo distante",date:taskDate,priority:"high",dueDate:C.addDays(date,30),recurrence:{kind:"none"}}];
+P.model.records={};
+const task=V.taskAssessment(C.addDays(date,-7),date,true);
+assert.ok(task.issues.some(i=>i.x.id==="high"));
+assert.ok(!task.issues.some(i=>["low","future"].includes(i.x.id)));
+P.model.records["high@"+date]={status:"done"};
+assert.ok(!V.taskAssessment(C.addDays(date,-7),date,true).issues.some(i=>i.x.id==="high"));
+assert.ok(!V.mentorPanel().includes("Execução ="));
+V.model.closed=savedClosed;P.model.entries=savedEntries;P.model.records=savedRecords;

@@ -1,5 +1,12 @@
 # Órbita
 
+## v5.23 — Orientador contextual
+
+- Avaliação de hábitos, focos, sessões, evolução da carga e gestão de pendências; disponibilidade e descanso preservados.
+- Quatro personalidades, memória das cobranças, incentivo contextual e lembrete único por ausência de consulta.
+- Históricos fechados preservados; avaliações anteriores não são comparadas como se usassem a mesma fórmula.
+- Referências de desenvolvimento: `docs/mentor-foundations.md`.
+
 ## v5.22 — datas inteligentes
 
 - Campos de data compartilhados: digitação e colagem em formato brasileiro, compacto e ISO, atalhos H/A/O, deslocamentos relativos e setas.

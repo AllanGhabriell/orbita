@@ -117,16 +117,16 @@ function dayHasMovement(date){
 function reviewStatus(s){return ({done:"Concluída",pending:"Pendente",progress:"Parcial / em andamento",notdone:"Não realizada",moved:"Remanejada"})[s]||"Pendente";}
 function reviewTone(snap){
  const n=dailyCounts(snap),rest=!!snap.pause||snap.availability?.mode==="rest";
- const total=n.foci+n.tasks+n.habitCount+n.plannedStudy,done=n.doneFocus+n.tasksDone+n.habitDone+n.studiesDone;
+ const due=snap.activities.filter(a=>a.type==="task"&&a.dueDate&&a.dueDate<=snap.date),total=n.foci+n.habitCount+n.plannedStudy+due.length,done=n.doneFocus+n.habitDone+n.studiesDone+due.filter(a=>a.status==="done").length;
  if(rest&&!total)return {kind:"rest",label:"Descanso registrado",description:"Este dia possui descanso registrado e não tem compromissos identificados para pontuar.",rate:null};
  if(!total)return {kind:"unknown",label:"Sem dados suficientes",description:"Não há compromissos registrados para classificar o cumprimento.",rate:null};
  const rate=Math.round(100*done/total),kind=rate>=75?"good":rate>=45?"mid":"bad";
- return {kind,label:kind==="good"?"Bom cumprimento registrado":kind==="mid"?"Cumprimento parcial":"Abaixo do planejado",description:"Classificação visual baseada apenas na proporção de compromissos marcados como concluídos. Não mede esforço, aprendizagem ou culpa.",rate};
+ return {kind,label:kind==="good"?"Bom cumprimento registrado":kind==="mid"?"Cumprimento parcial":"Abaixo do planejado",description:"Resumo dos compromissos do dia, sem tratar tarefas flexíveis como falhas automáticas.",rate};
 }
 function visualSummary(snap,final=false){
  const n=dailyCounts(snap),rating=reviewTone(snap);
  const totalActivities=n.foci+n.tasks+n.habitCount,doneActivities=n.doneFocus+n.tasksDone+n.habitDone;
- const missing=n.unmarked;
+ const missing=snap.activities.filter(a=>["pending","progress"].includes(a.status)&&(a.type!=="task"||a.dueDate&&a.dueDate<=snap.date)).length+snap.studies.filter(a=>["pending","progress"].includes(a.status)).length;
  const title=final?"Dia finalizado e preservado":"Balanço provisório — dia aberto";
  const positive=[];
  if(n.doneFocus)positive.push(n.doneFocus+" foco(s) concluído(s)");
@@ -328,7 +328,7 @@ function guidance(x){
 }
 
 /* Supervisor: diagnóstico verificável e contínuo. Dados ausentes não viram falhas inventadas. */
-function mentorAnalysis(){
+function legacyMentorAnalysis(){
  const all=periodData("all",today()),week=periodData("week",today()),previous=periodData("week",add(today(),-7));
  const c=all.count,w=week.count,b=previous.count;
  const nowMs=Date.now(),recent=7*86400000;
@@ -397,75 +397,227 @@ function mentorAnalysis(){
  const digest=picked.map(x=>x.key+":"+x.evidence).join("|");
  return {items:picked,digest,important:picked.some(x=>x.score>=65),closed:c.closed,days:c.days};
 }
-function mentorUnreadCount(){
- if(ev.settings.mentorEnabled===false)return 0;
- const analysis=mentorAnalysis();
- if(!analysis.important||analysis.digest===ev.mentor.lastReadSignature||analysis.digest===ev.mentor.dismissedSignature)return 0;
- return analysis.items.filter(x=>x.score>=65).length;
+/* Critérios internos do Orientador v5.23. Não expor parâmetros no painel. */
+const M_DAY=86400000;
+const profiles={gentle:{high:7,medium:21,grace:.08,stagnation:35,penalty:.65},firm:{high:5,medium:14,grace:.04,stagnation:30,penalty:1},strict:{high:3,medium:10,grace:0,stagnation:28,penalty:1.15},hard:{high:2,medium:7,grace:0,stagnation:24,penalty:1.35}};
+const mentorTone=()=>profiles[ev.settings.strictness]?ev.settings.strictness:"firm";
+const cfg=()=>profiles[mentorTone()];
+const clamp01=n=>Math.min(1,Math.max(0,n));
+const elapsedDays=(from,to)=>Math.max(0,Math.round((parse(to)-parse(from))/M_DAY));
+const closedRows=(from,to)=>Object.keys(ev.closed).filter(d=>d>=from&&d<=to).sort().map(d=>ev.closed[d]);
+const labelMinutes=n=>minutes(Math.round(n));
+function actualStudy(snap){return Math.max(0,Number(snap.result?.actualStudyMin)||0);}
+function studyCapacity(snap){
+ if(!snap.availability||snap.availableMin==null||!Number.isFinite(Number(snap.availableMin)))return null;
+ const available=Math.max(0,Number(snap.availableMin)),other=Math.max(0,Number(snap.plan?.otherMin)||0,Number(snap.result?.actualOtherMin)||0);
+ if(snap.pause||snap.availability.mode==="rest")return 0;
+ // Reserve space for transitions, meals and breaks; avoid recommending the entire free interval.
+ return Math.max(0,available*.8-other);
 }
-function mentorUnread(){return mentorUnreadCount()>0;}
+function studyWindow(from,to){
+ const rows=closedRows(from,to).filter(s=>studyCapacity(s)>0&&!(s.studies||[]).some(x=>x.status!=="notdone"&&x.actualMin==null));
+ const sum=rows.reduce((a,s)=>a+actualStudy(s),0),cap=rows.reduce((a,s)=>a+studyCapacity(s),0);
+ return {days:rows.length,sum,capacity:cap,average:rows.length?sum/rows.length:0,use:cap?sum/cap:0};
+}
+function loadAssessment(end){
+ const recent=studyWindow(add(end,-13),end),prior=studyWindow(add(end,-27),add(end,-14));
+ const full=closedRows(add(end,-29),end),known=full.filter(s=>studyCapacity(s)>0&&!(s.studies||[]).some(x=>x.status!=="notdone"&&x.actualMin==null));
+ const overload=known.filter(s=>actualStudy(s)>studyCapacity(s)*1.15&&actualStudy(s)>=180).length;
+ const age=elapsedDays(first(),end)+1;
+ if(known.length<4||recent.days<3)return {kind:"unknown",rate:null,recent,prior,age,overload};
+ if(overload>=3&&overload/known.length>=.35)return {kind:"overload",rate:clamp01(1-.25*cfg().penalty),recent,prior,age,overload};
+ if(prior.days<4||recent.days<4)return {kind:recent.use>=.85?"sustain":"forming",rate:null,recent,prior,age,overload};
+ const change=prior.average>0?(recent.average-prior.average)/prior.average:recent.average>0?1:0;
+ const capacityChange=prior.capacity/prior.days>0?(recent.capacity/recent.days)/(prior.capacity/prior.days):1;
+ const out={recent,prior,age,overload,change};
+ if(change>.5&&recent.average-prior.average>=60)return {...out,kind:"rapid",rate:clamp01(1-.12*cfg().penalty)};
+ if(recent.use>=.85&&change>=-.15)return {...out,kind:"sustain",rate:1};
+ if(change<-.25&&capacityChange>=.85&&prior.average>=30)return {...out,kind:"drop",rate:clamp01(1-Math.min(.65,Math.abs(change)*cfg().penalty))};
+ if(change>=.08&&recent.average-prior.average>=10)return {...out,kind:"growth",rate:1};
+ if(age>=cfg().stagnation&&prior.average>=30&&Math.abs(change)<.08&&recent.use<.65&&capacityChange>=.85&&recent.capacity/recent.days-recent.average>=60)return {...out,kind:"stagnation",rate:clamp01(1-.35*cfg().penalty)};
+ return {...out,kind:"stable",rate:.95};
+}
+function taskHistory(end,live=false){
+ // Historical snapshots contain the task at creation and completion. Keep a single row per flexible task.
+ const map=new Map(),done=new Map();
+ for(const snap of closedRows(first(),end))for(const a of snap.activities||[]){
+  if(a.type!=="task")continue;
+  const recurring=a.recurrence&&a.recurrence!=="none",key=recurring?a.id+"@"+snap.date:a.id;
+  const row={...a,date:a.sourceDate||snap.date,occurrence:snap.date,key};
+  const old=map.get(key);
+  if(!old||snap.date>=old.occurrence)map.set(key,row);
+  if(a.status==="done"&&!done.has(key))done.set(key,snap.date);
+ }
+ if(live){
+  for(const x of p.entries||[]){
+   if(x.type!=="task"||x.date>end||x.recurrence?.kind&&x.recurrence.kind!=="none")continue;
+   if(x.archivedAt&&x.archivedAt<=end){map.delete(x.id);done.delete(x.id);continue;}
+   map.set(x.id,{...x,key:x.id,occurrence:end});
+  }
+  for(const [key,r] of Object.entries(p.records||{})){
+   const at=key.lastIndexOf("@"),id=key.slice(0,at),d=key.slice(at+1);
+   if(r.status==="done"&&d<=end){if(map.has(key)&&!done.has(key))done.set(key,d);if(map.has(id)&&(!done.has(id)||done.get(id)>d))done.set(id,d);}
+  }
+  for(const x of S2.allOn(end)||[]){
+   if(x.type!=="task"||!x.recurrence?.kind||x.recurrence.kind==="none")continue;
+   const key=x.id+"@"+end;map.set(key,{...x,key,date:end,occurrence:end});if(x.status==="done")done.set(key,end);
+  }
+ }
+ return [...map.values()].map(x=>({...x,completed:done.get(x.key)||""}));
+}
+function taskAssessment(from,end,live=false){
+ const rows=taskHistory(end,live),issues=[],alerts=[],eligible=[];
+ for(const x of rows){
+  if(x.completed&&x.completed<from)continue;
+  const age=elapsedDays(x.date,end),due=x.dueDate||"",priority=x.priority||"medium",tolerance=cfg()[priority],deadline=due&&due<=end;
+  const late=!!due&&(x.completed?x.completed>due:end>due),dueNow=!!due&&due===end&&!x.completed;
+  const overdueAge=late?elapsedDays(due,x.completed||end):0;
+  const ageBreach=(!due||priority==="high"&&elapsedDays(end,due)<=2)&&Number.isFinite(tolerance)&&age>=tolerance&&!x.completed;
+  const near=due&&due>end&&elapsedDays(end,due)<=2&&priority==="high"&&!x.completed;
+  // A low priority without a deadline never causes an age penalty.
+  if(late||dueNow||ageBreach){
+   const severity=late?Math.min(1,.45+overdueAge*.09):dueNow?.35:Math.min(.85,.25+(age-tolerance)*.07);
+   eligible.push(clamp01(1-severity*cfg().penalty));issues.push({x,age,late,dueNow,ageBreach});
+  }else if(x.completed&&(deadline||priority==="high"||priority==="medium"))eligible.push(1);
+  else if(deadline&&x.completed)eligible.push(1);
+  if(near)alerts.push({x,age});
+ }
+ return {rate:eligible.length?eligible.reduce((a,b)=>a+b,0)/eligible.length:null,issues,alerts,rows};
+}
+function habitAssessment(rows){
+ const grouped=new Map();
+ for(const snap of rows)for(const a of snap.activities||[]){
+  if(a.type!=="habit")continue;
+  const key=a.id||a.title,old=grouped.get(key)||{title:a.title,done:0,miss:0,unknown:0,total:0};
+  old.total++;if(a.status==="done")old.done++;else if(a.status==="notdone"||a.status==="moved")old.miss++;else old.unknown++;
+  grouped.set(key,old);
+ }
+ const groups=[...grouped.values()],total=groups.reduce((n,g)=>n+g.total,0),done=groups.reduce((n,g)=>n+g.done,0),miss=groups.reduce((n,g)=>n+g.miss,0),unknown=total-done-miss;
+ // Count actual misses strongly. Pending is a record gap, not a proven failure.
+ const rate=total&&done+miss?clamp01((done+Math.min(cfg().grace*total,miss))/(done+miss)):null;
+ return {groups,total,done,miss,unknown,rate};
+}
+function executionAssessment(rows){
+ const h=habitAssessment(rows),f={total:0,done:0,miss:0,unknown:0},st={total:0,done:0,miss:0,unknown:0,planned:0,actual:0,known:0,missing:0,partial:0};
+ for(const snap of rows){
+  for(const a of snap.activities||[])if(a.type==="focus"){f.total++;if(a.status==="done")f.done++;else if(["notdone","moved"].includes(a.status))f.miss++;else f.unknown++;}
+  for(const a of snap.studies||[]){
+   st.total++;if(a.status==="done")st.done++;else if(a.status==="notdone")st.miss++;else if(a.status==="progress"&&a.actualMin!=null)st.partial++;else st.unknown++;
+   if(a.actualMin!=null||a.status==="notdone"){st.actual+=Math.max(0,Number(a.actualMin)||0);st.planned+=Math.max(0,Number(a.plannedMin)||0);st.known++;}
+   else st.missing++;
+  }
+ }
+ const focusRate=f.total?clamp01((f.done+Math.min(f.miss,cfg().grace*f.total))/f.total):null;
+ const sessionRate=st.total?clamp01((st.done+st.partial*.5)/st.total):null;
+ const studyRate=sessionRate===null?null:st.planned>0?sessionRate*.7+clamp01(st.actual/st.planned)*.3:sessionRate;
+ return {h,f,st,focusRate,studyRate};
+}
+function mentorWeek(date){
+ const from=periodStart("week",date),to=periodEnd("week",date),end=to<today()?to:today(),rows=closedRows(from,end),last=rows.at(-1)?.date||end;
+ const x=executionAssessment(rows),load=loadAssessment(last),tasks=taskAssessment(from,last,false);
+ const components=[[30,x.h.rate],[25,x.focusRate],[20,load.rate],[15,x.studyRate],[10,tasks.rate]];
+ const assessed=components.filter(([,r])=>r!==null&&Number.isFinite(r)),weight=assessed.reduce((n,[w])=>n+w,0);
+ const provisional=rows.length<5||x.h.unknown>0||x.f.unknown>0||x.st.missing>0||weight<70||load.rate===null||end<to;
+ let score=rows.length&&weight?Math.round(100*assessed.reduce((n,[w,r])=>n+w*r,0)/weight):null;
+ if(score!==null&&provisional&&score>=96)score=95;
+ if(score!==null&&score===100&&(x.h.miss||x.f.miss||x.st.miss||x.st.partial||tasks.issues.length))score=99;
+ return {from,to,days:rows.length,score,rate:score,provisional,focus:x.f.total,doneFocus:x.f.done,study:x.st.total,studiesDone:x.st.done,studyMin:rows.reduce((n,s)=>n+actualStudy(s),0),plannedStudyMin:rows.reduce((n,s)=>n+(Number(s.plan?.studyMin)||0),0),tasks:tasks.rows.length,tasksDone:tasks.rows.filter(t=>t.completed).length,habits:x.h.total,habitsDone:x.h.done,habitsMiss:x.h.miss,execution:x,load,tasksAssessment:tasks};
+}
+const messages={
+ habits:["Vamos ajustar essa rotina para que ela caiba no seu dia.","Você precisa dar às suas rotinas a mesma atenção que dá aos outros compromissos.","Você quer resultados consistentes com hábitos inconsistentes?","Planejamento sem execução é decoração. Sustente as rotinas que você assumiu."],
+ focus:["Reveja o que dificultou a execução dos seus focos.","Você assumiu esses compromissos. Reorganize a agenda para cumpri-los.","Ninguém escolheu esse compromisso por você. Foi você quem decidiu que era importante.","Antes de assumir novas prioridades, entregue as que você mesmo declarou indispensáveis."],
+ tasks:["Revise as tarefas que ainda precisam de atenção.","Resolva as pendências importantes ou revise sua prioridade.","Suas prioridades precisam refletir suas ações.","Se tudo é prioridade alta, você não está priorizando absolutamente nada."],
+ stagnation:["Você tem uma base estável. Experimente um pequeno avanço, se fizer sentido.","Há espaço para evoluir gradualmente. Escolha um próximo passo viável.","Você está evoluindo ou apenas repetindo a mesma semana?","Já construiu uma base. Agora prove que consegue avançar sem perder a constância."],
+ overload:["Seu esforço é importante. Reserve espaço para recuperação.","Reorganize a carga; seu ritmo precisa caber na sua disponibilidade.","Não confunda intensidade com disciplina. Quero um ritmo que consiga sustentar.","Não tente levantar um peso que não consegue sustentar. Constância antes de intensidade."],
+ rapid:["Consolide o novo ritmo antes de aumentar novamente.","A carga cresceu rápido. Dê tempo para adaptar sua rotina.","Não tente construir em uma semana aquilo que exige meses de disciplina.","Não quero uma semana extraordinária seguida de abandono. Consolide o que conquistou."],
+ drop:["Veja o que mudou e escolha um ritmo possível para retomar.","A carga diminuiu. Reavalie os obstáculos antes de planejar a recuperação.","Você já demonstrou um ritmo maior. O que mudou?","Não deixe uma queda de ritmo virar padrão. Ajuste a estratégia e retome com cautela."],
+ growth:["Seu esforço está produzindo progresso.","A evolução registrada merece reconhecimento. Mantenha a estratégia.","Resultados concretos. Agora consolide essa conquista.","Finalmente, progresso comprovado. Sustente o que conquistou."],
+ sustain:["Você está mantendo uma carga elevada. Cuide do descanso.","O ritmo já ocupa boa parte do tempo disponível; mantenha a constância.","Não preciso de mais horas. Preciso que você mantenha a qualidade e o descanso.","Não confunda mais horas com mais mérito. Sustente o ritmo, não se sobrecarregue."],
+ study:["Observe o que dificultou as sessões planejadas.","Revise a duração e a distribuição das sessões.","Você precisa transformar sessões planejadas em estudo efetivo.","O plano não estuda por você. Cumpra o que é viável e ajuste o que não é."],
+ missing:["Registre a duração quando souber.","Sem os tempos reais, não consigo avaliar a carga com precisão.","Não me dê uma conclusão sem os dados que consegue registrar.","Quero registros confiáveis, não uma lista de conclusões sem contexto."]
+};
+const phrases={
+ good:["Esse esforço está construindo seu caminho. Continue.","Você ainda não chegou onde deseja, mas já avançou.","As raízes da educação são amargas, mas seus frutos são doces. — Atribuída a Aristóteles","Uma derrota não determina toda a trajetória.","Disciplina é continuar mesmo quando a empolgação desaparece."],
+ firm:["Seu planejamento precisa sair do papel.","O que você fez nesta semana que não conseguia fazer na anterior?","Aumente sua dedicação ou reveja suas ambições.","Você quer resultados diferentes mantendo os mesmos comportamentos?"],
+ caution:["Constância antes de intensidade.","Prefiro um ritmo sustentável a um esforço extraordinário que não dura.","Descansar quando necessário faz parte da preparação.","Não tente conquistar em um dia o que exige meses de prática."]
+};
+function voice(key){const list=messages[key]||messages.study;return list[["gentle","firm","strict","hard"].indexOf(mentorTone())];}
+function mentorIssues(current){
+ const issues=[],x=current.execution,load=current.load,live=taskAssessment(current.from,today(),true),rolling=habitAssessment(closedRows(add(today(),-29),today()));
+ const addIssue=(key,score,tone,title,body,evidence,action)=>issues.push({key,score,tone,title,body,evidence,action:action||voice(key)});
+ if(x.h.miss)addIssue("habits",92,"warning","Regularidade das rotinas",x.h.done+" de "+(x.h.done+x.h.miss)+" ocorrências registradas como cumpridas. "+rolling.groups.filter(g=>g.miss>=2).slice(0,3).map(g=>g.title+": "+g.miss+" não realizadas no último mês.").join(" "),x.h.miss+" não realizadas");
+ if(x.h.unknown)addIssue("habitRecords",68,"neutral","Rotinas sem confirmação",x.h.unknown+" ocorrência(s) ficaram sem confirmação. Não vou presumir que você falhou.",""+x.h.unknown+" sem registro","Confira os registros antes de avaliar a regularidade.");
+ if(x.f.miss||x.f.unknown)addIssue("focus",89,"warning","Focos pendentes ou não realizados",x.f.done+" de "+x.f.total+" focos foram concluídos. "+x.f.miss+" não realizados ou remanejados; "+x.f.unknown+" sem conclusão confirmada.",x.f.done+"/"+x.f.total);
+ if(x.st.total>x.st.done)addIssue("study",78,"warning","Execução dos estudos",x.st.done+" de "+x.st.total+" sessões concluídas. "+x.st.partial+" parciais e "+x.st.miss+" não realizadas.",x.st.done+"/"+x.st.total);
+ if(x.st.missing)addIssue("missing",66,"neutral","Duração sem registro",x.st.missing+" sessão(ões) sem duração confirmada.",x.st.missing+" sem duração");
+ if(live.issues.length){
+  const first=live.issues.sort((a,b)=>Number(b.late)-Number(a.late)||Number(b.x.priority==="high")-Number(a.x.priority==="high")||b.age-a.age)[0];
+  const detail=first.late? "O prazo de «"+first.x.title+"» venceu"+(first.x.completed?" antes da conclusão.":"."):first.dueNow?"«"+first.x.title+"» vence hoje.":"«"+first.x.title+"» está pendente há "+first.age+" dias, com prioridade "+({high:"alta",medium:"média"}[first.x.priority]||"definida")+".";
+  addIssue("tasks",85,"warning","Gestão das prioridades",detail+" "+live.issues.length+" pendência(s) ou atraso(s) merecem revisão.",live.issues.length+" em atenção");
+ }
+ if(live.alerts.length)addIssue("near",64,"neutral","Prazos próximos",live.alerts.length+" tarefa(s) de alta prioridade têm prazo próximo: "+live.alerts.slice(0,3).map(a=>a.x.title).join(", ")+".",live.alerts.length+" próximas do prazo","Reserve tempo para essas tarefas antes do vencimento.");
+ const loadTitles={overload:"Carga elevada demais",rapid:"Aumento rápido da carga",stagnation:"Carga sem evolução",drop:"Redução de ritmo",growth:"Evolução dos estudos",sustain:"Ritmo elevado e estável"};
+ if(loadTitles[load.kind]){
+  const positive=["growth","sustain"].includes(load.kind);
+  const detail=(load.kind==="overload"?load.overload+" dias com carga elevada no último mês. ":"")+ "Média recente: "+labelMinutes(load.recent.average)+" por dia registrado"+(load.prior.days>=4?", antes "+labelMinutes(load.prior.average):"")+". "+(load.kind==="sustain"||load.kind==="overload"?"Considere os outros compromissos e as pausas necessárias.":load.kind==="stagnation"?"Há espaço na disponibilidade registrada; avalie um avanço gradual.":"");
+  addIssue(load.kind,load.kind==="overload"?96:load.kind==="stagnation"?84:load.kind==="rapid"?87:76,positive?"good":"warning",loadTitles[load.kind],detail,labelMinutes(load.recent.average)+"/dia");
+ }
+ if(x.h.done&&x.h.miss===0&&x.h.unknown===0)addIssue("habitGood",72,"good","Rotinas consistentes",x.h.done+" ocorrências cumpridas.",""+x.h.done+" realizadas","Continue sustentando seus hábitos.");
+ if(x.f.done)addIssue("focusGood",60,"good","Focos entregues",x.f.done+" compromissos concluídos.",String(x.f.done),"Mantenha a qualidade.");
+ if(x.st.done)addIssue("studyGood",60,"good","Sessões concluídas",x.st.done+" sessões concluídas nos dias analisados.",String(x.st.done),"Continue registrando os resultados reais.");
+ for(const a of legacyMentorAnalysis().items.filter(i=>["deleted","late","pauses"].includes(i.key)))issues.push(a);
+ if(!issues.length)addIssue("forming",10,"neutral","Acompanhamento em formação","Ainda preciso de mais registros para avaliar sua trajetória.","Histórico em formação","Continue registrando seus compromissos.");
+ const memory=ev.mentor.issueHistory||{};
+ for(const i of issues){
+  const old=memory[i.key];
+  if(i.tone==="warning"&&old?.active&&elapsedDays(old.first||today(),today())>=7)i.body="Já conversamos sobre esse padrão. "+i.body;
+ }
+ for(const [key,old] of Object.entries(memory)){
+  if(!old?.active||!old?.last||elapsedDays(old.last,today())>30)continue;
+  const improved=(key==="habits"&&x.h.total>=3&&x.h.miss===0&&x.h.unknown===0)||(key==="focus"&&x.f.total>0&&x.f.done===x.f.total)||(key==="stagnation"&&load.kind==="growth")||(key==="tasks"&&live.issues.length===0&&live.rows.some(t=>t.completed&&t.completed>=old.last));
+  if(improved)addIssue("recovery-"+key,90,"good","Melhora após cobrança","O padrão que conversamos anteriormente apresentou melhora nos registros atuais.","Avanço registrado","Agora mantenha essa mudança.");
+ }
+ return issues.sort((a,b)=>b.score-a.score);
+}
+function mentorAnalysis(){
+ const current=mentorWeek(today()),items=mentorIssues(current);
+ return {items,digest:items.map(x=>x.key+":"+x.evidence).join("|"),important:items.some(x=>x.tone==="warning"),closed:current.days,days:current.days};
+}
 function mentorNoticeEligible(){
- if(ev.settings.mentorEnabled===false||ev.settings.mentorNotices===false||!mentorUnread())return false;
+ if(ev.settings.mentorEnabled===false||ev.settings.mentorNotices===false)return false;
  if(Date.parse(ev.mentor.snoozeUntil||"")>Date.now())return false;
- const base=Date.parse(ev.mentor.lastViewed||ev.mentor.lastDelivery||state.firstAccess+"T12:00:00");
- if(Number.isFinite(base)&&Date.now()-base<3*86400000)return false;
- return true;
+ const last=Math.max(...[ev.mentor.lastViewed,ev.mentor.lastDelivery].map(v=>Date.parse(v||"")).filter(Number.isFinite),Date.parse(first()+"T00:00:00"));
+ const days=Math.max(3,Math.min(30,Number(ev.settings.mentorInterval)||7));
+ return Number.isFinite(last)&&Date.now()-last>=days*M_DAY;
 }
+function mentorUnreadCount(){return mentorNoticeEligible()?1:0;}
+function mentorUnread(){return mentorUnreadCount()>0;}
 function mentorNotice(){
  if(!mentorNoticeEligible())return "";
- const detail=mentorOptionsOpen?'<div class="evo-mentor-options"><button class="btn small ghost" data-s4="mentorSnooze" data-min="10">Daqui a 10 min</button><button class="btn small ghost" data-s4="mentorSnooze" data-min="15">Daqui a 15 min</button><button class="btn small ghost" data-s4="mentorSnooze" data-min="1440">Não mostrar hoje</button><button class="btn small ghost" data-s4="mentorDismiss">Dispensar mensagem</button><button class="btn small ghost" data-s4="mentorDisableNotices">Desativar avisos</button></div>':"";
- return '<aside class="card evo-mentor-message evo-mentor-note" aria-label="Nova mensagem do orientador"><div class="evo-mentor-avatar" aria-hidden="true">◉</div><div class="evo-mentor-copy"><strong>O Orientador tem '+mentorUnreadCount()+' observação(ões) nova(s)</strong><p>Há dados recentes do seu planejamento para analisar, quando for conveniente.</p><div class="row"><button class="btn primary small" data-s4="mentorOpen">Ver feedback</button><button class="btn small ghost" data-s4="mentorOptions" aria-expanded="'+!!mentorOptionsOpen+'">'+(mentorOptionsOpen?"Ocultar opções":"Agora não ▾")+'</button></div>'+detail+'</div></aside>';
-}
-
-/* Orientador visual: notas são descrições de execução, nunca de inteligência.
- * Somente dias encerrados entram na nota; faltas não confirmadas aparecem à parte. */
-function mentorWeek(date){
- const from=periodStart("week",date),to=periodEnd("week",date),days=[];
- for(let d=from;d<=to&&d<=today();d=add(d,1))if(ev.closed[d])days.push(ev.closed[d]);
- const n={focus:0,doneFocus:0,study:0,studiesDone:0,studyMin:0,plannedStudyMin:0,tasks:0,tasksDone:0,days:days.length};
- for(const snap of days){
-  const d=dailyCounts(snap);
-  n.focus+=d.foci;n.doneFocus+=d.doneFocus;n.study+=d.plannedStudy;n.studiesDone+=d.studiesDone;
-  n.tasks+=d.tasks;n.tasksDone+=d.tasksDone;
-  n.studyMin+=Number(snap.result?.actualStudyMin)||0;
-  n.plannedStudyMin+=Number(snap.plan?.studyMin)||0;
- }
- const denominator=n.focus+n.study;
- n.score=denominator?Math.round(100*(n.doneFocus+n.studiesDone)/denominator):null;
- n.rate=denominator?Math.round(100*(n.doneFocus+n.studiesDone)/denominator):null;
- n.from=from;n.to=to;
- return n;
+ return '<aside class="card evo-mentor-message evo-mentor-note" aria-label="Lembrete do Orientador"><div class="evo-mentor-copy"><strong>Há algum tempo não conversamos.</strong><p>Quando puder, vamos rever seu desempenho.</p><div class="row"><button class="btn small ghost" data-s4="mentorOpen">Consultar</button><button class="btn small ghost" data-s4="mentorDismiss">Agora não</button></div></div></aside>';
 }
 function mentorVisualData(){
  const current=mentorWeek(today()),previous=mentorWeek(add(today(),-7)),history=[];
  for(let k=5;k>=0;k--)history.push(mentorWeek(add(today(),-k*7)));
- const known=history.filter(x=>x.score!==null);
- const comparable=current.score!==null&&previous.score!==null;
- const delta=comparable?current.score-previous.score:null;
- const problems=[],positives=[];
- if(current.focus>=1&&current.doneFocus<current.focus)problems.push({title:"Focos não cumpridos",value:(current.focus-current.doneFocus)+" de "+current.focus,description:"Nos dias finalizados desta semana, "+(current.focus-current.doneFocus)+" foco(s) ficaram sem conclusão.",action:"Defina menos prioridades se necessário, mas cumpra o que assumir."});
- if(current.study>=1&&current.studiesDone<current.study)problems.push({title:"Sessões não concluídas",value:(current.study-current.studiesDone)+" de "+current.study,description:"Das "+current.study+" sessões registradas em dias encerrados, "+(current.study-current.studiesDone)+" não foram concluídas integralmente.",action:"Revise duração e distribuição antes de aumentar a carga."});
- if(current.doneFocus>0)positives.push({title:"Focos entregues",value:String(current.doneFocus),description:"Você concluiu "+current.doneFocus+" foco(s) nesta semana. Esse compromisso foi registrado."});
- if(current.studiesDone>0)positives.push({title:"Sessões concluídas",value:String(current.studiesDone),description:"Você concluiu "+current.studiesDone+" sessão(ões) em dias finalizados."});
- if(delta!==null&&delta>0)positives.unshift({title:"Evolução comprovada",value:"+"+delta+" p.p.",description:"Sua taxa de execução cresceu "+delta+" ponto(s) percentual(is) em relação à semana anterior."});
- if(delta!==null&&delta<0)problems.unshift({title:"Queda na execução",value:delta+" p.p.",description:"A taxa de execução caiu "+Math.abs(delta)+" ponto(s) percentual(is) em relação à semana passada.",action:"Compare a carga planejada e os imprevistos antes de definir a nova meta."});
- if(!positives.length&&current.days>0)positives.push({title:"Dias registrados",value:String(current.days),description:"Você finalizou "+current.days+" dia(s). Manter registros confiáveis é um avanço, mas não substitui executar o planejado."});
- const all=mentorAnalysis(),more=all.items.filter(x=>x.key!=="focus"&&x.key!=="consistent");
- const ranked=problems[0];
- const grade=current.score===null?"Sem nota ainda":current.score>=85?"Muito bom":current.score>=70?"Bom":current.score>=50?"Regular":"Abaixo do esperado";
- const stateTone=current.score===null?"neutral":current.score>=70?"good":current.score>=50?"mid":"bad";
- const slogan=current.score===null?"Sem registros fechados suficientes para avaliar. Comece pelo básico.":current.score<50?"Você quer atingir seu objetivo? Seus registros precisam acompanhar essa ambição.":current.score<70?"Você está entregando uma parte, mas ainda há trabalho pendente.":"Bom resultado. Agora prove que consegue manter a consistência.";
- const proposal=previous.score===null?null:Math.min(100,previous.score+10);
- return {current,previous,history,known,delta,problems,positives,more,ranked,grade,stateTone,slogan,proposal};
+ const known=history.filter(x=>x.score!==null),delta=current.score!==null&&previous.score!==null?current.score-previous.score:null;
+ const all=mentorAnalysis(),problems=all.items.filter(i=>i.tone==="warning").map(i=>({...i,value:i.evidence,description:i.body})),positives=all.items.filter(i=>i.tone==="good").map(i=>({...i,value:i.evidence,description:i.body})),more=all.items.filter(i=>i.tone==="neutral");
+ const ranked=problems[0],score=current.score;
+ const grade=score===null?"Sem nota ainda":score===100?"Excepcional":score>=90?"Excelente":score>=80?"Muito bom":score>=70?"Bom":score>=60?"Regular":score>=40?"Insatisfatório":"Crítico";
+ const stateTone=score===null?"neutral":score>=80?"good":score>=60?"mid":"bad";
+ const category=["overload","rapid"].includes(ranked?.key)||["sustain","overload","rapid"].includes(current.load.kind)?"caution":ranked&&["strict","hard"].includes(mentorTone())?"firm":"good";
+ const list=phrases[category],seed=Number(today().replaceAll("-",""));
+ const slogan=ranked?ranked.action:positives[0]?.action||"Vamos acompanhar seus registros.";
+ const proposal=previous.score===null?null:Math.min(100,previous.score+(previous.score>=85?3:5));
+ return {current,previous,history,known,delta,problems,positives,more,ranked,grade,stateTone,slogan,proposal,phrase:list[seed%list.length]};
 }
 function mentorTrendGraph(data){
  const weeks=data.history,valid=weeks.filter(w=>w.score!==null);
- if(!valid.length)return '<p class="note">Finalize dias com focos ou sessões para formar o gráfico. Não inventamos pontuações.</p>';
+ if(!valid.length)return '<p class="note">Ainda não há registros suficientes para acompanhar a evolução.</p>';
  return '<div class="evo-boss-chart" role="img" aria-label="Notas de execução das últimas seis semanas">'+weeks.map((w,i)=>{
   const h=w.score===null?0:Math.max(3,w.score);
   const color=w.score===null?"none":w.score>=70?"good":w.score>=50?"mid":"bad";
   return '<div class="evo-boss-barcol" title="'+E("Semana de "+fmt(w.from,false)+": "+(w.score===null?"sem nota":w.score+"/100"))+'"><strong>'+(w.score===null?"—":w.score)+'</strong><div class="evo-boss-barback">'+(w.score!==null?'<span class="'+color+'" style="height:'+h+'%"></span>':"")+'</div><small>'+E(i===weeks.length-1?"Atual":"S-"+(weeks.length-i-1))+'</small></div>';
- }).join("")+'</div><p class="note">Notas de execução (0–100). Só entram compromissos de dias finalizados; semanas sem registros não recebem nota.</p>';
+ }).join("")+'</div><p class="note">Histórico de desempenho. Semanas com poucos dados são provisórias.</p>';
 }
 let mentorDraftTarget=null,statsExpanded=false;
 function mentorPanel(){
@@ -474,23 +626,23 @@ function mentorPanel(){
  const display=score===null?"—":String(score),delta=d.delta;
  const trend=delta===null?"Sem comparação":delta>0?"▲ +"+delta+" p.p.":delta<0?"▼ "+delta+" p.p.":"● Estável";
  const trendTone=delta===null?"neutral":delta>0?"good":delta<0?"bad":"mid";
- const critique=tone==="gentle"?"Vamos ajustar sua execução com base no que foi realmente registrado.":tone==="strict"?"Chega de metas apenas no papel. "+d.slogan:d.slogan;
+ const critique=d.slogan;
  const top=d.ranked?d.ranked.title+" · "+d.ranked.value:(score===null?"Ainda não há desempenho confirmado para cobrar.":"Mantenha o que está funcionando e cuide dos próximos compromissos.");
  const issue=(v,i)=>'<details class="evo-boss-detail"><summary><span class="evo-boss-detail-icon">!</span><span>'+E(v.title)+'</span><strong>'+E(v.value)+'</strong></summary><div><p>'+E(v.description)+'</p><p><strong>Próximo passo:</strong> '+E(v.action)+'</p></div></details>';
  const good=(v,i)=>'<details class="evo-boss-detail"><summary><span class="evo-boss-detail-icon">✓</span><span>'+E(v.title)+'</span><strong>'+E(v.value)+'</strong></summary><div><p>'+E(v.description)+'</p></div></details>';
  const target=mentorDraftTarget===null?d.proposal??60:mentorDraftTarget;
  const goal=ev.mentor.goal,finished=goal&&goal.weekEnd<today(),goalResult=goal&&finished?mentorWeek(goal.weekStart):null;
- const goalState=goalResult&&goalResult.score!==null?(goalResult.score>=goal.target?"Meta cumprida":"Meta não cumprida"):"Ainda sem resultado final";
+ const oldGoal=goal&&goal.scoringVersion!==2;const goalState=oldGoal?"Compromisso da avaliação anterior":goalResult&&goalResult.score!==null&&!goalResult.provisional?(goalResult.score>=goal.target?"Meta cumprida":"Meta não cumprida"):"Ainda sem resultado conclusivo";
  return '<section class="card evo-mentor-section evo-boss"><div class="evo-boss-head"><span class="overline">◉ Meu Orientador · CHEFE DE DESEMPENHO</span><span class="evo-boss-mini">'+E(x.days)+" dia(s) encerrado(s) nesta semana"+'</span></div>'+
- '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(score===null?"Quero ver registros reais.":score<50?"Você está falhando na execução.":score<70?"Sua entrega ainda está fraca.":"Boa execução. Mantenha o ritmo.")+'</h2><p>'+E(critique)+'</p><small>Nota baseada em focos e sessões de dias finalizados. Não mede inteligência ou aprendizagem.</small></div></div>'+
- '<div class="evo-boss-priority '+(d.ranked?"bad":"good")+'"><span>MINHA COBRANÇA PRINCIPAL</span><strong>'+E(top)+'</strong><small>'+E(d.ranked?d.ranked.action:"Continue registrando seus resultados reais.")+'</small></div>'+
+ '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(score===null?"Vamos acompanhar sua trajetória.":d.ranked?d.ranked.title:score>=90?"Bom trabalho. Mantenha a constância.":"Continue consolidando sua rotina.")+'</h2><p>'+E(critique)+'</p><small>'+E(x.provisional?"Avaliação provisória · "+x.days+" dia(s) finalizado(s)":"Avaliação dos registros disponíveis")+'.</small></div></div>'+
+ '<p class="note evo-mentor-phrase">'+E(d.phrase)+'</p><div class="evo-boss-priority '+(d.ranked?"bad":"good")+'"><span>MINHA COBRANÇA PRINCIPAL</span><strong>'+E(top)+'</strong><small>'+E(d.ranked?d.ranked.action:"Continue registrando seus resultados reais.")+'</small></div>'+
  '<div class="evo-boss-grid"><details class="evo-boss-tile evo-boss-bad"><summary><span>✕</span><strong>Pontos de melhoria</strong><small>'+d.problems.length+' ponto(s)</small></summary><div class="evo-boss-tile-body">'+(d.problems.length?d.problems.map(issue).join(""):'<p class="note">Nenhuma falha confirmada nesta amostra.</p>')+'</div></details>'+
  '<details class="evo-boss-tile evo-boss-good"><summary><span>✓</span><strong>Pontos positivos</strong><small>'+d.positives.length+' avanço(s)</small></summary><div class="evo-boss-tile-body">'+(d.positives.length?d.positives.map(good).join(""):'<p class="note">Os pontos positivos aparecem conforme forem confirmados.</p>')+'</div></details>'+
  '<details class="evo-boss-tile"><summary><span>▥</span><strong>Minha evolução</strong><small>Últimas 6 semanas</small></summary><div class="evo-boss-tile-body">'+mentorTrendGraph(d)+'</div></details>'+
- '<details class="evo-boss-tile"><summary><span>◎</span><strong>Meta da semana</strong><small>Negociar com o chefe</small></summary><div class="evo-boss-tile-body"><p class="note">Proposta para a próxima semana: '+(d.proposal===null?"sem histórico comparável ainda":d.proposal+"% de execução")+'. Você pode escolher uma meta menor ou maior.</p><label class="evo-boss-target-label" for="s4-mentor-target">Sua meta <strong id="s4-mentor-target-value">'+target+'%</strong></label><input type="range" id="s4-mentor-target" min="0" max="100" step="5" value="'+target+'"><p class="note">Execução = compromissos concluídos ÷ compromissos planejados em dias finalizados. A meta não altera seu planejamento.</p><button class="btn primary small" data-s4="mentorAcceptGoal">Assumir compromisso</button>'+
- (goal?'<div class="evo-boss-commitment"><strong>Compromisso registrado: '+goal.target+'%</strong><small>Semana de '+E(fmt(goal.weekStart,false))+' a '+E(fmt(goal.weekEnd,false))+'</small><p>'+E(finished?"Prestação de contas: "+goalState+(goalResult?.score!==null?" · você entregou "+goalResult.score+"%.":". Não há dados suficientes para avaliar."):"O chefe vai conferir este compromisso depois do prazo.")+'</p></div>':"")+
+ '<details class="evo-boss-tile"><summary><span>◎</span><strong>Meta da semana</strong><small>Negociar com o chefe</small></summary><div class="evo-boss-tile-body"><p class="note">Proposta para a próxima semana: '+(d.proposal===null?"sem histórico comparável ainda":d.proposal+"% de execução")+'. Você pode escolher uma meta menor ou maior.</p><label class="evo-boss-target-label" for="s4-mentor-target">Sua meta <strong id="s4-mentor-target-value">'+target+'%</strong></label><input type="range" id="s4-mentor-target" min="0" max="100" step="5" value="'+target+'"><p class="note">Escolha um compromisso realista para a próxima semana.</p><button class="btn primary small" data-s4="mentorAcceptGoal">Assumir compromisso</button>'+
+ (goal?'<div class="evo-boss-commitment"><strong>Compromisso registrado: '+goal.target+'%</strong><small>Semana de '+E(fmt(goal.weekStart,false))+' a '+E(fmt(goal.weekEnd,false))+'</small><p>'+E(finished?"Prestação de contas: "+goalState+(!oldGoal&&goalResult?.score!=null?" · avaliação "+goalResult.score+"%.":"."):"O chefe vai conferir este compromisso depois do prazo.")+'</p></div>':"")+
  '</div></details>'+
- '<details class="evo-boss-tile"><summary><span>▤</span><strong>Análises adicionais</strong><small>Registro, pausas e hábitos</small></summary><div class="evo-boss-tile-body">'+d.more.map(v=>'<details class="evo-boss-detail"><summary><span>'+E(v.title)+'</span><strong>'+E(v.evidence)+'</strong></summary><div><p>'+E(v.body)+'</p><p>'+E(v.action)+'</p></div></details>').join("")+'<p class="note">Os registros são analisados por regras locais, não por IA externa. Falta de dados não é prova de falta de esforço.</p></div></details></div>'+
+ '<details class="evo-boss-tile"><summary><span>▤</span><strong>Análises adicionais</strong><small>Registro, pausas e hábitos</small></summary><div class="evo-boss-tile-body">'+d.more.map(v=>'<details class="evo-boss-detail"><summary><span>'+E(v.title)+'</span><strong>'+E(v.evidence)+'</strong></summary><div><p>'+E(v.body)+'</p><p>'+E(v.action)+'</p></div></details>').join("")+'<p class="note">Vamos distinguir falta de registro de falta de execução.</p></div></details></div>'+
  '<div class="evo-boss-bottom"><button class="btn small ghost" data-s4="mentorStats">▥ Consultar estatísticas completas</button></div></section>';
 }
 
@@ -560,18 +712,15 @@ function mentorActivitySummary(x){
  const n=x.count,rows=[
   ["Focos do dia",n.doneFocus,n.focus],
   ["Sessões de estudo",n.studiesDone,n.study],
-  ["Tarefas secundárias",n.tasksDone,n.tasks]
+  ["Rotinas e hábitos",n.habitDone,n.habits],["Tarefas secundárias",n.tasksDone,n.tasks]
  ];
  const cards=rows.map(([name,done,total])=>{
-  const pct=total?Math.round(done/total*100):null;
-  const klass=pct===null?"neutral":pct>=75?"good":pct>=45?"mid":"bad";
-  return '<div class="evo-boss-activity"><div><strong>'+E(name)+'</strong><span>'+done+' / '+total+'</span></div><div class="evo-boss-progress" role="img" aria-label="'+E(name+': '+(pct===null?'sem dados':pct+' por cento concluídos'))+'"><i class="'+klass+'" style="width:'+(pct||0)+'%"></i></div><small>'+(pct===null?"Sem compromissos no período":pct+"% realizados")+'</small></div>';
+  const flexible=name==="Tarefas secundárias",pct=total?Math.round(done/total*100):null;
+  const klass=flexible||pct===null?"neutral":pct>=75?"good":pct>=45?"mid":"bad";
+  return '<div class="evo-boss-activity"><div><strong>'+E(name)+'</strong><span>'+done+' / '+total+'</span></div><div class="evo-boss-progress" role="img" aria-label="'+E(name+': '+(pct===null?'sem dados':pct+' por cento concluídos'))+'"><i class="'+klass+'" style="width:'+(pct||0)+'%"></i></div><small>'+(pct===null?"Sem compromissos no período":flexible?done+" concluídas · pendências não são falhas automáticas":pct+"% realizados")+'</small></div>';
  }).join("");
  const seen=Object.keys(ev.visitedDays||{}).filter(day=>day>=x.from&&day<=x.to&&day<=today()).length;
- const high=p.entries.filter(v=>v.type==="task"&&v.priority==="high"&&!v.archived&&v.date<=today()).filter(v=>{
-  const record=p.records[v.id+"@"+(v.date||today())];
-  return (record?.status||v.status||"pending")!=="done";
- }).length;
+ const high=taskHistory(today(),true).filter(v=>v.priority==="high"&&!v.completed).length;
  return '<section class="card evo-boss-usage"><div class="card-head"><div><h2>Execução do planejamento</h2><p class="note">Quanto você está planejando e quanto realmente entrega?</p></div></div>'+
  '<div class="evo-boss-activity-grid">'+cards+'</div><div class="evo-boss-usage-foot"><span>◷ '+seen+' dia(s) com abertura registrada neste período</span><span>◉ '+high+' tarefa(s) de alta prioridade ainda pendente(s)</span></div>'+
  '<p class="note">Abrir o Órbita não equivale a estudar. Tarefas recorrentes e datas ainda não encerradas podem estar pendentes legitimamente.</p></section>';
@@ -616,7 +765,7 @@ function viewEvolution(){
  '<div class="evo-toolbar"><div class="tab-line">'+[["day","Dia"],["week","Semana"],["month","Mês"],["year","Ano"]].map(([key,label])=>'<button class="tab '+(period===key?"active":"")+'" data-s4="period" data-period="'+key+'">'+label+'</button>').join("")+'</div><div class="row"><button class="btn small ghost" data-s4="prevPeriod">‹</button><button class="btn small" data-s4="currentPeriod">Atual</button><button class="btn small ghost" data-s4="nextPeriod">›</button></div></div>'+
  overviewPeriod(current)+
  '</div></details>'+
- '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="checkline"><input id="s4-mentor-enabled" type="checkbox" '+(ev.settings.mentorEnabled!==false?"checked":"") +'> Ativar Orientador</label><label class="checkline"><input id="s4-mentor-notices" type="checkbox" '+(ev.settings.mentorNotices!==false?"checked":"")+'> Avisos discretos na tela inicial</label><label class="field">Tom do feedback<select id="s4-tone"><option value="strict" '+(ev.settings.strictness==="strict"?"selected":"")+'>Chefe chato · exigente</option><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Firme e objetivo</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Mais discreto</option></select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
+ '<section class="card"><div class="card-head"><h2>Preferências do orientador</h2></div><div class="evo-settings"><label class="checkline"><input id="s4-mentor-enabled" type="checkbox" '+(ev.settings.mentorEnabled!==false?"checked":"") +'> Ativar Orientador</label><label class="checkline"><input id="s4-mentor-notices" type="checkbox" '+(ev.settings.mentorNotices!==false?"checked":"")+'> Avisos discretos na tela inicial</label><label class="field">Personalidade<select id="s4-tone"><option value="hard" '+(ev.settings.strictness==="hard"?"selected":"")+'>Chefe implacável</option><option value="strict" '+(ev.settings.strictness==="strict"?"selected":"")+'>Chefe exigente</option><option value="firm" '+(ev.settings.strictness==="firm"?"selected":"")+'>Equilibrado</option><option value="gentle" '+(ev.settings.strictness==="gentle"?"selected":"")+'>Compreensivo</option></select></label><label class="field">Intervalo do lembrete<select id="s4-mentor-interval">'+[3,7,14,30].map(n=>'<option value="'+n+'" '+(Number(ev.settings.mentorInterval||7)===n?"selected":"")+'>A cada '+n+' dias</option>').join("")+'</select></label><label class="checkline"><input id="s4-reminders" type="checkbox" '+(ev.settings.reminders!==false?"checked":"")+'> Lembretes discretos de estatísticas</label></div></section>';
 }
 function yesterday(){return add(today(),-1);}
 function lastStudyDayOfWeek(d){
@@ -655,9 +804,9 @@ function homeDecor(base){
  }
  if(date>today())return base;
  const closeLink='<div class="evo-footer"><button class="btn primary" data-s4="reviewDate" data-date="'+A(date)+'">Finalizar dia</button><button class="btn small ghost" data-s4="viewStats">Evolução</button></div>';
- const miniWeek=lastStudyDayOfWeek(date)?'<div class="evo-alert"><span>Último dia de estudos previsto na semana. O balanço semanal já pode ser consultado como prévia; será definitivo após fechar os dias restantes.</span><button class="btn small" data-s4="viewStats">Ver semana</button></div>':"";
- const remind=reminderEligible()?'<div class="evo-alert evo-reminder"><span>Seu desempenho merece uma revisão. Há novos registros para analisar.</span><button class="btn small" data-s4="viewStats">Ver estatísticas</button><button class="btn small ghost" data-s4="dismissReminder">Depois</button><button class="btn small ghost" data-s4="disableReminder">Desativar</button></div>':"";
- return mentorNotice()+upper+remind+base+miniWeek+closeLink;
+ const miniWeek=ev.settings.mentorEnabled===false&&lastStudyDayOfWeek(date)?'<div class="evo-alert"><span>Último dia de estudos previsto na semana. O balanço semanal já pode ser consultado como prévia; será definitivo após fechar os dias restantes.</span><button class="btn small" data-s4="viewStats">Ver semana</button></div>':"";
+ const remind=ev.settings.mentorEnabled===false&&reminderEligible()?'<div class="evo-alert evo-reminder"><span>Seu desempenho merece uma revisão. Há novos registros para analisar.</span><button class="btn small" data-s4="viewStats">Ver estatísticas</button><button class="btn small ghost" data-s4="dismissReminder">Depois</button><button class="btn small ghost" data-s4="disableReminder">Desativar</button></div>':"";
+ return upper+base+mentorNotice()+remind+miniWeek+closeLink;
 }
 function profileDecor(base){
  return base+'<section class="card"><div class="card-head"><h2>Evolução e orientador</h2><button class="btn primary small" data-s4="viewStats">Abrir estatísticas</button></div><p class="note">Análises diárias, semanais, mensais e anuais, descanso, consistência, carga e recomendações contextualizadas.</p>'+overviewMini()+'</section>';
@@ -680,11 +829,22 @@ function decorate(route,base){
  if(route==="inicio")return homeDecor(base);
  if(route==="perfil")return profileDecor(base);
  if(route==="planejamento")return calendarDecor(base);
- if(route==="evolucao")return viewEvolution();
+ if(route==="evolucao"){if(ev.settings.mentorEnabled!==false&&ev.mentor.reviewDay!==today())markViewed();return viewEvolution();}
  if(route==="fechamento")return dayReview(state.date);
  return base;
 }
-function markViewed(){ev.lastStatsView=now();ev.mentor.previousReview=ev.mentor.lastReview||null;ev.mentor.lastReview={studyActualMin:periodData("week",today()).count.studyActualMin,at:now()};ev.mentor.lastViewed=now();ev.mentor.lastReadSignature=mentorAnalysis().digest;ev.mentor.dismissedSignature="";ev.mentor.snoozeUntil="";mentorOptionsOpen=false;C.save();}
+function markViewed(){
+ const analysis=mentorAnalysis(),day=today();ev.mentor.issueHistory||={};
+ if(ev.mentor.reviewDay!==day){
+  const memory=ev.mentor.issueHistory;
+  for(const a of analysis.items.filter(i=>i.tone==="warning")){
+   const old=memory[a.key];memory[a.key]={first:old?.active?old.first:day,last:day,active:true,count:(old?.count||0)+1};
+  }
+  for(const a of analysis.items.filter(i=>i.key.startsWith("recovery-"))){const old=memory[a.key.slice(9)];if(old)old.active=false;}
+  ev.mentor.previousReview=ev.mentor.lastReview||null;ev.mentor.lastReview={studyActualMin:periodData("week",day).count.studyActualMin,at:now()};ev.mentor.reviewDay=day;
+ }
+ ev.lastStatsView=now();ev.mentor.lastViewed=now();ev.mentor.lastReadSignature=analysis.digest;ev.mentor.dismissedSignature="";ev.mentor.snoozeUntil="";mentorOptionsOpen=false;C.save();
+}
 function goView(){period="week";referenceDate=state.date;markViewed();C.go("evolucao");}
 function confirmSubmit(data){
  if(!data.has("reviewed")||String(data.get("phrase")||"").trim()!=="FINALIZAR")throw Error("Marque a revisão e digite FINALIZAR exatamente.");
@@ -716,14 +876,14 @@ const actions={
  viewStats(){goView()},
  mentorOpen(){goView()},
  mentorQuick(){
-  if(document.querySelector?.("#view .evo-boss")){document.querySelector("#view .evo-boss")?.scrollIntoView?.({block:"start"});return;}
+  if(document.querySelector?.("#view .evo-boss")){markViewed();document.querySelector("#view .evo-boss")?.scrollIntoView?.({block:"start"});return;}
   markViewed();C.render();C.openModal("Conversar com Orientador",'<div id="s4-mentor-quick">'+mentorPanel()+'</div>');
  },
  mentorStats(){if(document.getElementById?.("s4-mentor-quick")){C.closeModal();goView();}statsExpanded=true;const node=document.getElementById?.("evo-boss-statistics");if(node){node.open=true;node.scrollIntoView?.({behavior:"smooth",block:"start"});}},
- mentorAcceptGoal(){const d=mentorVisualData(),target=Number(mentorDraftTarget===null?d.proposal??60:mentorDraftTarget);if(!Number.isInteger(target)||target<0||target>100)return C.notify("Meta inválida.");const start=add(periodStart("week",today()),7);ev.mentor.goal={target,weekStart:start,weekEnd:add(start,6),createdAt:now(),suggested:d.proposal,baseline:d.previous.score};mentorDraftTarget=target;C.save();C.render();C.notify("Compromisso semanal registrado. O Orientador vai cobrar o resultado.");const quick=document.getElementById?.("s4-mentor-quick");if(quick)quick.innerHTML=mentorPanel();},
+ mentorAcceptGoal(){const d=mentorVisualData(),target=Number(mentorDraftTarget===null?d.proposal??60:mentorDraftTarget);if(!Number.isInteger(target)||target<0||target>100)return C.notify("Meta inválida.");const start=add(periodStart("week",today()),7);ev.mentor.goal={target,weekStart:start,weekEnd:add(start,6),createdAt:now(),suggested:d.proposal,baseline:d.previous.score,scoringVersion:2};mentorDraftTarget=target;C.save();C.render();C.notify("Compromisso semanal registrado. O Orientador vai cobrar o resultado.");const quick=document.getElementById?.("s4-mentor-quick");if(quick)quick.innerHTML=mentorPanel();},
  mentorOptions(){mentorOptionsOpen=!mentorOptionsOpen;C.render()},
  mentorSnooze(b){const min=Number(b.dataset.min);if(![10,15,1440].includes(min))return;const until=min===1440?new Date(new Date().setHours(23,59,59,999)):new Date(Date.now()+min*60000);ev.mentor.snoozeUntil=until.toISOString();ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
- mentorDismiss(){ev.mentor.dismissedSignature=mentorAnalysis().digest;ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
+ mentorDismiss(){ev.mentor.lastDelivery=now();mentorOptionsOpen=false;C.save();C.render()},
  mentorDisableNotices(){ev.settings.mentorNotices=false;mentorOptionsOpen=false;C.save();C.render()},
  period(b){statsExpanded=true;period=b.dataset.period;referenceDate=state.date;C.render()},
  prevPeriod(){statsExpanded=true;referenceDate=period==="day"?add(referenceDate,-1):period==="week"?add(referenceDate,-7):period==="month"?iso(new Date(parse(referenceDate).getFullYear(),parse(referenceDate).getMonth()-1,1,12)):referenceDate.slice(0,4)-1+"-01-01";if(referenceDate<first())referenceDate=first();C.render()},
@@ -749,20 +909,21 @@ document.addEventListener("change",event=>{
  if(event.target.id==="s4-mentor-enabled"){ev.settings.mentorEnabled=event.target.checked;C.save();C.render();}
  if(event.target.id==="s4-mentor-notices"){ev.settings.mentorNotices=event.target.checked;C.save();C.render();}
  if(event.target.id==="s4-mentor-target"){mentorDraftTarget=Number(event.target.value);const v=$("s4-mentor-target-value");if(v)v.textContent=mentorDraftTarget+"%";}
- if(event.target.id==="s4-tone"){ev.settings.strictness=event.target.value;C.save();C.render();}
+ if(event.target.id==="s4-tone"&&profiles[event.target.value]){ev.settings.strictness=event.target.value;C.save();C.render();}
+ if(event.target.id==="s4-mentor-interval"){ev.settings.mentorInterval=Number(event.target.value)||7;C.save();C.render();}
  if(event.target.id==="s4-reminders"){ev.settings.reminders=event.target.checked;C.save();C.render();}
 });
 window.OrbitaStage4={decorate,afterRender(){
  const unread=mentorUnreadCount();
  const showBadge=unread>0&&ev.settings.mentorNotices!==false;
  const badge=document.getElementById?.("s4-mentor-top-badge");
- if(badge){badge.hidden=!showBadge;badge.textContent=showBadge?String(unread):"";badge.title=showBadge?unread+" análise(s) do Orientador":"";}
+ if(badge){badge.hidden=!showBadge;badge.textContent=showBadge?String(unread):"";badge.title=showBadge?"Consultar o Orientador":"";}
  for(const node of document.querySelectorAll?.('[data-nav="perfil"]')||[]){
   const previous=node.querySelector?.(".evo-mentor-badge");
   if(!showBadge){previous?.remove?.();continue;}
-  if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="'+unread+' análise(s) do Orientador" aria-label="'+unread+' análise(s) do Orientador">'+unread+'</span>');
-  else if(previous){previous.textContent=String(unread);previous.title=unread+" análise(s) do Orientador";}
+  if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="Consultar o Orientador" aria-label="Consultar o Orientador">'+unread+'</span>');
+  else if(previous){previous.textContent=String(unread);previous.title="Consultar o Orientador";}
  }
-},inspect:{get model(){return ev},mentorWeek,mentorVisualData,capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
+},inspect:{get model(){return ev},mentorWeek,mentorVisualData,loadAssessment,taskAssessment,habitAssessment,capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
 C.render();
 })();

@@ -255,3 +255,11 @@
 .s4-mentor-top-badge[hidden]{display:none}
 #s4-mentor-quick .evo-mentor-section{border:0;background:transparent;padding:0;box-shadow:none;margin:0}
 #s4-mentor-quick .evo-boss-diagnosis,#s4-mentor-quick .evo-boss-grid{grid-template-columns:1fr}
+
+/* v5.23 — acompanhamento discreto. */
+.evo-mentor-phrase{padding:10px 12px;border-left:2px solid var(--borderStrong);margin:0;font-style:italic;line-height:1.5}
+.evo-mentor-note{padding:10px 12px;margin-top:5px;max-width:100%;box-shadow:none}
+.evo-mentor-note .evo-mentor-copy{min-width:0;flex:1}
+.evo-mentor-note .evo-mentor-copy .row{justify-content:flex-end}
+.evo-boss-activity-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
+.evo-boss-progress i.neutral{background:var(--soft)}
