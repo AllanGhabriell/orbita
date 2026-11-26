@@ -830,6 +830,65 @@ function mentorCommunication(score,kind,delta,profile,ranked,day=today()){
  return {heading,summary,group,quote:selected};
 }
 function voice(key){const list=messages[key]||messages.study;return list[["gentle","firm","strict","hard"].indexOf(mentorTone())];}
+/* Daily observations complement, rather than replace, the longitudinal score. */
+function studyDay(snap,provisional=false){
+ const sessions=snap.studies||[],done=sessions.filter(x=>x.status==="done").length;
+ const known=sessions.every(x=>x.actualMin!=null||x.status==="notdone");
+ return {date:snap.date,provisional,rest:!!snap.pause||snap.availability?.mode==="rest",capacity:studyCapacity(snap),done,planned:sessions.length,plannedMin:Math.max(0,Number(snap.plan?.studyMin)||0),actual:actualStudy(snap),known};
+}
+function weeklyStudyInsights(from,end=today(),preview=true){
+ const history=closedRows(first(),end).map(s=>studyDay(s));
+ const byDate=new Map(history.map(d=>[d.date,d]));
+ if(preview&&end===today()&&!byDate.has(end)&&hasCommitment(end)){
+  byDate.set(end,studyDay(capture(end),true));
+ }
+ const rows=[...byDate.values()].filter(d=>d.date>=from&&d.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+ const items=[];
+ const addNote=(key,tone,title,body,evidence,action,day,score=74)=>items.push({key,score,tone,title,body,evidence,action,date:day});
+ const profile=mentorTone();
+ const push=(soft,firm,strict,hard)=>[soft,firm,strict,hard][["gentle","firm","strict","hard"].indexOf(profile)];
+ const recordAction=push("Parabéns pelo avanço. Continue no seu ritmo.","Bom trabalho. Consolide o novo ritmo.","Você demonstrou que consegue avançar. Agora sustente esse resultado.","Resultado concreto. Mantenha a disciplina sem transformar um recorde em obrigação diária.");
+ for(const row of rows){
+  const prior=history.filter(d=>d.date<row.date&&!d.rest&&d.planned>0&&d.known);
+  const priorCounts=history.filter(d=>d.date<row.date&&d.planned>0);
+  const last=byDate.get(add(row.date,-1));
+  const stamp=fmt(row.date,false)+(row.provisional?" (em andamento)":"");
+  const peak=prior.length?Math.max(...prior.map(d=>d.actual)):0,peakDone=priorCounts.length?Math.max(...priorCounts.map(d=>d.done)):0;
+  const timeRecord=prior.length>=3&&peak>0&&row.actual>peak&&row.actual-peak>=15;
+  const countRecord=priorCounts.length>=3&&row.done>=2&&row.done>peakDone;
+  if(timeRecord||countRecord){
+   const parts=[];
+   if(timeRecord)parts.push(labelMinutes(row.actual)+" estudadas, "+labelMinutes(row.actual-peak)+" acima do maior tempo diário anterior registrado");
+   if(countRecord)parts.push(row.done+" sessões concluídas, superando o máximo anterior de "+peakDone);
+   addNote("record-"+row.date,"good","Novo recorde pessoal registrado","Em "+stamp+", você registrou "+parts.join("; ")+".",labelMinutes(row.actual)+" · "+row.done+" sessões",recordAction,row.date,82);
+  }else if(last&&!last.rest&&last.known&&last.actual>0&&row.actual-last.actual>=30){
+   addNote("dailyGain-"+row.date,"good","Avanço na carga diária","Em "+stamp+", você registrou "+labelMinutes(row.actual)+" de estudo, "+labelMinutes(row.actual-last.actual)+" a mais que no dia anterior.", "+"+labelMinutes(row.actual-last.actual),recordAction,row.date,76);
+  }else if(row.done>=3&&priorCounts.length<3){
+   addNote("milestone-"+row.date,"good","Três ou mais sessões no dia","Em "+stamp+", você concluiu "+row.done+" sessões. Ainda estou conhecendo seu histórico, mas este é um resultado concreto.",row.done+" sessões",recordAction,row.date,73);
+  }else if(!row.rest&&row.known&&prior.length>=3){
+   const recent=prior.slice(-7),avg=recent.reduce((n,d)=>n+d.actual,0)/recent.length;
+   if(avg>0&&row.actual-avg>=30&&row.actual>=avg*1.2){
+    addNote("aboveAverage-"+row.date,"good","Acima do seu ritmo recente","Em "+stamp+", você estudou "+labelMinutes(row.actual)+", acima da média dos dias de estudo recentes ("+labelMinutes(avg)+").",labelMinutes(row.actual-avg)+" acima da média",recordAction,row.date,72);
+   }
+  }
+  // Plans are intentions, not evidence of completed study.
+  if(row.provisional&&row.planned>row.done&&last&&!last.rest&&row.planned>last.planned&&row.plannedMin-last.plannedMin>=30){
+   addNote("planGrowth-"+row.date,"neutral","Mais estudo planejado","Hoje você planejou "+labelMinutes(row.plannedMin)+", "+labelMinutes(row.plannedMin-last.plannedMin)+" a mais que no dia anterior. Ainda falta confirmar quanto foi efetivamente estudado.","+"+labelMinutes(row.plannedMin-last.plannedMin)+" no plano","Execute a carga viável; depois avaliamos o resultado.",row.date,65);
+  }
+  // A record does not establish a new minimum. Do not compare an unfinished day, a rest day or reduced availability as a failure.
+  if(last&&!last.provisional&&!row.provisional&&!last.rest&&!row.rest&&last.known&&row.known&&last.done>=3&&row.done<last.done&&last.actual-row.actual>=30){
+   const comparable=row.capacity!=null&&last.capacity!=null&&last.capacity>0&&row.capacity>=last.capacity*.8;
+   const unfinished=row.planned>row.done;
+   const text="Em "+fmt(last.date,false)+", você concluiu "+last.done+" sessões; em "+stamp+", "+row.done+".";
+   if(comparable&&unfinished){
+    addNote("paceCheck-"+row.date,"attention","Mudança no ritmo diário",text+" Parte do plano ficou sem conclusão. Um dia isolado não confirma perda de constância.",last.done+" → "+row.done+" sessões","O que mudou entre esses dias? Veja se a carga planejada continua viável.",row.date,70);
+   }else{
+    addNote("paceContext-"+row.date,"neutral","Variação natural do ritmo",text+(comparable?" O recorde anterior não precisa se repetir diariamente.":" A disponibilidade é diferente ou não foi confirmada; não vou tratar essa diferença como falha."),last.done+" → "+row.done+" sessões","Observe a regularidade ao longo da semana.",row.date,63);
+   }
+  }
+ }
+ return {rows,items:items.sort((a,b)=>b.date.localeCompare(a.date)||b.score-a.score)};
+}
 function mentorIssues(current){
  const issues=[],x=current.execution,load=current.load,live=taskAssessment(current.from,today(),true),rolling=habitAssessment(closedRows(add(today(),-29),today()));
  const addIssue=(key,score,tone,title,body,evidence,action)=>issues.push({key,score,tone,title,body,evidence,action:action||voice(key)});
@@ -855,6 +914,7 @@ function mentorIssues(current){
  if(x.st.done)addIssue("studyGood",60,"good","Sessões concluídas",x.st.done+" sessões concluídas nos dias analisados.",String(x.st.done),"Continue registrando os resultados reais.");
  for(const a of legacyMentorAnalysis().items.filter(i=>["deleted","late","pauses"].includes(i.key)))issues.push(a);
  if(!issues.length)addIssue("forming",10,"neutral","Acompanhamento em formação","Ainda preciso de mais registros para avaliar sua trajetória.","Histórico em formação","Continue registrando seus compromissos.");
+ issues.push(...weeklyStudyInsights(current.from,today(),true).items);
  const memory=ev.mentor.issueHistory||{};
  for(const i of issues){
   const old=memory[i.key];
@@ -889,13 +949,13 @@ function mentorVisualData(){
  for(let k=5;k>=0;k--)history.push(mentorWeek(add(today(),-k*7)));
  const known=history.filter(x=>x.score!==null),delta=current.score!==null&&previous.score!==null?current.score-previous.score:null;
  const all=mentorAnalysis(),problems=all.items.filter(i=>i.tone==="warning").map(i=>({...i,value:i.evidence,description:i.body})),positives=all.items.filter(i=>i.tone==="good").map(i=>({...i,value:i.evidence,description:i.body})),more=all.items.filter(i=>i.tone==="neutral"),attention=all.items.filter(i=>i.tone==="attention").map(i=>({...i,value:i.evidence,description:i.body}));
- const ranked=problems[0],score=current.score;
+ const ranked=problems[0],score=current.score,weekly=weeklyStudyInsights(current.from,today(),true);
  const grade=score===null?"Sem nota ainda":score===100?"Excepcional":score>=90?"Excelente":score>=80?"Muito bom":score>=70?"Bom":score>=60?"Regular":score>=40?"Insatisfatório":"Crítico";
  const stateTone=score===null?"neutral":score>=80?"good":score>=60?"mid":"bad";
  const communication=mentorCommunication(score,current.load.kind,delta,mentorTone(),ranked);
  const slogan=communication.summary;
  const proposal=previous.score===null?null:Math.min(100,previous.score+(previous.score>=85?3:5));
- return {current,previous,history,known,delta,problems,positives,more,attention,ranked,grade,stateTone,slogan,proposal,phrase:communication.quote.quote,phraseSource:communication.quote,heading:communication.heading};
+ return {current,previous,history,known,delta,problems,positives,more,attention,weekly,ranked,grade,stateTone,slogan,proposal,phrase:communication.quote.quote,phraseSource:communication.quote,heading:communication.heading};
 }
 function mentorTrendGraph(data){
  const weeks=data.history,valid=weeks.filter(w=>w.score!==null);
@@ -907,6 +967,16 @@ function mentorTrendGraph(data){
  }).join("")+'</div><p class="note">Histórico de desempenho. Semanas com poucos dados são provisórias.</p>';
 }
 let mentorDraftTarget=null,statsExpanded=false;
+function mentorWeeklyPanel(data){
+ const rows=data.rows,highlights=data.items.filter(i=>i.tone==="good"),latest=highlights[0];
+ if(!rows.length)return "";
+ const peak=Math.max(1,...rows.map(d=>d.actual));
+ const total=rows.reduce((n,d)=>n+d.actual,0),done=rows.reduce((n,d)=>n+d.done,0);
+ return '<details class="evo-boss-tile evo-mentor-weekly"><summary><span>▥</span><strong>O que você fez nesta semana</strong><small>'+E(labelMinutes(total))+' · '+done+' sessões concluídas</small></summary><div class="evo-boss-tile-body">'+
+ (latest?'<div class="evo-mentor-highlight"><strong>'+E(latest.title)+'</strong><p>'+E(latest.body)+'</p><small>'+E(latest.action)+'</small></div>':'')+
+ '<div class="evo-mentor-days">'+rows.map(d=>'<div class="evo-mentor-day"><div><strong>'+E(fmt(d.date,false))+'</strong><small>'+E(d.rest?"Descanso":d.provisional?"Em andamento":!d.known?"Registro incompleto":"Finalizado")+'</small></div><div class="evo-mentor-day-meter"><i style="width:'+Math.round(d.actual/peak*100)+'%"></i></div><div class="evo-mentor-day-result"><strong>'+E(labelMinutes(d.actual))+'</strong><small>'+d.done+'/'+d.planned+' sessões</small></div></div>').join("")+'</div>'+
+ '<p class="note">Tempo efetivamente registrado. Dias em aberto ainda podem mudar.</p></div></details>';
+}
 function mentorPanel(){
  if(ev.settings.mentorEnabled===false)return '<section class="card"><h2>Orientador desativado</h2><p class="note">Suas estatísticas continuam disponíveis. Você pode reativar a análise nas preferências abaixo.</p></section>';
  const d=mentorVisualData(),x=d.current,tone=ev.settings.strictness||"firm",score=x.score;
@@ -916,7 +986,7 @@ function mentorPanel(){
  const critique=d.slogan;
  const top=d.ranked?d.ranked.title+" · "+d.ranked.value:(score===null?"Ainda não há desempenho confirmado para cobrar.":"Mantenha o que está funcionando e cuide dos próximos compromissos.");
  const issue=(v,i)=>'<details class="evo-boss-detail"><summary><span class="evo-boss-detail-icon">!</span><span>'+E(v.title)+'</span><strong>'+E(v.value)+'</strong></summary><div><p>'+E(v.description)+'</p><p><strong>Próximo passo:</strong> '+E(v.action)+'</p></div></details>';
- const good=(v,i)=>'<details class="evo-boss-detail"><summary><span class="evo-boss-detail-icon">✓</span><span>'+E(v.title)+'</span><strong>'+E(v.value)+'</strong></summary><div><p>'+E(v.description)+'</p></div></details>';
+ const good=(v,i)=>'<details class="evo-boss-detail"><summary><span class="evo-boss-detail-icon">✓</span><span>'+E(v.title)+'</span><strong>'+E(v.value)+'</strong></summary><div><p>'+E(v.description)+'</p>'+(v.action?'<p class="note">'+E(v.action)+'</p>':'')+'</div></details>';
  const target=mentorDraftTarget===null?d.proposal??60:mentorDraftTarget;
  const goal=ev.mentor.goal,finished=goal&&goal.weekEnd<today(),goalResult=goal&&finished?mentorWeek(goal.weekStart):null;
  const oldGoal=goal&&goal.scoringVersion!==2;const goalState=oldGoal?"Compromisso da avaliação anterior":goalResult&&goalResult.score!==null&&!goalResult.provisional?(goalResult.score>=goal.target?"Meta cumprida":"Meta não cumprida"):"Ainda sem resultado conclusivo";
@@ -924,8 +994,9 @@ function mentorPanel(){
  '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(d.heading)+'</h2><p>'+E(critique)+'</p><small>'+E(x.provisional?"Avaliação provisória · "+x.days+" dia(s) finalizado(s)":"Avaliação dos registros disponíveis")+'.</small></div></div>'+
  '<figure class="evo-mentor-phrase"><blockquote>'+E(d.phrase)+'</blockquote><figcaption>'+E(d.phraseSource.author)+(d.phraseSource.translation?' · tradução livre':'')+'</figcaption></figure><div class="evo-boss-priority '+(d.ranked?"bad":"good")+'"><span>MINHA COBRANÇA PRINCIPAL</span><strong>'+E(top)+'</strong><small>'+E(d.ranked?d.ranked.action:"Continue registrando seus resultados reais.")+'</small></div>'+
  '<div class="evo-boss-grid"><details class="evo-boss-tile evo-boss-bad"><summary><span>✕</span><strong>Pontos de melhoria</strong><small>'+d.problems.length+' ponto(s)</small></summary><div class="evo-boss-tile-body">'+(d.problems.length?d.problems.map(issue).join(""):'<p class="note">Nenhuma falha confirmada nesta amostra.</p>')+'</div></details>'+
- '<details class="evo-boss-tile evo-boss-attention"><summary><span>!</span><strong>Pontos de atenção</strong><small>'+d.attention.length+' observação(ões)</small></summary><div class="evo-boss-tile-body">'+(d.attention.length?d.attention.map(issue).join(""):'<p class="note">Nada que exija acompanhamento especial no momento.</p>')+'</div></details>'+
+ (d.attention.length?'<details class="evo-boss-tile evo-boss-attention"><summary><span>!</span><strong>Pontos de atenção</strong><small>'+d.attention.length+' observação(ões)</small></summary><div class="evo-boss-tile-body">'+d.attention.map(issue).join("")+'</div></details>':"")+
  '<details class="evo-boss-tile evo-boss-good"><summary><span>✓</span><strong>Pontos positivos</strong><small>'+d.positives.length+' avanço(s)</small></summary><div class="evo-boss-tile-body">'+(d.positives.length?d.positives.map(good).join(""):'<p class="note">Os pontos positivos aparecem conforme forem confirmados.</p>')+'</div></details>'+
+ mentorWeeklyPanel(d.weekly)+
  '<details class="evo-boss-tile"><summary><span>▥</span><strong>Minha evolução</strong><small>Últimas 6 semanas</small></summary><div class="evo-boss-tile-body">'+mentorTrendGraph(d)+'</div></details>'+
  '<details class="evo-boss-tile"><summary><span>◎</span><strong>Meta da semana</strong><small>Negociar com o chefe</small></summary><div class="evo-boss-tile-body"><p class="note">Proposta para a próxima semana: '+(d.proposal===null?"sem histórico comparável ainda":d.proposal+"% de execução")+'. Você pode escolher uma meta menor ou maior.</p><label class="evo-boss-target-label" for="s4-mentor-target">Sua meta <strong id="s4-mentor-target-value">'+target+'%</strong></label><div class="evo-boss-target-control"><input type="range" id="s4-mentor-target" min="0" max="100" step="1" value="'+target+'" style="--mentor-progress:'+target+'%" aria-valuetext="'+target+'%"><div class="evo-boss-target-scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div></div><p class="note">Escolha um compromisso realista para a próxima semana.</p><button class="btn primary small" data-s4="mentorAcceptGoal">Assumir compromisso</button>'+
  (goal?'<div class="evo-boss-commitment"><strong>Compromisso registrado: '+goal.target+'%</strong><small>Semana de '+E(fmt(goal.weekStart,false))+' a '+E(fmt(goal.weekEnd,false))+'</small><p>'+E(finished?"Prestação de contas: "+goalState+(!oldGoal&&goalResult?.score!=null?" · avaliação "+goalResult.score+"%.":"."):"O chefe vai conferir este compromisso depois do prazo.")+'</p></div>':"")+
@@ -1219,6 +1290,6 @@ window.OrbitaStage4={decorate,afterRender(){
   if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="Consultar o Orientador" aria-label="Consultar o Orientador">'+unread+'</span>');
   else if(previous){previous.textContent=String(unread);previous.title="Consultar o Orientador";}
  }
-},inspect:{get model(){return ev},mentorWeek,mentorVisualData,mentorCommunication,loadAssessment,taskAssessment,habitAssessment,capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
+},inspect:{get model(){return ev},mentorWeek,mentorVisualData,mentorCommunication,weeklyStudyInsights,loadAssessment,taskAssessment,habitAssessment,capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
 C.render();
 })();

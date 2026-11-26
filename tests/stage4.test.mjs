@@ -192,7 +192,7 @@ assert.equal(V.loadAssessment(end).kind,"growth","aumento moderado acima de 50% 
 for(const snap of Object.values(V.model.closed)){const n=snap.date>=C.addDays(end,-13)?330:120;snap.result.actualStudyMin=n;snap.plan.studyMin=n;snap.studies[0].actualMin=n;snap.studies[0].plannedMin=n;}
 assert.equal(V.loadAssessment(end).kind,"rapid","aumento grande próximo da capacidade merece atenção");
 assert.equal(V.loadAssessment(end).rate,1,"atenção por aumento não reduz nota");
-assert.match(V.mentorPanel(),/Pontos de atenção/);
+assert.equal(V.mentorPanel().includes("Pontos de atenção"),V.mentorVisualData().attention.length>0);
 const taskDate=C.addDays(todayForTest(),-12);
 function todayForTest(){return C.today();}
 P.model.entries=[{id:"low",type:"task",title:"Baixa antiga",date:taskDate,priority:"low",dueDate:"",recurrence:{kind:"none"}},{id:"high",type:"task",title:"Alta antiga",date:taskDate,priority:"high",dueDate:"",recurrence:{kind:"none"}},{id:"future",type:"task",title:"Prazo distante",date:taskDate,priority:"high",dueDate:C.addDays(date,30),recurrence:{kind:"none"}}];
@@ -218,3 +218,28 @@ for(const profile of ["gentle","firm","strict","hard"]){
 assert.equal(V.mentorCommunication(45,"stable",-8,"hard",{action:"Corrigir"},"2026-11-26").group,"challenge");
 const quoteIds=new Set(Array.from({length:7},(_,i)=>V.mentorCommunication(87,"growth",5,"strict",null,"2026-11-"+(10+i)).quote.id));
 assert.equal(quoteIds.size,7,"variedade diária, sem troca a cada renderização");
+
+const weekSaved=V.model.closed,accessSaved=C.state.firstAccess;
+V.model.closed={};
+const baselineDay=C.addDays(date,-6);
+C.state.firstAccess=baselineDay;
+function makeDaily(dt,count,minutes,planned=count,available=480,rest=false){
+ const ss=Array.from({length:planned},(_,i)=>({id:dt+"-"+i,status:i<count?"done":"notdone",actualMin:i<count?minutes/count:0,plannedMin:90}));
+ return {date:dt,availability:{mode:rest?"rest":"hours",hours:available/60},availableMin:available,pause:rest?{kind:"planejado"}:null,activities:[],studies:ss,plan:{studyMin:planned*90,otherMin:0,totalMin:planned*90},result:{actualStudyMin:minutes,actualOtherMin:0}};
+}
+for(let i=0;i<3;i++){const dt=C.addDays(baselineDay,i);V.model.closed[dt]=makeDaily(dt,2,180);}
+const recordDay=C.addDays(date,-3),nextDay=C.addDays(date,-2),restDay=C.addDays(date,-1);
+V.model.closed[recordDay]=makeDaily(recordDay,3,270);
+V.model.closed[nextDay]=makeDaily(nextDay,2,180,3);
+V.model.closed[restDay]=makeDaily(restDay,0,0,0,0,true);
+let insight=V.weeklyStudyInsights(baselineDay,restDay,false);
+assert.ok(insight.items.some(i=>i.key==="record-"+recordDay&&i.tone==="good"&&i.body.includes("3 sessões")),"novo máximo de sessões reconhecido");
+assert.ok(insight.items.some(i=>i.key==="paceCheck-"+nextDay&&i.tone==="attention"),"queda isolada com plano incompleto recebe atenção");
+assert.ok(!insight.items.some(i=>i.key==="paceCheck-"+restDay),"descanso não é queda de desempenho");
+V.model.closed[nextDay]=makeDaily(nextDay,2,180,2,240);
+insight=V.weeklyStudyInsights(baselineDay,restDay,false);
+assert.ok(insight.items.some(i=>i.key==="paceContext-"+nextDay&&i.tone==="neutral"),"disponibilidade menor contextualiza redução");
+assert.ok(!insight.items.some(i=>i.key==="paceCheck-"+nextDay),"recorde não vira obrigação");
+assert.equal(V.mentorPanel().includes("Pontos de atenção"),V.mentorVisualData().attention.length>0,"categoria só aparece se houver conteúdo");
+assert.match(V.mentorPanel(),/O que você fez nesta semana/);
+V.model.closed=weekSaved;C.state.firstAccess=accessSaved;

@@ -1,5 +1,9 @@
 # Órbita
 
+## v5.27 — Acompanhamento diário da semana
+
+- Pontos de atenção aparecem somente quando existem. Destaques de recordes, evolução diária, mudanças de planejamento e variações de ritmo contextualizadas pela disponibilidade. Resumo semanal de tempos e sessões; dias abertos identificados como provisórios. Sem novas notificações por atividade nem penalização automática por não repetir recordes.
+
 ## v5.26 — Comunicação contextual do Orientador
 
 - Diagnóstico geral coerente com a nota; cobranças específicas separadas do reconhecimento. 42 mensagens e citações, rotacionadas diariamente conforme o contexto, com fontes em `docs/mentor-quotes.md`.

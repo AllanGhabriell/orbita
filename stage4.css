@@ -285,3 +285,10 @@
 /* v5.26: short contextual quotation, separate from the diagnosis. */
 .evo-mentor-phrase blockquote{margin:0;font-size:13px;line-height:1.5;color:var(--text)}
 .evo-mentor-phrase figcaption{margin-top:5px;color:var(--muted);font-style:normal;font-size:10px}
+
+/* v5.27 — weekly observations with compact daily comparisons. */
+.evo-mentor-weekly{grid-column:1/-1}
+.evo-mentor-highlight{border-left:2px solid var(--good);background:var(--surface2);padding:10px 12px;border-radius:8px;margin:8px 0 12px;font-size:12px;line-height:1.5}
+.evo-mentor-highlight p{margin:5px 0}.evo-mentor-highlight small{color:var(--muted)}
+.evo-mentor-days{display:grid;gap:8px}.evo-mentor-day{display:grid;grid-template-columns:minmax(75px,1fr) minmax(30px,1fr) auto;align-items:center;gap:10px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)}
+.evo-mentor-day strong,.evo-mentor-day small{display:block}.evo-mentor-day small{font-size:10px;color:var(--muted)}.evo-mentor-day-result{text-align:right;white-space:nowrap}.evo-mentor-day-meter{height:5px;border-radius:999px;background:var(--surface3);overflow:hidden}.evo-mentor-day-meter i{display:block;height:100%;border-radius:999px;background:var(--accent)}
