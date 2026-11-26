@@ -183,6 +183,16 @@ for(const snap of Object.values(V.model.closed)){snap.result.actualStudyMin=360;
 assert.equal(V.loadAssessment(end).kind,"sustain","carga elevada estável não exige aumento");
 for(const snap of Object.values(V.model.closed)){snap.result.actualStudyMin=480;snap.plan.studyMin=480;snap.studies[0].actualMin=480;snap.studies[0].plannedMin=480;}
 assert.equal(V.loadAssessment(end).kind,"overload","sobrecarga recorrente identificada");
+// An ordinary increase is a positive development; substantial growth near capacity is attention only.
+for(const snap of Object.values(V.model.closed)){const n=snap.date>=C.addDays(end,-13)?180:120;snap.result.actualStudyMin=n;snap.plan.studyMin=n;snap.studies[0].actualMin=n;snap.studies[0].plannedMin=n;}
+assert.equal(V.loadAssessment(end).kind,"growth","2h para 3h é evolução");
+assert.equal(V.loadAssessment(end).rate,1,"crescimento normal não perde pontos");
+for(const snap of Object.values(V.model.closed)){const n=snap.date>=C.addDays(end,-13)?190:120;snap.result.actualStudyMin=n;snap.plan.studyMin=n;snap.studies[0].actualMin=n;snap.studies[0].plannedMin=n;}
+assert.equal(V.loadAssessment(end).kind,"growth","aumento moderado acima de 50% continua positivo");
+for(const snap of Object.values(V.model.closed)){const n=snap.date>=C.addDays(end,-13)?330:120;snap.result.actualStudyMin=n;snap.plan.studyMin=n;snap.studies[0].actualMin=n;snap.studies[0].plannedMin=n;}
+assert.equal(V.loadAssessment(end).kind,"rapid","aumento grande próximo da capacidade merece atenção");
+assert.equal(V.loadAssessment(end).rate,1,"atenção por aumento não reduz nota");
+assert.match(V.mentorPanel(),/Pontos de atenção/);
 const taskDate=C.addDays(todayForTest(),-12);
 function todayForTest(){return C.today();}
 P.model.entries=[{id:"low",type:"task",title:"Baixa antiga",date:taskDate,priority:"low",dueDate:"",recurrence:{kind:"none"}},{id:"high",type:"task",title:"Alta antiga",date:taskDate,priority:"high",dueDate:"",recurrence:{kind:"none"}},{id:"future",type:"task",title:"Prazo distante",date:taskDate,priority:"high",dueDate:C.addDays(date,30),recurrence:{kind:"none"}}];

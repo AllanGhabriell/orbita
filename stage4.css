@@ -277,3 +277,7 @@
 .evo-mentor-note .evo-mentor-copy .row{justify-content:flex-end}
 .evo-boss-activity-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
 .evo-boss-progress i.neutral{background:var(--soft)}
+
+/* v5.25: observations that do not imply a failure. */
+.evo-boss-attention>summary>span{color:var(--warning);background:color-mix(in srgb,var(--warning) 12%,var(--surface3))}
+.evo-boss-attention .evo-boss-detail-icon{color:var(--warning)}

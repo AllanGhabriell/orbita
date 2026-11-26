@@ -1,5 +1,9 @@
 # Órbita
 
+## v5.25 — Crescimento e pontos de atenção
+
+- Aumento moderado da carga reconhecido como avanço. Crescimento substancial próximo da capacidade gera acompanhamento sem perda de nota; problemas concretos permanecem separados.
+
 ## v5.24 — Controle da meta semanal
 
 - Slider personalizado nos temas claro e escuro, trilho preenchido, escala e atualização ao arrastar; precisão de 1 ponto percentual.

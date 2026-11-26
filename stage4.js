@@ -430,7 +430,8 @@ function loadAssessment(end){
  const change=prior.average>0?(recent.average-prior.average)/prior.average:recent.average>0?1:0;
  const capacityChange=prior.capacity/prior.days>0?(recent.capacity/recent.days)/(prior.capacity/prior.days):1;
  const out={recent,prior,age,overload,change};
- if(change>.5&&recent.average-prior.average>=60)return {...out,kind:"rapid",rate:clamp01(1-.12*cfg().penalty)};
+ // Growth is not a fault. Flag only a substantial sustained increase close to the available capacity.
+ if(change>=.5&&recent.average-prior.average>=120&&recent.use>=.75)return {...out,kind:"rapid",rate:1};
  if(recent.use>=.85&&change>=-.15)return {...out,kind:"sustain",rate:1};
  if(change<-.25&&capacityChange>=.85&&prior.average>=30)return {...out,kind:"drop",rate:clamp01(1-Math.min(.65,Math.abs(change)*cfg().penalty))};
  if(change>=.08&&recent.average-prior.average>=10)return {...out,kind:"growth",rate:1};
@@ -555,12 +556,12 @@ function mentorIssues(current){
   const detail=first.late? "O prazo de «"+first.x.title+"» venceu"+(first.x.completed?" antes da conclusão.":"."):first.dueNow?"«"+first.x.title+"» vence hoje.":"«"+first.x.title+"» está pendente há "+first.age+" dias, com prioridade "+({high:"alta",medium:"média"}[first.x.priority]||"definida")+".";
   addIssue("tasks",85,"warning","Gestão das prioridades",detail+" "+live.issues.length+" pendência(s) ou atraso(s) merecem revisão.",live.issues.length+" em atenção");
  }
- if(live.alerts.length)addIssue("near",64,"neutral","Prazos próximos",live.alerts.length+" tarefa(s) de alta prioridade têm prazo próximo: "+live.alerts.slice(0,3).map(a=>a.x.title).join(", ")+".",live.alerts.length+" próximas do prazo","Reserve tempo para essas tarefas antes do vencimento.");
- const loadTitles={overload:"Carga elevada demais",rapid:"Aumento rápido da carga",stagnation:"Carga sem evolução",drop:"Redução de ritmo",growth:"Evolução dos estudos",sustain:"Ritmo elevado e estável"};
+ if(live.alerts.length)addIssue("near",64,"attention","Prazos próximos",live.alerts.length+" tarefa(s) de alta prioridade têm prazo próximo: "+live.alerts.slice(0,3).map(a=>a.x.title).join(", ")+".",live.alerts.length+" próximas do prazo","Reserve tempo para essas tarefas antes do vencimento.");
+ const loadTitles={overload:"Carga elevada demais",rapid:"Acompanhar o novo ritmo de estudos",stagnation:"Carga sem evolução",drop:"Redução de ritmo",growth:"Evolução dos estudos",sustain:"Ritmo elevado e estável"};
  if(loadTitles[load.kind]){
   const positive=["growth","sustain"].includes(load.kind);
   const detail=(load.kind==="overload"?load.overload+" dias com carga elevada no último mês. ":"")+ "Média recente: "+labelMinutes(load.recent.average)+" por dia registrado"+(load.prior.days>=4?", antes "+labelMinutes(load.prior.average):"")+". "+(load.kind==="sustain"||load.kind==="overload"?"Considere os outros compromissos e as pausas necessárias.":load.kind==="stagnation"?"Há espaço na disponibilidade registrada; avalie um avanço gradual.":"");
-  addIssue(load.kind,load.kind==="overload"?96:load.kind==="stagnation"?84:load.kind==="rapid"?87:76,positive?"good":"warning",loadTitles[load.kind],detail,labelMinutes(load.recent.average)+"/dia");
+  addIssue(load.kind,load.kind==="overload"?96:load.kind==="stagnation"?84:load.kind==="rapid"?87:76,positive?"good":load.kind==="rapid"?"attention":"warning",loadTitles[load.kind],detail,labelMinutes(load.recent.average)+"/dia");
  }
  if(x.h.done&&x.h.miss===0&&x.h.unknown===0)addIssue("habitGood",72,"good","Rotinas consistentes",x.h.done+" ocorrências cumpridas.",""+x.h.done+" realizadas","Continue sustentando seus hábitos.");
  if(x.f.done)addIssue("focusGood",60,"good","Focos entregues",x.f.done+" compromissos concluídos.",String(x.f.done),"Mantenha a qualidade.");
@@ -600,15 +601,15 @@ function mentorVisualData(){
  const current=mentorWeek(today()),previous=mentorWeek(add(today(),-7)),history=[];
  for(let k=5;k>=0;k--)history.push(mentorWeek(add(today(),-k*7)));
  const known=history.filter(x=>x.score!==null),delta=current.score!==null&&previous.score!==null?current.score-previous.score:null;
- const all=mentorAnalysis(),problems=all.items.filter(i=>i.tone==="warning").map(i=>({...i,value:i.evidence,description:i.body})),positives=all.items.filter(i=>i.tone==="good").map(i=>({...i,value:i.evidence,description:i.body})),more=all.items.filter(i=>i.tone==="neutral");
+ const all=mentorAnalysis(),problems=all.items.filter(i=>i.tone==="warning").map(i=>({...i,value:i.evidence,description:i.body})),positives=all.items.filter(i=>i.tone==="good").map(i=>({...i,value:i.evidence,description:i.body})),more=all.items.filter(i=>i.tone==="neutral"),attention=all.items.filter(i=>i.tone==="attention").map(i=>({...i,value:i.evidence,description:i.body}));
  const ranked=problems[0],score=current.score;
  const grade=score===null?"Sem nota ainda":score===100?"Excepcional":score>=90?"Excelente":score>=80?"Muito bom":score>=70?"Bom":score>=60?"Regular":score>=40?"Insatisfatório":"Crítico";
  const stateTone=score===null?"neutral":score>=80?"good":score>=60?"mid":"bad";
  const category=["overload","rapid"].includes(ranked?.key)||["sustain","overload","rapid"].includes(current.load.kind)?"caution":ranked&&["strict","hard"].includes(mentorTone())?"firm":"good";
  const list=phrases[category],seed=Number(today().replaceAll("-",""));
- const slogan=ranked?ranked.action:positives[0]?.action||"Vamos acompanhar seus registros.";
+ const slogan=ranked?ranked.action:attention[0]?.action||positives[0]?.action||"Vamos acompanhar seus registros.";
  const proposal=previous.score===null?null:Math.min(100,previous.score+(previous.score>=85?3:5));
- return {current,previous,history,known,delta,problems,positives,more,ranked,grade,stateTone,slogan,proposal,phrase:list[seed%list.length]};
+ return {current,previous,history,known,delta,problems,positives,more,attention,ranked,grade,stateTone,slogan,proposal,phrase:list[seed%list.length]};
 }
 function mentorTrendGraph(data){
  const weeks=data.history,valid=weeks.filter(w=>w.score!==null);
@@ -634,9 +635,10 @@ function mentorPanel(){
  const goal=ev.mentor.goal,finished=goal&&goal.weekEnd<today(),goalResult=goal&&finished?mentorWeek(goal.weekStart):null;
  const oldGoal=goal&&goal.scoringVersion!==2;const goalState=oldGoal?"Compromisso da avaliação anterior":goalResult&&goalResult.score!==null&&!goalResult.provisional?(goalResult.score>=goal.target?"Meta cumprida":"Meta não cumprida"):"Ainda sem resultado conclusivo";
  return '<section class="card evo-mentor-section evo-boss"><div class="evo-boss-head"><span class="overline">◉ Meu Orientador · CHEFE DE DESEMPENHO</span><span class="evo-boss-mini">'+E(x.days)+" dia(s) encerrado(s) nesta semana"+'</span></div>'+
- '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(score===null?"Vamos acompanhar sua trajetória.":d.ranked?d.ranked.title:score>=90?"Bom trabalho. Mantenha a constância.":"Continue consolidando sua rotina.")+'</h2><p>'+E(critique)+'</p><small>'+E(x.provisional?"Avaliação provisória · "+x.days+" dia(s) finalizado(s)":"Avaliação dos registros disponíveis")+'.</small></div></div>'+
+ '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(score===null?"Vamos acompanhar sua trajetória.":d.ranked?d.ranked.title:d.attention.length?"Acompanhe seu progresso.":score>=90?"Bom trabalho. Mantenha a constância.":"Continue consolidando sua rotina.")+'</h2><p>'+E(critique)+'</p><small>'+E(x.provisional?"Avaliação provisória · "+x.days+" dia(s) finalizado(s)":"Avaliação dos registros disponíveis")+'.</small></div></div>'+
  '<p class="note evo-mentor-phrase">'+E(d.phrase)+'</p><div class="evo-boss-priority '+(d.ranked?"bad":"good")+'"><span>MINHA COBRANÇA PRINCIPAL</span><strong>'+E(top)+'</strong><small>'+E(d.ranked?d.ranked.action:"Continue registrando seus resultados reais.")+'</small></div>'+
  '<div class="evo-boss-grid"><details class="evo-boss-tile evo-boss-bad"><summary><span>✕</span><strong>Pontos de melhoria</strong><small>'+d.problems.length+' ponto(s)</small></summary><div class="evo-boss-tile-body">'+(d.problems.length?d.problems.map(issue).join(""):'<p class="note">Nenhuma falha confirmada nesta amostra.</p>')+'</div></details>'+
+ '<details class="evo-boss-tile evo-boss-attention"><summary><span>!</span><strong>Pontos de atenção</strong><small>'+d.attention.length+' observação(ões)</small></summary><div class="evo-boss-tile-body">'+(d.attention.length?d.attention.map(issue).join(""):'<p class="note">Nada que exija acompanhamento especial no momento.</p>')+'</div></details>'+
  '<details class="evo-boss-tile evo-boss-good"><summary><span>✓</span><strong>Pontos positivos</strong><small>'+d.positives.length+' avanço(s)</small></summary><div class="evo-boss-tile-body">'+(d.positives.length?d.positives.map(good).join(""):'<p class="note">Os pontos positivos aparecem conforme forem confirmados.</p>')+'</div></details>'+
  '<details class="evo-boss-tile"><summary><span>▥</span><strong>Minha evolução</strong><small>Últimas 6 semanas</small></summary><div class="evo-boss-tile-body">'+mentorTrendGraph(d)+'</div></details>'+
  '<details class="evo-boss-tile"><summary><span>◎</span><strong>Meta da semana</strong><small>Negociar com o chefe</small></summary><div class="evo-boss-tile-body"><p class="note">Proposta para a próxima semana: '+(d.proposal===null?"sem histórico comparável ainda":d.proposal+"% de execução")+'. Você pode escolher uma meta menor ou maior.</p><label class="evo-boss-target-label" for="s4-mentor-target">Sua meta <strong id="s4-mentor-target-value">'+target+'%</strong></label><div class="evo-boss-target-control"><input type="range" id="s4-mentor-target" min="0" max="100" step="1" value="'+target+'" style="--mentor-progress:'+target+'%" aria-valuetext="'+target+'%"><div class="evo-boss-target-scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div></div><p class="note">Escolha um compromisso realista para a próxima semana.</p><button class="btn primary small" data-s4="mentorAcceptGoal">Assumir compromisso</button>'+

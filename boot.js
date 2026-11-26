@@ -1,7 +1,7 @@
 /* Órbita: bootstrap offline-first, sem dependência de servidor no primeiro uso. */
 (async function(){
 "use strict";
-window.ORBITA_VERSION="5.24";
+window.ORBITA_VERSION="5.25";
 const KEY="orbita:stage1:v1",DB="orbita-offline-v1",STORE="documents";
 let database=null;
 function openDb(){
@@ -70,7 +70,7 @@ function load(src){
  });
 }
 for(const file of ["config.js","smart-date.js","app.js","stage2.js","stage3.js","stage4.js","stage5.js","stage6.js","stage7.js","stage8.js","stage9.js"]){
- try{await load("./"+file+(file==="smart-date.js"?"?v=20261126-v5-24-slider":file==="stage2.js"?"?v=20261126-v5-24-slider":file==="stage3.js"?"?v=20261126-v5-24-slider":file==="stage4.js"?"?v=20261126-v5-24-slider":file==="stage7.js"?"?v=20261126-v5-24-slider":file==="stage8.js"?"?v=20261126-v5-24-slider":file==="app.js"?"?v=20261126-v5-24-slider":file==="stage5.js"?"?v=20261119-orbita-v5-07-final":file==="stage9.js"?"?v=20261121-daily-review-v5-14b":""));}catch(err){
+ try{await load("./"+file+(file==="smart-date.js"?"?v=20261126-v5-25-attention":file==="stage2.js"?"?v=20261126-v5-25-attention":file==="stage3.js"?"?v=20261126-v5-25-attention":file==="stage4.js"?"?v=20261126-v5-25-attention":file==="stage7.js"?"?v=20261126-v5-25-attention":file==="stage8.js"?"?v=20261126-v5-25-attention":file==="app.js"?"?v=20261126-v5-25-attention":file==="stage5.js"?"?v=20261119-orbita-v5-07-final":file==="stage9.js"?"?v=20261121-daily-review-v5-14b":""));}catch(err){
   console.error(err);
   const view=document.getElementById("view");if(view)view.textContent="Não foi possível carregar o aplicativo. Verifique a conexão e atualize a página.";
   return;
