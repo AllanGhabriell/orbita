@@ -111,6 +111,117 @@ function applyLayout(data){
 }
 
 const note=id=>notes.find(x=>x.id===id);
+/* Images are compact raster attachments in the same saved/synced document.
+ * Bound their storage cost; never accept remote URLs or SVG markup. */
+const IMAGE_LIMIT=8,IMAGE_SIZE=240000,IMAGE_TOTAL=1500000,FILE_LIMIT=25*1024*1024;
+let imageDraft=null,imageViewer=null;
+const imagePositions=new Map();
+function validImage(x){return !!x&&typeof x.src==="string"&&x.src.length<=IMAGE_SIZE&&/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(x.src);}
+function noteImages(n){return Array.isArray(n?.images)?n.images.filter(validImage).slice(0,IMAGE_LIMIT):[];}
+function imageBudget(items,except=""){
+ const total=notes.filter(n=>n.id!==except).reduce((n,x)=>n+noteImages(x).reduce((a,y)=>a+y.src.length,0),0);
+ return total+items.reduce((n,x)=>n+x.src.length,0)<=IMAGE_TOTAL;
+}
+function imageData(file){
+ return new Promise((resolve,reject)=>{
+  if(!file||!/^image\/(?:jpeg|png|webp|gif|bmp|avif|x-ms-bmp)$/i.test(file.type)||file.size>FILE_LIMIT)return reject(Error("Escolha uma imagem válida de até 25 MB."));
+  const url=URL.createObjectURL(file),img=new Image();
+  function fail(){URL.revokeObjectURL(url);reject(Error("Não foi possível abrir esta imagem."));}
+  img.onerror=fail;
+  img.onload=()=>{
+   try{
+    if(!img.naturalWidth||!img.naturalHeight)throw Error("Imagem inválida.");
+    const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+    if(!ctx)throw Error("Não foi possível preparar a imagem.");
+    let edge=1600,src="";
+    for(let attempt=0;attempt<8;attempt++){
+     const ratio=Math.min(1,edge/Math.max(img.naturalWidth,img.naturalHeight));
+     canvas.width=Math.max(1,Math.round(img.naturalWidth*ratio));canvas.height=Math.max(1,Math.round(img.naturalHeight*ratio));
+     ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+     src=canvas.toDataURL("image/webp",.82-attempt*.045);
+     if(!src.startsWith("data:image/webp;")){ctx.globalCompositeOperation="destination-over";ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalCompositeOperation="source-over";src=canvas.toDataURL("image/jpeg",.82-attempt*.045);}
+     if(src.length<=IMAGE_SIZE&&validImage({src}))break;
+     edge=Math.round(edge*.78);
+    }
+    if(!validImage({src}))throw Error("A imagem não coube no limite de armazenamento.");
+    resolve({id:id(),name:String(file.name||"Imagem colada").slice(0,120),src,width:canvas.width,height:canvas.height});
+   }catch(e){reject(e);}finally{URL.revokeObjectURL(url);}
+  };
+  img.src=url;
+ });
+}
+function imageEditorMarkup(items){
+ return items.map((x,i)=>'<div class="s8-image-edit-item"><img src="'+A(x.src)+'" alt="'+A(x.name||"Imagem "+(i+1))+'"><button type="button" data-s8="removeImageDraft" data-index="'+i+'" class="s8-image-remove" aria-label="Remover imagem '+(i+1)+'" title="Remover imagem">×</button></div>').join("");
+}
+function refreshImageEditor(draft){
+ if(!draft||imageDraft!==draft||!draft.form?.isConnected)return;
+ const list=$("s8-image-edit-list"),hint=$("s8-image-edit-status"),picker=$("s8-image-input");
+ if(list)list.innerHTML=imageEditorMarkup(draft.items);
+ if(hint)hint.textContent=draft.busy?"Preparando imagens…":draft.items.length+"/"+IMAGE_LIMIT+" imagens"+(draft.message?" · "+draft.message:"");
+ if(picker)picker.disabled=draft.busy||draft.items.length>=IMAGE_LIMIT;
+ const submit=draft.form.querySelector('button[type="submit"]');if(submit)submit.disabled=draft.busy;
+}
+async function addDraftImages(files){
+ const draft=imageDraft;if(!draft||!draft.form?.isConnected||draft.busy)return;
+ draft.busy=true;draft.message="";refreshImageEditor(draft);
+ try{
+  for(const file of files){
+   if(imageDraft!==draft||!draft.form.isConnected)return;
+   if(draft.items.length>=IMAGE_LIMIT){draft.message="Limite de imagens atingido.";break;}
+   try{
+    const item=await imageData(file);
+    if(imageDraft!==draft||!draft.form.isConnected)return;
+    if(!imageBudget([...draft.items,item],draft.id)){draft.message="Espaço de imagens esgotado. Remova algum anexo.";break;}
+    draft.items.push(item);
+   }catch(e){draft.message=e.message||"Não foi possível adicionar a imagem.";}
+  }
+ }finally{draft.busy=false;refreshImageEditor(draft);}
+}
+function imageIndex(n){const len=noteImages(n).length;return len?((Number(imagePositions.get(n.id)||0)%len)+len)%len:0;}
+function galleryMarkup(n){
+ const imgs=noteImages(n);if(!imgs.length)return "";
+ const i=imageIndex(n),x=imgs[i],key=A(n.id);
+ return '<div class="s8-gallery" data-s8-gallery="'+key+'"><button type="button" class="s8-image-preview" data-s8="imageOpen" data-id="'+key+'" aria-label="Ampliar imagem '+(i+1)+' de '+imgs.length+'" title="Ampliar imagem"><img src="'+A(x.src)+'" alt="'+A(x.name||"Imagem do lembrete")+'" loading="lazy" decoding="async" draggable="false"><span class="s8-image-expand" aria-hidden="true">'+glyph("expand")+'</span></button>'+
+ (imgs.length>1?'<button type="button" class="s8-image-nav s8-image-prev" data-s8="imagePrev" data-id="'+key+'" aria-label="Imagem anterior">'+glyph("chevronLeft")+'</button><button type="button" class="s8-image-nav s8-image-next" data-s8="imageNext" data-id="'+key+'" aria-label="Próxima imagem">'+glyph("chevronRight")+'</button><span class="s8-image-count" aria-live="polite">'+(i+1)+' / '+imgs.length+'</span>':'')+'</div>';
+}
+function moveImage(idValue,delta){
+ const n=note(idValue),imgs=noteImages(n);if(imgs.length<2)return;
+ imagePositions.set(idValue,(imageIndex(n)+delta+imgs.length)%imgs.length);
+ const card=$("s8-note-"+idValue),gallery=card?.querySelector?.(".s8-gallery");
+ if(gallery){const action=document.activeElement?.dataset?.s8;gallery.outerHTML=galleryMarkup(n);if(action==="imagePrev"||action==="imageNext")card.querySelector('[data-s8="'+action+'"]')?.focus({preventScroll:true});}
+ if(imageViewer?.id===idValue){imageViewer.zoom=1;renderImageViewer();}
+}
+function closeImageViewer(){
+ const v=imageViewer;if(!v)return;imageViewer=null;v.root.remove();if(v.returnFocus?.isConnected)v.returnFocus.focus({preventScroll:true});
+}
+function renderImageViewer(){
+ const v=imageViewer;if(!v)return;
+ const n=note(v.id),imgs=noteImages(n);if(!imgs.length){closeImageViewer();return;}
+ const i=imageIndex(n),x=imgs[i];
+ v.root.innerHTML='<div class="s8-viewer-top"><div><strong>'+E(n.title)+'</strong><small>'+E(x.name||"Imagem")+' · '+(i+1)+' / '+imgs.length+'</small></div><button type="button" data-s8="imageClose" class="s8-viewer-btn" aria-label="Fechar imagem" title="Fechar">'+glyph("close")+'</button></div>'+
+ '<div class="s8-viewer-stage"><div class="s8-viewer-canvas" style="--s8-image-zoom:'+v.zoom+'"><img src="'+A(x.src)+'" alt="'+A(x.name||"Imagem do lembrete")+'" draggable="false"></div></div>'+
+ '<div class="s8-viewer-controls">'+(imgs.length>1?'<button type="button" class="s8-viewer-btn" data-s8="viewerPrev" aria-label="Imagem anterior">'+glyph("chevronLeft")+'</button>':'')+
+ '<button type="button" class="s8-viewer-btn" data-s8="imageZoomOut" aria-label="Diminuir zoom">'+glyph("minus")+'</button><button type="button" class="s8-viewer-btn s8-viewer-percent" data-s8="imageZoomReset" aria-label="Restaurar zoom">'+Math.round(v.zoom*100)+'%</button><button type="button" class="s8-viewer-btn" data-s8="imageZoomIn" aria-label="Aumentar zoom">'+glyph("plus")+'</button>'+
+ (imgs.length>1?'<button type="button" class="s8-viewer-btn" data-s8="viewerNext" aria-label="Próxima imagem">'+glyph("chevronRight")+'</button>':'')+'</div>';
+}
+function openImageViewer(idValue){
+ const n=note(idValue);if(!noteImages(n).length||!document.createElement)return;
+ closeContext();closeImageViewer();
+ const overlay=document.createElement("div");overlay.id="s8-image-viewer";overlay.className="s8-image-viewer";overlay.setAttribute("role","dialog");overlay.setAttribute("aria-modal","true");overlay.setAttribute("aria-label","Visualização de imagem");
+ imageViewer={id:idValue,zoom:1,root:overlay,returnFocus:document.activeElement};
+ document.body.appendChild(overlay);renderImageViewer();
+ overlay.addEventListener("click",ev=>{if(ev.target===overlay||ev.target.classList?.contains("s8-viewer-stage")||ev.target.classList?.contains("s8-viewer-canvas"))closeImageViewer();});
+ overlay.querySelector('[data-s8="imageClose"]')?.focus();
+}
+function imageZoom(delta){
+ const v=imageViewer;if(!v)return;
+ v.zoom=delta===0?1:clamp(v.zoom+delta,1,4);
+ const canvas=v.root.querySelector(".s8-viewer-canvas"),label=v.root.querySelector(".s8-viewer-percent"),stage=v.root.querySelector(".s8-viewer-stage");
+ if(canvas)canvas.style.setProperty("--s8-image-zoom",v.zoom);
+ if(label)label.textContent=Math.round(v.zoom*100)+"%";
+ if(v.zoom===1&&stage){stage.scrollLeft=0;stage.scrollTop=0;}
+}
+
 const id=()=>typeof crypto!=="undefined"&&crypto.randomUUID?crypto.randomUUID():"rem-"+Date.now()+"-"+Math.random().toString(36).slice(2);
 function age(created){
  const elapsed=Math.max(0,Date.now()-new Date(created).getTime());
@@ -123,7 +234,7 @@ function age(created){
 }
 const icons={pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"};
 function glyph(name){
- const paths={sort:'<path d="M7 3v18m-4-4 4 4 4-4M13 5h8m-8 5h6m-6 5h4"/>',unlock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>',reset:'<path d="M5 9a8 8 0 1 1 0 6M5 4v5h5"/>',all:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 12 3 3 7-7M2 7V2h5"/>',minus:'<path d="M5 12h14"/>',pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
+ const paths={expand:'<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/>',chevronLeft:'<path d="m15 18-6-6 6-6"/>',chevronRight:'<path d="m9 18 6-6-6-6"/>',sort:'<path d="M7 3v18m-4-4 4 4 4-4M13 5h8m-8 5h6m-6 5h4"/>',unlock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>',reset:'<path d="M5 9a8 8 0 1 1 0 6M5 4v5h5"/>',all:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 12 3 3 7-7M2 7V2h5"/>',minus:'<path d="M5 12h14"/>',pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||"")+'</svg>';
 }
 function smallButton(action,icon,label,extra=""){return '<button type="button" class="s8-mini" data-s8="'+action+'" title="'+A(label)+'" aria-label="'+A(label)+'" '+extra+'>'+glyph(icon)+'</button>';}
@@ -442,7 +553,7 @@ function markup(){
    smallButton("noteMenu","more","Mais opções",'data-id="'+A(n.id)+'"')+'</div></div>'+
    '<button class="s8-note-title" type="button" data-s8="noteMenu" data-id="'+A(n.id)+'">'+E(n.title)+'</button>'+
    (n.description?'<button class="s8-fold" type="button" data-s8="observation" data-id="'+A(n.id)+'" aria-label="Abrir ou recolher observação" aria-expanded="'+expandedNotes.has(n.id)+'"></button>':"")+
-   (n.description&&expandedNotes.has(n.id)?'<p class="s8-observation">'+E(n.description)+'</p>':"")+'</article>';
+   (n.description&&expandedNotes.has(n.id)?'<p class="s8-observation">'+E(n.description)+'</p>':"")+galleryMarkup(n)+'</article>';
  };
  const visible=visibleNotes(),pinned=visible.filter(n=>n.pinned),others=visible.filter(n=>!n.pinned);
  const list=(pinned.length?'<div class="s8-note-group s8-pinned-group">'+pinned.map(renderNote).join("")+'</div>':"")+(others.length?'<div class="s8-note-group">'+others.map(renderNote).join("")+'</div>':"");
@@ -475,10 +586,12 @@ function edit(idValue,preselected){
  const n=idValue?note(idValue):null;
  if(idValue&&!n)return C.notify("Lembrete não encontrado.");
  const scope=preselected?.scope||initialScope(n),target=preselected?.target||encodedTarget(n),targetDate=selectedDateForLink(n,preselected);
+ const attachments=noteImages(n).slice();
  C.openModal(n?"Editar lembrete":"Novo lembrete",'<form id="s8-note-form" class="section-stack">'+
  '<input type="hidden" name="id" value="'+A(n?.id||"")+'">'+
  '<div class="field"><label>Título</label><input name="title" maxlength="140" required value="'+A(n?.title||"")+'" placeholder="O que você quer lembrar?"></div>'+
  '<div class="field"><label>Observações (opcional)</label><textarea name="description" maxlength="1200" rows="3" placeholder="Detalhes para organizar depois">'+E(n?.description||"")+'</textarea></div>'+
+ '<div class="field s8-image-editor"><label for="s8-image-input">Imagens (opcional)</label><label class="s8-image-add" for="s8-image-input">'+glyph("plus")+' Adicionar imagens</label><input class="s8-image-file" id="s8-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" multiple><div class="s8-image-edit-list" id="s8-image-edit-list">'+imageEditorMarkup(attachments)+'</div><small id="s8-image-edit-status" aria-live="polite">'+attachments.length+'/'+IMAGE_LIMIT+' imagens</small><small>Selecione arquivos ou cole uma imagem com Ctrl + V.</small></div>'+
  '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Cor do papel</label><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="presetColor" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-note-color" aria-label="Escolher qualquer cor" value="'+noteColor(n||{priority:"medium"})+'"></div><label class="checkline"><input type="checkbox" name="autoColor" '+(!safeColor(n?.color)?"checked":"")+'> Cor automática da prioridade</label><label class="checkline"><input type="checkbox" name="pinned" '+(n?.pinned?"checked":"")+'> Fixar este lembrete no topo</label></div>'+
  '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+E(value)+'</option>').join("")+'</select></div>'+
@@ -490,8 +603,9 @@ function edit(idValue,preselected){
  '<small id="s8-link-help">Vínculos específicos encerram ao concluir a atividade; o lembrete permanece no mural.</small></div>'+
  '<p class="note">Lembretes não possuem conclusão ou data obrigatória. Ficam aqui até você excluir ou transformar em uma atividade.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar lembrete</button></div></form>');
+ imageDraft={id:n?.id||"",items:attachments,busy:false,message:"",form:$("s8-note-form")};
 }
-function saveNote(data){
+function saveNote(data,attachments){
  const title=String(data.get("title")||"").trim().slice(0,140);
  const description=String(data.get("description")||"").trim().slice(0,1200);
  const priority=String(data.get("priority")||"medium");
@@ -504,14 +618,21 @@ function saveNote(data){
  if(!title)throw Error("Informe o título do lembrete.");
  if(!Object.hasOwn(labels,priority))throw Error("Prioridade inválida.");
  const existing=note(String(data.get("id")||""));
+ const images=attachments===undefined?noteImages(existing):attachments;
+ if(!Array.isArray(images)||images.length>IMAGE_LIMIT||!images.every(validImage)||!imageBudget(images,existing?.id||""))throw Error("Limite de armazenamento de imagens atingido.");
+ const old=existing?{...existing}:null;
  const color=data.get("autoColor")?null:safeColor(data.get("color"))||existing?.color||null;
  const pinned=data.get("pinned")!==null;
  if(existing&&link?.scope==="next"&&existing.link?.scope==="next"&&link.id===existing.link.id&&link.cycleId===existing.link.cycleId){
   link.boundSessionId=existing.link.boundSessionId;
  }
- if(existing)Object.assign(existing,{title,description,priority,icon,link,color,pinned,lastLinkLabel:link?null:existing.lastLinkLabel,updatedAt:new Date().toISOString()});
- else notes.push({id:id(),title,description,priority,icon,link,color,pinned,createdAt:new Date().toISOString()});
- bindNextNotes();C.save();C.closeModal();redraw();C.notify(existing?"Lembrete atualizado.":"Lembrete adicionado.");
+ if(existing)Object.assign(existing,{title,description,priority,icon,link,color,pinned,images:images.slice(),lastLinkLabel:link?null:existing.lastLinkLabel,updatedAt:new Date().toISOString()});
+ else notes.push({id:id(),title,description,priority,icon,link,color,pinned,images:images.slice(),createdAt:new Date().toISOString()});
+ if(C.save()===false){
+  if(existing){for(const k of Object.keys(existing))if(!Object.hasOwn(old,k))delete existing[k];Object.assign(existing,old);}else notes.pop();
+  throw Error("Não foi possível salvar. Remova imagens ou libere espaço e tente novamente.");
+ }
+ bindNextNotes();C.save();imageDraft=null;C.closeModal();redraw();C.notify(existing?"Lembrete atualizado.":"Lembrete adicionado.");
 }
 function updateTargetSelect(scope,keepSelection=false){
  const target=$("s8-link-target"),wrapper=$("s8-target-wrap");
@@ -530,7 +651,7 @@ function updateTargetSelect(scope,keepSelection=false){
 function remove(idValue){
  const n=note(idValue);if(!n)return;
  if(!window.confirm("Excluir o lembrete “"+n.title+"”?"))return;
- notes.splice(notes.indexOf(n),1);
+ notes.splice(notes.indexOf(n),1);imagePositions.delete(n.id);if(imageViewer?.id===n.id)closeImageViewer();
  C.save();redraw();C.notify("Lembrete excluído.");
 }
 function convert(idValue){
@@ -539,6 +660,7 @@ function convert(idValue){
  const date=C.today()>C.state.firstAccess?C.today():C.state.firstAccess;
  C.openModal("Transformar em atividade",'<form id="s8-convert-form" class="section-stack"><input type="hidden" name="id" value="'+A(n.id)+'">'+
  '<p class="note">Crie um foco do dia ou uma tarefa secundária. O lembrete será removido somente após salvar a atividade.</p>'+
+ (noteImages(n).length?'<label class="checkline"><input type="checkbox" name="discardImages" required> Entendo que as imagens serão excluídas na conversão.</label>':"")+
  '<div class="field"><label>Transformar em</label><select name="type"><option value="task">Tarefa secundária</option><option value="focus">Foco do dia</option></select></div>'+
  '<div class="field"><label>Atividade</label><input name="title" required maxlength="140" value="'+A(n.title)+'"></div>'+
  '<div class="field"><label>Data</label><input type="date" name="date" required min="'+A(C.state.firstAccess)+'" value="'+A(date)+'"></div>'+
@@ -551,6 +673,7 @@ function convert(idValue){
 }
 function convertSubmit(data){
  const n=note(String(data.get("id")||""));if(!n)throw Error("Lembrete não encontrado.");
+ if(noteImages(n).length&&!data.get("discardImages"))throw Error("Confirme a remoção das imagens antes de converter.");
  const type=String(data.get("type")||"");
  if(!["focus","task"].includes(type))throw Error("Selecione um tipo de atividade.");
  const title=String(data.get("title")||"").trim();
@@ -595,6 +718,12 @@ document.addEventListener("click",ev=>{
   else if(action==="selectAllContext"||action==="clearSelection"||action==="invertSelection"||action==="exitSelection")selectionAction(action);
   else if(action==="resetAppearance")resetAppearance();
   else if(action==="themeColor"){ui.backgroundColor="";C.save();applyAppearance();settingsMenu();}
+  else if(action==="imageOpen")openImageViewer(b.dataset.id);
+  else if(action==="imagePrev"||action==="imageNext")moveImage(b.dataset.id,action==="imagePrev"?-1:1);
+  else if(action==="viewerPrev"||action==="viewerNext"){if(imageViewer){moveImage(imageViewer.id,action==="viewerPrev"?-1:1);imageViewer?.root.querySelector('[data-s8="'+action+'"]')?.focus();}}
+  else if(action==="imageClose")closeImageViewer();
+  else if(action==="imageZoomIn"||action==="imageZoomOut"||action==="imageZoomReset")imageZoom(action==="imageZoomIn"?.5:action==="imageZoomOut"?-.5:0);
+  else if(action==="removeImageDraft"){if(imageDraft&&!imageDraft.busy){imageDraft.items.splice(Number(b.dataset.index),1);imageDraft.message="";refreshImageEditor(imageDraft);}}
   else if(action==="new")edit();
   else if(action==="lock")toggleLock();
   else if(action==="reset"){if(window.confirm("Restaurar posição, tamanho e zoom do mural?"))resetLayout();}
@@ -623,6 +752,7 @@ document.addEventListener("contextmenu",ev=>{
 });
 document.addEventListener("change",event=>{
  const t=event.target;
+ if(t?.id==="s8-image-input"){const files=Array.from(t.files||[]);t.value="";void addDraftImages(files);return;}
  if(t?.dataset?.s8Pref){setAppearance(t.dataset.s8Pref,t.type==="checkbox"?t.checked:t.value);C.save();return;}
  if(t?.dataset?.s8Select){if(t.checked)selectedNotes.add(t.dataset.s8Select);else selectedNotes.delete(t.dataset.s8Select);syncSelection();return;}
  if(t?.id==="s8-zoom-slider"){setZoom(t.value,true);return;}
@@ -635,6 +765,7 @@ document.addEventListener("change",event=>{
  if(event.target?.id==="s8-link-scope")updateTargetSelect(event.target.value);
  if(event.target?.id==="s8-future-date")updateTargetSelect($("s8-link-scope")?.value||"future");
 });
+document.addEventListener("paste",event=>{if(!imageDraft?.form?.isConnected||!imageDraft.form.contains(event.target))return;const files=Array.from(event.clipboardData?.items||[]).filter(x=>x.kind==="file"&&x.type.startsWith("image/")).map(x=>x.getAsFile()).filter(Boolean);if(files.length){event.preventDefault();void addDraftImages(files);}});
 document.addEventListener("input",event=>{
  if(event.target?.dataset?.s8Pref&&["range","color"].includes(event.target.type)){setAppearance(event.target.dataset.s8Pref,event.target.value);return;}
  if(event.target?.id==="s8-zoom-slider"){setZoom(event.target.value);return;}
@@ -645,7 +776,7 @@ document.addEventListener("pointerdown",ev=>{
  const select=ev.target.closest?.('[data-s8="selectMode"]');
  if(select?.dataset?.s8==="selectMode"&&ev.pointerType==="touch"){selectionHeld=false;selectionHold=setTimeout(()=>{selectionHeld=true;selectionMenu(select);},500);}
  const card=ev.target.closest?.("[data-s8-card]");
- if(card?.dataset?.s8Card&&!selecting&&ev.button===0&&!note(card.dataset.s8Card)?.pinned&&!ev.target.closest?.(".s8-mini,.s8-fold")){
+ if(card?.dataset?.s8Card&&!selecting&&ev.button===0&&!note(card.dataset.s8Card)?.pinned&&!ev.target.closest?.(".s8-mini,.s8-fold,.s8-gallery")){
   cardDrag={id:card.dataset.s8Card,pointer:ev.pointerId,x:ev.clientX,y:ev.clientY,card,moved:false,target:null,after:false};return;
  }
  pointerStart(ev);
@@ -673,13 +804,23 @@ document.addEventListener("submit",ev=>{
  ev.preventDefault();
  try{
   const data=new FormData(ev.target);
-  if(formId==="s8-note-form")saveNote(data);
+  if(formId==="s8-note-form"){const draft=imageDraft?.form===ev.target?imageDraft:null;if(draft?.busy)throw Error("Aguarde o preparo das imagens.");saveNote(data,draft?.items);}
   else if(formId==="s8-layout-form")applyLayout(data);
   else if(formId==="s8-bulk-form")bulkEdit(data);
   else convertSubmit(data);
  }catch(err){C.notify(err.message||"Verifique os dados informados.");}
 });
 document.addEventListener("scroll",ev=>{if(contextAnchor&&ev.target.closest?.(".s8-note-list"))closeContext();},true);
+document.addEventListener("keydown",ev=>{
+ if(imageViewer){
+  if(["Escape","ArrowLeft","ArrowRight","+","-","=","0","Tab"].includes(ev.key)){ev.preventDefault();ev.stopImmediatePropagation?.();
+   if(ev.key==="Escape")closeImageViewer();
+   else if(ev.key==="ArrowLeft"||ev.key==="ArrowRight"){moveImage(imageViewer.id,ev.key==="ArrowLeft"?-1:1);imageViewer?.root.querySelector('[data-s8="imageClose"]')?.focus();}
+   else if(ev.key==="Tab"){const bs=Array.from(imageViewer.root.querySelectorAll("button"));const i=bs.indexOf(document.activeElement);bs[(i+(ev.shiftKey?-1:1)+bs.length)%bs.length]?.focus();}
+   else imageZoom(ev.key==="0"?0:ev.key==="-"?-.5:.5);
+  }else if(!imageViewer.root.contains(ev.target)){ev.preventDefault();ev.stopImmediatePropagation?.();}
+ }
+},true);
 document.addEventListener("keydown",ev=>{
  if(ev.key==="Escape"&&contextAnchor){const anchor=contextAnchor;closeContext();anchor?.focus?.({preventScroll:true});return;}
  if(ev.target.closest?.('[data-s8="selectMode"]')&&["ArrowDown","ContextMenu"].includes(ev.key)){ev.preventDefault();selectionMenu(ev.target.closest('[data-s8="selectMode"]'));return;}
@@ -690,13 +831,13 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
  if(contextAnchor&&!contextAnchor.isConnected)closeContext();
  const incoming=document.querySelector?.('#view #s8-floating-root');
  const detached=document.querySelectorAll?.('body > #s8-floating-root')||[];
- if(route!=="inicio"){closeContext();layoutObserver?.disconnect();for(const node of detached)node.remove?.();return;}
+ if(route!=="inicio"){closeImageViewer();closeContext();layoutObserver?.disconnect();for(const node of detached)node.remove?.();return;}
  if(incoming&&document.body?.appendChild){
   for(const node of detached)if(node!==incoming)node.remove?.();
   document.body.appendChild(incoming);
  }
  if(contextAnchor&&!contextAnchor.isConnected)closeContext();
  place();observeLayout();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,remove,convertSubmit,age,sorted,togglePin,zoomBy,setZoom,setOpacity,selectAll,bulkEdit,moveNote,resetOrder,selectionAction,toggleSelection,toggleObservation,setAppearance,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,noteImages,imageBudget,validImage,galleryMarkup,imageIndex,moveImage,remove,convertSubmit,age,sorted,togglePin,zoomBy,setZoom,setOpacity,selectAll,bulkEdit,moveNote,resetOrder,selectionAction,toggleSelection,toggleObservation,setAppearance,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
 C.render();
 })();

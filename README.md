@@ -1,5 +1,10 @@
 # Órbita
 
+## v5.28 — Imagens no mural de lembretes
+
+- Anexos de imagem por seleção de arquivos ou colagem, miniaturas de tamanho fixo sem recorte, carrossel, visualizador opaco com zoom e navegação por teclado.
+- Imagens raster compactadas para salvar no documento existente: até 8 por lembrete, orçamento compartilhado de 1,5 milhão de caracteres codificados, entradas de até 25 MB. GIFs são armazenados como imagem estática. A conversão em atividade solicita confirmação da remoção dos anexos.
+
 ## v5.27 — Acompanhamento diário da semana
 
 - Pontos de atenção aparecem somente quando existem. Destaques de recordes, evolução diária, mudanças de planejamento e variações de ritmo contextualizadas pela disponibilidade. Resumo semanal de tempos e sessões; dias abertos identificados como provisórios. Sem novas notificações por atividade nem penalização automática por não repetir recordes.

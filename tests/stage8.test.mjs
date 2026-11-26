@@ -116,7 +116,7 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261126-v5-27-weekly"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261126-v5-28-reminder-images"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
 
 R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
@@ -175,3 +175,29 @@ R.resetOrder();assert.equal(R.layout.orderMode,"auto");assert.equal(R.layout.spa
 R.selectionAction("selectAll");assert.doesNotMatch(markup,/class="s8-select-note"/);assert.match(markup,/s8-selected/);
 R.toggleSelection(one.id);assert.match(markup,/aria-checked="false"/);R.selectionAction("exitSelection");
 one.description="Observação de teste";R.toggleObservation(one.id);assert.match(markup,/s8-observation/);R.toggleObservation(one.id);assert.doesNotMatch(markup,/class="s8-observation"/);assert.match(markup,/class="s8-fold"/);
+
+const testImage={id:"pic1",name:"Imagem de estudo",src:"data:image/png;base64,aGVsbG8=",width:100,height:50};
+const testImage2={...testImage,id:"pic2",name:"Outra imagem"};
+R.saveNote(form({title:"Lembrete ilustrado",priority:"low"}),[testImage,testImage2]);
+const imgNote=R.notes.at(-1);
+assert.equal(R.noteImages(imgNote).length,2);
+assert.match(R.galleryMarkup(imgNote),/s8-image-count[^>]*>1 \/ 2/);
+assert.match(R.galleryMarkup(imgNote),/data-s8="imageNext"/);
+R.moveImage(imgNote.id,1);
+assert.equal(R.imageIndex(imgNote),1);
+assert.match(R.galleryMarkup(imgNote),/2 \/ 2/);
+R.moveImage(imgNote.id,1);assert.equal(R.imageIndex(imgNote),0);
+R.moveImage(imgNote.id,-1);assert.equal(R.imageIndex(imgNote),1);
+R.saveNote(form({id:imgNote.id,title:"Imagem preservada",priority:"medium"}));
+assert.equal(R.noteImages(imgNote).length,2,"edição textual mantém anexos");
+assert.throws(()=>R.saveNote(form({title:"Insegura"}),[{src:"https://example.com/image.png"}]),/Limite/);
+assert.equal(R.validImage({src:"data:image/svg+xml;base64,PHN2Zz4="}),false);
+assert.throws(()=>R.saveNote(form({title:"Muitas imagens"}),Array(9).fill(testImage)),/Limite/);
+assert.throws(()=>R.convertSubmit(form({id:imgNote.id,type:"task",title:"Converter",date:"2026-11-11"})),/remoção das imagens/);
+assert.ok(R.notes.includes(imgNote),"conversão sem confirmação mantém anexos");
+R.saveNote(form({id:imgNote.id,title:"Uma imagem",priority:"medium"}),[testImage]);
+assert.doesNotMatch(R.galleryMarkup(imgNote),/s8-image-next/);
+R.saveNote(form({id:imgNote.id,title:"Sem imagem",priority:"medium"}),[]);
+assert.equal(R.galleryMarkup(imgNote),"");
+assert.match(read("stage8.css"),/object-fit:contain/);
+assert.match(read("stage8.css"),/\.s8-image-viewer\{[^}]*background:#101116/);
