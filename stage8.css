@@ -222,16 +222,23 @@ body[data-theme="light"] .s8-float.s8-open .s8-panel{background:var(--bg2);color
 .s8-image-nav{top:50%;transform:translateY(-50%);width:24px;height:28px;display:grid;place-items:center;border:0;padding:0;cursor:pointer}
 .s8-image-prev{left:3px}.s8-image-next{right:3px}.s8-image-count{bottom:4px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1.2;padding:3px 6px;font-variant-numeric:tabular-nums;pointer-events:none;white-space:nowrap}
 .s8-image-nav:hover{background:#111}.s8-image-preview:focus-visible,.s8-image-nav:focus-visible{outline:2px solid #fff;outline-offset:-3px}
-.s8-image-editor{gap:7px}.s8-image-add{display:flex;align-items:center;justify-content:center;gap:6px;min-height:38px;padding:8px;border:1px dashed var(--borderStrong);border-radius:9px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:12px}
-.s8-image-add:hover{border-color:var(--accent);color:var(--accent)}
-.s8-image-editor .s8-image-file{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;padding:0;border:0}
-.s8-image-editor:focus-within .s8-image-add{outline:2px solid var(--accent);outline-offset:2px}
-.s8-image-editor:has(.s8-image-file:disabled) .s8-image-add{opacity:.45;cursor:default}
+.s8-composer{position:relative;display:flex;flex-direction:column;min-width:0;width:100%;gap:5px;padding:0 8px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:11px;box-sizing:border-box;transition:border-color .15s}
+.s8-composer:focus-within{border-color:var(--accent)}
+.field .s8-composer textarea,.modal-card .field .s8-composer textarea{border:0!important;box-shadow:none!important;background:transparent!important;color:var(--text);width:100%;min-width:0;min-height:76px;resize:vertical;padding:10px 3px 3px;border-radius:0;outline:none!important}
+.s8-composer-tools{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:27px}
+.s8-composer-tools small{flex:1;min-width:0;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.s8-composer-attach{display:grid;place-items:center;width:28px;height:28px;flex:none;margin-left:auto;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted);opacity:.75;cursor:pointer}
+.s8-composer-attach:hover:not(:disabled),.s8-composer-attach:focus-visible{background:var(--surface3);color:var(--accent);opacity:1}
+.s8-composer-attach:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.s8-composer-attach:disabled{opacity:.35;cursor:default}
+.s8-composer .s8-image-file{position:absolute;width:1px!important;height:1px;opacity:0;overflow:hidden;padding:0!important;border:0!important;pointer-events:none}
+.s8-composer .s8-image-edit-list{padding:0 2px;grid-template-columns:repeat(auto-fill,minmax(64px,84px));gap:5px}
+.s8-composer .s8-image-edit-item{height:62px}
+@media(pointer:coarse){.s8-composer-attach{width:36px;height:36px}}
 .s8-image-edit-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px}.s8-image-edit-list:empty{display:none}
 .s8-image-edit-item{position:relative;height:76px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;overflow:hidden}
 .s8-image-edit-item img{width:100%;height:100%;object-fit:contain;display:block}
 .s8-image-remove{position:absolute;right:3px;top:3px;width:24px;height:24px;display:grid;place-items:center;padding:0;line-height:1;border:1px solid #ffffff30;border-radius:6px;background:#25252bee;color:white;font-size:18px;cursor:pointer}
-.s8-image-editor small{color:var(--muted);font-size:11px}
 .s8-image-viewer{position:fixed;inset:0;z-index:10000;background:#101116;color:#f2f2f5;display:flex;flex-direction:column;min-width:0;min-height:0;overscroll-behavior:contain;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 .s8-viewer-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;flex:none;background:#16171d;border-bottom:1px solid #30313a}
 .s8-viewer-top>div{min-width:0;overflow:hidden}.s8-viewer-top strong,.s8-viewer-top small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.s8-viewer-top strong{font-size:14px}.s8-viewer-top small{color:#aaaab4;font-size:11px;margin-top:3px}

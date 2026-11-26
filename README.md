@@ -1,5 +1,9 @@
 # Órbita
 
+## v5.29 — Observações com imagens integradas
+
+- Campo único de composição: texto, miniaturas anexadas e botão discreto de imagem no canto. Ctrl+V de imagens no campo de observações; texto e anexos preservados separadamente no documento. Carrossel e ampliação mantidos.
+
 ## v5.28 — Imagens no mural de lembretes
 
 - Anexos de imagem por seleção de arquivos ou colagem, miniaturas de tamanho fixo sem recorte, carrossel, visualizador opaco com zoom e navegação por teclado.

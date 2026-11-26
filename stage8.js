@@ -157,8 +157,9 @@ function refreshImageEditor(draft){
  if(!draft||imageDraft!==draft||!draft.form?.isConnected)return;
  const list=$("s8-image-edit-list"),hint=$("s8-image-edit-status"),picker=$("s8-image-input");
  if(list)list.innerHTML=imageEditorMarkup(draft.items);
- if(hint)hint.textContent=draft.busy?"Preparando imagens…":draft.items.length+"/"+IMAGE_LIMIT+" imagens"+(draft.message?" · "+draft.message:"");
+ if(hint)hint.textContent=draft.busy?"Preparando imagens…":[draft.items.length?draft.items.length+"/"+IMAGE_LIMIT+" imagens":"",draft.message].filter(Boolean).join(" · ");
  if(picker)picker.disabled=draft.busy||draft.items.length>=IMAGE_LIMIT;
+ const attach=draft.form.querySelector('[data-s8="chooseImages"]');if(attach)attach.disabled=draft.busy||draft.items.length>=IMAGE_LIMIT;
  const submit=draft.form.querySelector('button[type="submit"]');if(submit)submit.disabled=draft.busy;
 }
 async function addDraftImages(files){
@@ -234,7 +235,7 @@ function age(created){
 }
 const icons={pin:"Alfinete",bookmark:"Continuidade",alert:"Importante",idea:"Ideia"};
 function glyph(name){
- const paths={expand:'<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/>',chevronLeft:'<path d="m15 18-6-6 6-6"/>',chevronRight:'<path d="m9 18 6-6-6-6"/>',sort:'<path d="M7 3v18m-4-4 4 4 4-4M13 5h8m-8 5h6m-6 5h4"/>',unlock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>',reset:'<path d="M5 9a8 8 0 1 1 0 6M5 4v5h5"/>',all:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 12 3 3 7-7M2 7V2h5"/>',minus:'<path d="M5 12h14"/>',pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
+ const paths={imageAdd:'<rect x="3" y="5" width="15" height="15" rx="2"/><circle cx="7.5" cy="9.5" r="1.5"/><path d="m3 17 5-5 4 4 2-2 4 4M20 2v6m-3-3h6"/>',expand:'<path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/>',chevronLeft:'<path d="m15 18-6-6 6-6"/>',chevronRight:'<path d="m9 18 6-6-6-6"/>',sort:'<path d="M7 3v18m-4-4 4 4 4-4M13 5h8m-8 5h6m-6 5h4"/>',unlock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/>',reset:'<path d="M5 9a8 8 0 1 1 0 6M5 4v5h5"/>',all:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m7 12 3 3 7-7M2 7V2h5"/>',minus:'<path d="M5 12h14"/>',pin:'<path d="m16 3 5 5-4 2-3 5-5-5 5-3zM9 15l-6 6"/>',plus:'<path d="M12 5v14M5 12h14"/>',more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',note:'<path d="M5 3h14v13l-5 5H5zM14 21v-5h5M8 8h8m-8 4h6"/>',link:'<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m3 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/>',lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',edit:'<path d="m4 16 11-11 4 4L8 20H4z"/>',arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14"/>',check:'<path d="m5 12 4 4L19 6"/>',select:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/>'};
  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||"")+'</svg>';
 }
 function smallButton(action,icon,label,extra=""){return '<button type="button" class="s8-mini" data-s8="'+action+'" title="'+A(label)+'" aria-label="'+A(label)+'" '+extra+'>'+glyph(icon)+'</button>';}
@@ -590,8 +591,9 @@ function edit(idValue,preselected){
  C.openModal(n?"Editar lembrete":"Novo lembrete",'<form id="s8-note-form" class="section-stack">'+
  '<input type="hidden" name="id" value="'+A(n?.id||"")+'">'+
  '<div class="field"><label>Título</label><input name="title" maxlength="140" required value="'+A(n?.title||"")+'" placeholder="O que você quer lembrar?"></div>'+
- '<div class="field"><label>Observações (opcional)</label><textarea name="description" maxlength="1200" rows="3" placeholder="Detalhes para organizar depois">'+E(n?.description||"")+'</textarea></div>'+
- '<div class="field s8-image-editor"><label for="s8-image-input">Imagens (opcional)</label><label class="s8-image-add" for="s8-image-input">'+glyph("plus")+' Adicionar imagens</label><input class="s8-image-file" id="s8-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" multiple><div class="s8-image-edit-list" id="s8-image-edit-list">'+imageEditorMarkup(attachments)+'</div><small id="s8-image-edit-status" aria-live="polite">'+attachments.length+'/'+IMAGE_LIMIT+' imagens</small><small>Selecione arquivos ou cole uma imagem com Ctrl + V.</small></div>'+
+ '<div class="field"><label for="s8-description">Observações (opcional)</label><div class="s8-composer" id="s8-composer"><textarea id="s8-description" name="description" maxlength="1200" rows="3" placeholder="Escreva ou cole uma imagem (Ctrl + V)…">'+E(n?.description||"")+'</textarea>'+
+ '<div class="s8-image-edit-list" id="s8-image-edit-list">'+imageEditorMarkup(attachments)+'</div>'+
+ '<div class="s8-composer-tools"><small id="s8-image-edit-status" aria-live="polite">'+(attachments.length?attachments.length+'/'+IMAGE_LIMIT+' imagens':'')+'</small><button type="button" class="s8-composer-attach" data-s8="chooseImages" aria-label="Adicionar imagens" title="Adicionar imagens de uma pasta">'+glyph("imageAdd")+'</button><input class="s8-image-file" id="s8-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" multiple tabindex="-1" aria-label="Selecionar arquivos de imagem"></div></div></div>'+
  '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Cor do papel</label><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="presetColor" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-note-color" aria-label="Escolher qualquer cor" value="'+noteColor(n||{priority:"medium"})+'"></div><label class="checkline"><input type="checkbox" name="autoColor" '+(!safeColor(n?.color)?"checked":"")+'> Cor automática da prioridade</label><label class="checkline"><input type="checkbox" name="pinned" '+(n?.pinned?"checked":"")+'> Fixar este lembrete no topo</label></div>'+
  '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+E(value)+'</option>').join("")+'</select></div>'+
@@ -603,7 +605,7 @@ function edit(idValue,preselected){
  '<small id="s8-link-help">Vínculos específicos encerram ao concluir a atividade; o lembrete permanece no mural.</small></div>'+
  '<p class="note">Lembretes não possuem conclusão ou data obrigatória. Ficam aqui até você excluir ou transformar em uma atividade.</p>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar lembrete</button></div></form>');
- imageDraft={id:n?.id||"",items:attachments,busy:false,message:"",form:$("s8-note-form")};
+ imageDraft={id:n?.id||"",items:attachments,busy:false,message:"",form:$("s8-note-form")};refreshImageEditor(imageDraft);
 }
 function saveNote(data,attachments){
  const title=String(data.get("title")||"").trim().slice(0,140);
@@ -723,6 +725,7 @@ document.addEventListener("click",ev=>{
   else if(action==="viewerPrev"||action==="viewerNext"){if(imageViewer){moveImage(imageViewer.id,action==="viewerPrev"?-1:1);imageViewer?.root.querySelector('[data-s8="'+action+'"]')?.focus();}}
   else if(action==="imageClose")closeImageViewer();
   else if(action==="imageZoomIn"||action==="imageZoomOut"||action==="imageZoomReset")imageZoom(action==="imageZoomIn"?.5:action==="imageZoomOut"?-.5:0);
+  else if(action==="chooseImages"){$("s8-image-input")?.click();}
   else if(action==="removeImageDraft"){if(imageDraft&&!imageDraft.busy){imageDraft.items.splice(Number(b.dataset.index),1);imageDraft.message="";refreshImageEditor(imageDraft);}}
   else if(action==="new")edit();
   else if(action==="lock")toggleLock();
@@ -765,7 +768,7 @@ document.addEventListener("change",event=>{
  if(event.target?.id==="s8-link-scope")updateTargetSelect(event.target.value);
  if(event.target?.id==="s8-future-date")updateTargetSelect($("s8-link-scope")?.value||"future");
 });
-document.addEventListener("paste",event=>{if(!imageDraft?.form?.isConnected||!imageDraft.form.contains(event.target))return;const files=Array.from(event.clipboardData?.items||[]).filter(x=>x.kind==="file"&&x.type.startsWith("image/")).map(x=>x.getAsFile()).filter(Boolean);if(files.length){event.preventDefault();void addDraftImages(files);}});
+document.addEventListener("paste",event=>{if(!imageDraft?.form?.isConnected||event.target?.id!=="s8-description"||!imageDraft.form.contains(event.target))return;const clip=event.clipboardData;const items=Array.from(clip?.items||[]).filter(x=>x.kind==="file"&&x.type.startsWith("image/")).map(x=>x.getAsFile()).filter(Boolean);const files=items.length?items:Array.from(clip?.files||[]).filter(x=>x.type.startsWith("image/"));if(files.length){event.preventDefault();void addDraftImages(files);}});
 document.addEventListener("input",event=>{
  if(event.target?.dataset?.s8Pref&&["range","color"].includes(event.target.type)){setAppearance(event.target.dataset.s8Pref,event.target.value);return;}
  if(event.target?.id==="s8-zoom-slider"){setZoom(event.target.value);return;}
@@ -838,6 +841,6 @@ window.OrbitaStage8={decorate(route,base){if(route==="inicio"){prune();return ba
  }
  if(contextAnchor&&!contextAnchor.isConnected)closeContext();
  place();observeLayout();
-},inspect:{get notes(){return notes},get layout(){return ui},saveNote,noteImages,imageBudget,validImage,galleryMarkup,imageIndex,moveImage,remove,convertSubmit,age,sorted,togglePin,zoomBy,setZoom,setOpacity,selectAll,bulkEdit,moveNote,resetOrder,selectionAction,toggleSelection,toggleObservation,setAppearance,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink}};
+},inspect:{get notes(){return notes},get layout(){return ui},saveNote,noteImages,imageBudget,validImage,galleryMarkup,imageIndex,moveImage,remove,convertSubmit,age,sorted,togglePin,zoomBy,setZoom,setOpacity,selectAll,bulkEdit,moveNote,resetOrder,selectionAction,toggleSelection,toggleObservation,setAppearance,selectColor,panelRect,position,openPanel,closePanel,applyLayout,toggleLock,resetLayout,indicators,prune,jump,parseTarget,nextCandidate,bindNextNotes,targetRows,updateTargetSelect,linkLabel,selectedDateForLink,edit}};
 C.render();
 })();

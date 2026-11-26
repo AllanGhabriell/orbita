@@ -43,6 +43,8 @@ try{
  await page.click('[data-s8="new"]');
  await page.waitForSelector("#s8-note-form");
  await page.type('#s8-note-form input[name="title"]',"Imagens de revisão");
+ assert.equal(await page.$eval("#s8-description",el=>el.closest(".s8-composer")?.contains(document.querySelector('[data-s8="chooseImages"]'))),true);
+ await page.type("#s8-description","Revisar antes da aula.");
  await page.evaluate(async()=>{
   const make=async(w,h,name,color)=>{
    const c=document.createElement("canvas");c.width=w;c.height=h;
@@ -51,10 +53,21 @@ try{
   };
   const dt=new DataTransfer();
   dt.items.add(await make(300,1200,"vertical.png","#8844cc"));
-  dt.items.add(await make(1500,240,"horizontal.png","#44aa88"));
+  const editor=document.querySelector("#s8-description");editor.focus();editor.dispatchEvent(new ClipboardEvent("paste",{clipboardData:dt,bubbles:true,cancelable:true}));
+ });
+ await page.waitForFunction(()=>document.querySelectorAll(".s8-image-edit-item").length===1&&!document.querySelector('#s8-note-form button[type="submit"]').disabled);
+ await page.evaluate(()=>{
+  const input=document.querySelector("#s8-image-input");window.filePickerOpened=false;input.addEventListener("click",e=>{window.filePickerOpened=true;e.preventDefault();},{once:true});
+ });
+ await page.click('[data-s8="chooseImages"]');
+ assert.equal(await page.evaluate(()=>window.filePickerOpened),true);
+ await page.evaluate(async()=>{
+  const c=document.createElement("canvas");c.width=1500;c.height=240;c.getContext("2d").fillRect(0,0,c.width,c.height);
+  const dt=new DataTransfer();dt.items.add(new File([await new Promise(r=>c.toBlob(r,"image/png"))],"horizontal.png",{type:"image/png"}));
   const input=document.querySelector("#s8-image-input");input.files=dt.files;input.dispatchEvent(new Event("change",{bubbles:true}));
  });
  await page.waitForFunction(()=>document.querySelectorAll(".s8-image-edit-item").length===2&&!document.querySelector('#s8-note-form button[type="submit"]').disabled);
+ assert.equal(await page.$eval("#s8-description",el=>el.value),"Revisar antes da aula.");
  await page.click('#s8-note-form button[type="submit"]');
  await page.waitForSelector(".s8-gallery");
  const measure=()=>page.$eval(".s8-gallery",el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width,fit:getComputedStyle(el.querySelector("img")).objectFit,count:el.querySelector(".s8-image-count").textContent}));

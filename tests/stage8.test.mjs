@@ -116,7 +116,7 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261126-v5-28-reminder-images"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261126-v5-29-composer"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
 
 R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
@@ -201,3 +201,10 @@ R.saveNote(form({id:imgNote.id,title:"Sem imagem",priority:"medium"}),[]);
 assert.equal(R.galleryMarkup(imgNote),"");
 assert.match(read("stage8.css"),/object-fit:contain/);
 assert.match(read("stage8.css"),/\.s8-image-viewer\{[^}]*background:#101116/);
+
+R.edit(imgNote.id);
+assert.match(lastModal,/class="s8-composer"/);
+assert.match(lastModal,/id="s8-description" name="description"/);
+assert.match(lastModal,/data-s8="chooseImages"/);
+assert.doesNotMatch(lastModal,/Imagens \(opcional\)|Adicionar imagens<\/label>/);
+assert.match(read("stage8.css"),/\.s8-composer:focus-within/);
