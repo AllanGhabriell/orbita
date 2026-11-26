@@ -537,11 +537,298 @@ const messages={
  study:["Observe o que dificultou as sessões planejadas.","Revise a duração e a distribuição das sessões.","Você precisa transformar sessões planejadas em estudo efetivo.","O plano não estuda por você. Cumpra o que é viável e ajuste o que não é."],
  missing:["Registre a duração quando souber.","Sem os tempos reais, não consigo avaliar a carga com precisão.","Não me dê uma conclusão sem os dados que consegue registrar.","Quero registros confiáveis, não uma lista de conclusões sem contexto."]
 };
-const phrases={
- good:["Esse esforço está construindo seu caminho. Continue.","Você ainda não chegou onde deseja, mas já avançou.","As raízes da educação são amargas, mas seus frutos são doces. — Atribuída a Aristóteles","Uma derrota não determina toda a trajetória.","Disciplina é continuar mesmo quando a empolgação desaparece."],
- firm:["Seu planejamento precisa sair do papel.","O que você fez nesta semana que não conseguia fazer na anterior?","Aumente sua dedicação ou reveja suas ambições.","Você quer resultados diferentes mantendo os mesmos comportamentos?"],
- caution:["Constância antes de intensidade.","Prefiro um ritmo sustentável a um esforço extraordinário que não dura.","Descansar quando necessário faz parte da preparação.","Não tente conquistar em um dia o que exige meses de prática."]
-};
+const mentorQuotes=[
+ {
+  "id": "aristotle",
+  "group": "growth",
+  "quote": "As raízes da educação são amargas, mas o fruto é doce.",
+  "author": "Aristóteles, segundo Diógenes Laércio · Vidas, V.18",
+  "url": "https://penelope.uchicago.edu/Thayer/E/Roman/Texts/Diogenes_Laertius/Lives_of_the_Eminent_Philosophers/5/Aristotle%2A.html",
+  "translation": true
+ },
+ {
+  "id": "bacon",
+  "group": "growth",
+  "quote": "Os estudos servem ao deleite, ao ornamento e à capacidade.",
+  "author": "Francis Bacon · Dos estudos",
+  "url": "https://www.gutenberg.org/cache/epub/575/pg575-images.html",
+  "translation": true
+ },
+ {
+  "id": "gal",
+  "group": "growth",
+  "quote": "Não nos cansemos de fazer o bem, pois a seu tempo colheremos, se não desfalecermos.",
+  "author": "Gálatas 6:9 · Paulo",
+  "url": "https://www.biblegateway.com/passage/?search=Galatians+6%3A9&version=KJV",
+  "translation": true
+ },
+ {
+  "id": "aquinas",
+  "group": "growth",
+  "quote": "Concede-me inteligência para compreender, memória para reter e método para aprender.",
+  "author": "Tomás de Aquino · Oração antes do estudo (trecho, tradução livre)",
+  "url": "https://www.exeter.ac.uk/students/chaplaincy/catholic/ourfaith/prayersforstudents/",
+  "translation": true
+ },
+ {
+  "id": "prov",
+  "group": "sustain",
+  "quote": "Os planos do diligente conduzem à abundância; a pressa, à falta.",
+  "author": "Provérbios 21:5",
+  "url": "https://www.biblegateway.com/passage/?search=Proverbs+21%3A5&version=KJV",
+  "translation": true
+ },
+ {
+  "id": "cor",
+  "group": "steady",
+  "quote": "Que tudo seja feito com decência e ordem.",
+  "author": "1 Coríntios 14:40 · Paulo",
+  "url": "https://www.biblegateway.com/passage/?search=1Corinthians+14%3A40&version=KJV",
+  "translation": true
+ },
+ {
+  "id": "aurelius-return",
+  "group": "recover",
+  "quote": "Não desanime se não conseguir agir sempre segundo bons princípios; quando falhar, retorne.",
+  "author": "Marco Aurélio · Meditações 5.9",
+  "url": "https://www.whatwouldstoicsdo.com/passage/meditations/5.9",
+  "translation": true
+ },
+ {
+  "id": "epictetus",
+  "group": "challenge",
+  "quote": "Até quando adiarás exigir de ti os melhores aperfeiçoamentos?",
+  "author": "Epicteto · Manual 51",
+  "url": "https://www.gutenberg.org/cache/epub/45109/pg45109-images.html",
+  "translation": true
+ },
+ {
+  "id": "franklin",
+  "group": "challenge",
+  "quote": "Amas a vida? Então não desperdices o tempo, pois é dele que a vida é feita.",
+  "author": "Benjamin Franklin · O caminho da riqueza",
+  "url": "https://www.gutenberg.org/cache/epub/43855/pg43855-images.html",
+  "translation": true
+ },
+ {
+  "id": "seneca",
+  "group": "recover",
+  "quote": "Sofremos mais vezes na imaginação do que na realidade.",
+  "author": "Sêneca · Cartas a Lucílio, 13.4",
+  "url": "https://daily-stoicism.captaindev.app/en/seneca/letters/13/",
+  "translation": true
+ },
+ {
+  "id": "augustine",
+  "group": "sustain",
+  "quote": "Nosso coração está inquieto enquanto não repousa em ti.",
+  "author": "Agostinho · Confissões I.1",
+  "url": "https://ccel.org/ccel/augustine/confess/confess.ii.i.html",
+  "translation": true
+ },
+ {
+  "id": "bacon2",
+  "group": "steady",
+  "quote": "Os estudos aperfeiçoam a natureza, e são aperfeiçoados pela experiência.",
+  "author": "Francis Bacon · Dos estudos",
+  "url": "https://www.gutenberg.org/cache/epub/575/pg575-images.html",
+  "translation": true
+ },
+ {
+  "id": "marcus-dawn",
+  "group": "challenge",
+  "quote": "Ao amanhecer, quando for difícil levantar-te, lembra: levanto-me para o trabalho de um ser humano.",
+  "author": "Marco Aurélio · Meditações 5.1",
+  "url": "https://texts.stoameditation.com/read/meditations/5/1",
+  "translation": true
+ },
+ {
+  "id": "growth-0",
+  "group": "growth",
+  "quote": "O esforço de hoje está construindo seu caminho.",
+  "author": "Orientador"
+ },
+ {
+  "id": "growth-1",
+  "group": "growth",
+  "quote": "Você conquistou um resultado concreto. Consolide-o.",
+  "author": "Orientador"
+ },
+ {
+  "id": "growth-2",
+  "group": "growth",
+  "quote": "O progresso merece reconhecimento. Continue com a mesma responsabilidade.",
+  "author": "Orientador"
+ },
+ {
+  "id": "growth-3",
+  "group": "growth",
+  "quote": "A evolução não termina na conquista: ela se confirma na constância.",
+  "author": "Orientador"
+ },
+ {
+  "id": "growth-4",
+  "group": "growth",
+  "quote": "Seu trabalho está dando frutos. Preserve o que funciona.",
+  "author": "Orientador"
+ },
+ {
+  "id": "growth-5",
+  "group": "growth",
+  "quote": "Você está avançando. Não transforme a pressa em obstáculo.",
+  "author": "Orientador"
+ },
+ {
+  "id": "steady-0",
+  "group": "steady",
+  "quote": "A constância vale mais que uma semana extraordinária.",
+  "author": "Orientador"
+ },
+ {
+  "id": "steady-1",
+  "group": "steady",
+  "quote": "Há mérito em manter um ritmo que funciona.",
+  "author": "Orientador"
+ },
+ {
+  "id": "steady-2",
+  "group": "steady",
+  "quote": "Nem toda evolução exige mais horas. Aprofunde o que aprende.",
+  "author": "Orientador"
+ },
+ {
+  "id": "steady-3",
+  "group": "steady",
+  "quote": "Uma base sólida sustenta os próximos desafios.",
+  "author": "Orientador"
+ },
+ {
+  "id": "steady-4",
+  "group": "steady",
+  "quote": "Preserve seus bons hábitos; a regularidade é uma conquista.",
+  "author": "Orientador"
+ },
+ {
+  "id": "sustain-0",
+  "group": "sustain",
+  "quote": "Não confunda intensidade com disciplina.",
+  "author": "Orientador"
+ },
+ {
+  "id": "sustain-1",
+  "group": "sustain",
+  "quote": "Consolidar um novo ritmo também é progredir.",
+  "author": "Orientador"
+ },
+ {
+  "id": "sustain-2",
+  "group": "sustain",
+  "quote": "O descanso necessário faz parte da preparação.",
+  "author": "Orientador"
+ },
+ {
+  "id": "sustain-3",
+  "group": "sustain",
+  "quote": "Não acrescente peso antes de sustentar o que já conquistou.",
+  "author": "Orientador"
+ },
+ {
+  "id": "sustain-4",
+  "group": "sustain",
+  "quote": "A pressa não substitui a constância.",
+  "author": "Orientador"
+ },
+ {
+  "id": "recover-0",
+  "group": "recover",
+  "quote": "Uma dificuldade não determina toda a sua trajetória.",
+  "author": "Orientador"
+ },
+ {
+  "id": "recover-1",
+  "group": "recover",
+  "quote": "Corrija o próximo passo, não tente apagar o passado.",
+  "author": "Orientador"
+ },
+ {
+  "id": "recover-2",
+  "group": "recover",
+  "quote": "Reconstrua a constância com compromissos possíveis.",
+  "author": "Orientador"
+ },
+ {
+  "id": "recover-3",
+  "group": "recover",
+  "quote": "Retome o que funciona antes de aumentar as exigências.",
+  "author": "Orientador"
+ },
+ {
+  "id": "recover-4",
+  "group": "recover",
+  "quote": "O que importa agora é a próxima ação.",
+  "author": "Orientador"
+ },
+ {
+  "id": "challenge-0",
+  "group": "challenge",
+  "quote": "Seu planejamento precisa sair do papel.",
+  "author": "Orientador"
+ },
+ {
+  "id": "challenge-1",
+  "group": "challenge",
+  "quote": "O compromisso que você assumiu exige uma ação concreta.",
+  "author": "Orientador"
+ },
+ {
+  "id": "challenge-2",
+  "group": "challenge",
+  "quote": "Você quer resultados diferentes mantendo os mesmos comportamentos?",
+  "author": "Orientador"
+ },
+ {
+  "id": "challenge-3",
+  "group": "challenge",
+  "quote": "Escolha prioridades que esteja disposto a cumprir.",
+  "author": "Orientador"
+ },
+ {
+  "id": "challenge-4",
+  "group": "challenge",
+  "quote": "Uma promessa sem execução não substitui o trabalho.",
+  "author": "Orientador"
+ },
+ {
+  "id": "forming-0",
+  "group": "forming",
+  "quote": "O primeiro passo é construir uma base confiável.",
+  "author": "Orientador"
+ },
+ {
+  "id": "forming-1",
+  "group": "forming",
+  "quote": "Registre seus resultados reais; a constância se revela com o tempo.",
+  "author": "Orientador"
+ },
+ {
+  "id": "forming-2",
+  "group": "forming",
+  "quote": "Não tenha pressa em julgar uma trajetória que está começando.",
+  "author": "Orientador"
+ }
+];
+function mentorCommunication(score,kind,delta,profile,ranked,day=today()){
+ const good=score!==null&&score>=80,excellent=score!==null&&score>=90,highLoad=["overload","rapid","sustain"].includes(kind);
+ let group=score===null?"forming":highLoad?"sustain":good?(kind==="growth"||delta>0?"growth":"steady"):score<60&&ranked&&["strict","hard"].includes(profile)?"challenge":"recover";
+ // A good grade never receives a reprimanding daily quote. Avoid unsupported claims of improvement.
+ const pool=mentorQuotes.filter(q=>q.group===group||(group==="steady"&&q.group==="growth"&&["aristotle","bacon","gal","aquinas"].includes(q.id)));
+ const ordinal=Math.floor(Date.parse(day+"T00:00:00Z")/M_DAY);
+ const selected=pool[((ordinal%pool.length)+pool.length)%pool.length];
+ const heading=score===null?"Vamos acompanhar sua trajetória.":excellent?"Excelente desempenho.":good?"Muito bom. Reconheça seu progresso.":score>=70?"Bom desempenho, com ajustes.":score>=60?"Há espaço para melhorar.":"Vamos recuperar a consistência.";
+ let summary=score===null?"Ainda precisamos de mais registros para avaliar.":good?(kind==="growth"?"Seu esforço está se traduzindo em evolução. Consolide o novo ritmo.":highLoad?"Você está entregando bons resultados. Preserve a qualidade e o descanso.":"Você apresentou um bom desempenho. Mantenha o que funciona."):(highLoad?"Priorize um ritmo sustentável antes de aumentar a carga.":ranked?.action||"Escolha um próximo passo viável.");
+ if(good&&ranked)summary+=" Ainda há pontos específicos para ajustar.";
+ return {heading,summary,group,quote:selected};
+}
 function voice(key){const list=messages[key]||messages.study;return list[["gentle","firm","strict","hard"].indexOf(mentorTone())];}
 function mentorIssues(current){
  const issues=[],x=current.execution,load=current.load,live=taskAssessment(current.from,today(),true),rolling=habitAssessment(closedRows(add(today(),-29),today()));
@@ -605,11 +892,10 @@ function mentorVisualData(){
  const ranked=problems[0],score=current.score;
  const grade=score===null?"Sem nota ainda":score===100?"Excepcional":score>=90?"Excelente":score>=80?"Muito bom":score>=70?"Bom":score>=60?"Regular":score>=40?"Insatisfatório":"Crítico";
  const stateTone=score===null?"neutral":score>=80?"good":score>=60?"mid":"bad";
- const category=["overload","rapid"].includes(ranked?.key)||["sustain","overload","rapid"].includes(current.load.kind)?"caution":ranked&&["strict","hard"].includes(mentorTone())?"firm":"good";
- const list=phrases[category],seed=Number(today().replaceAll("-",""));
- const slogan=ranked?ranked.action:attention[0]?.action||positives[0]?.action||"Vamos acompanhar seus registros.";
+ const communication=mentorCommunication(score,current.load.kind,delta,mentorTone(),ranked);
+ const slogan=communication.summary;
  const proposal=previous.score===null?null:Math.min(100,previous.score+(previous.score>=85?3:5));
- return {current,previous,history,known,delta,problems,positives,more,attention,ranked,grade,stateTone,slogan,proposal,phrase:list[seed%list.length]};
+ return {current,previous,history,known,delta,problems,positives,more,attention,ranked,grade,stateTone,slogan,proposal,phrase:communication.quote.quote,phraseSource:communication.quote,heading:communication.heading};
 }
 function mentorTrendGraph(data){
  const weeks=data.history,valid=weeks.filter(w=>w.score!==null);
@@ -635,8 +921,8 @@ function mentorPanel(){
  const goal=ev.mentor.goal,finished=goal&&goal.weekEnd<today(),goalResult=goal&&finished?mentorWeek(goal.weekStart):null;
  const oldGoal=goal&&goal.scoringVersion!==2;const goalState=oldGoal?"Compromisso da avaliação anterior":goalResult&&goalResult.score!==null&&!goalResult.provisional?(goalResult.score>=goal.target?"Meta cumprida":"Meta não cumprida"):"Ainda sem resultado conclusivo";
  return '<section class="card evo-mentor-section evo-boss"><div class="evo-boss-head"><span class="overline">◉ Meu Orientador · CHEFE DE DESEMPENHO</span><span class="evo-boss-mini">'+E(x.days)+" dia(s) encerrado(s) nesta semana"+'</span></div>'+
- '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(score===null?"Vamos acompanhar sua trajetória.":d.ranked?d.ranked.title:d.attention.length?"Acompanhe seu progresso.":score>=90?"Bom trabalho. Mantenha a constância.":"Continue consolidando sua rotina.")+'</h2><p>'+E(critique)+'</p><small>'+E(x.provisional?"Avaliação provisória · "+x.days+" dia(s) finalizado(s)":"Avaliação dos registros disponíveis")+'.</small></div></div>'+
- '<p class="note evo-mentor-phrase">'+E(d.phrase)+'</p><div class="evo-boss-priority '+(d.ranked?"bad":"good")+'"><span>MINHA COBRANÇA PRINCIPAL</span><strong>'+E(top)+'</strong><small>'+E(d.ranked?d.ranked.action:"Continue registrando seus resultados reais.")+'</small></div>'+
+ '<div class="evo-boss-diagnosis"><div class="evo-boss-score '+d.stateTone+'"><small>NOTA DE EXECUÇÃO</small><strong>'+display+'<span>/100</span></strong><b>'+E(d.grade)+'</b></div><div class="evo-boss-verdict"><span class="evo-boss-trend '+trendTone+'">'+E(trend)+'</span><h2>'+E(d.heading)+'</h2><p>'+E(critique)+'</p><small>'+E(x.provisional?"Avaliação provisória · "+x.days+" dia(s) finalizado(s)":"Avaliação dos registros disponíveis")+'.</small></div></div>'+
+ '<figure class="evo-mentor-phrase"><blockquote>'+E(d.phrase)+'</blockquote><figcaption>'+E(d.phraseSource.author)+(d.phraseSource.translation?' · tradução livre':'')+'</figcaption></figure><div class="evo-boss-priority '+(d.ranked?"bad":"good")+'"><span>MINHA COBRANÇA PRINCIPAL</span><strong>'+E(top)+'</strong><small>'+E(d.ranked?d.ranked.action:"Continue registrando seus resultados reais.")+'</small></div>'+
  '<div class="evo-boss-grid"><details class="evo-boss-tile evo-boss-bad"><summary><span>✕</span><strong>Pontos de melhoria</strong><small>'+d.problems.length+' ponto(s)</small></summary><div class="evo-boss-tile-body">'+(d.problems.length?d.problems.map(issue).join(""):'<p class="note">Nenhuma falha confirmada nesta amostra.</p>')+'</div></details>'+
  '<details class="evo-boss-tile evo-boss-attention"><summary><span>!</span><strong>Pontos de atenção</strong><small>'+d.attention.length+' observação(ões)</small></summary><div class="evo-boss-tile-body">'+(d.attention.length?d.attention.map(issue).join(""):'<p class="note">Nada que exija acompanhamento especial no momento.</p>')+'</div></details>'+
  '<details class="evo-boss-tile evo-boss-good"><summary><span>✓</span><strong>Pontos positivos</strong><small>'+d.positives.length+' avanço(s)</small></summary><div class="evo-boss-tile-body">'+(d.positives.length?d.positives.map(good).join(""):'<p class="note">Os pontos positivos aparecem conforme forem confirmados.</p>')+'</div></details>'+
@@ -933,6 +1219,6 @@ window.OrbitaStage4={decorate,afterRender(){
   if(!previous&&node.insertAdjacentHTML)node.insertAdjacentHTML("beforeend",'<span class="evo-mentor-badge" title="Consultar o Orientador" aria-label="Consultar o Orientador">'+unread+'</span>');
   else if(previous){previous.textContent=String(unread);previous.title="Consultar o Orientador";}
  }
-},inspect:{get model(){return ev},mentorWeek,mentorVisualData,loadAssessment,taskAssessment,habitAssessment,capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
+},inspect:{get model(){return ev},mentorWeek,mentorVisualData,mentorCommunication,loadAssessment,taskAssessment,habitAssessment,capture,finalize,isClosed,dailyCounts,periodData,pendingDates,dayHasMovement,finalizeBatch,sampleLevel,guidance,mentorAnalysis,mentorUnread,mentorUnreadCount,mentorNoticeEligible,mentorPanel,reminderEligible,lastStudyDayOfWeek,actions}};
 C.render();
 })();

@@ -204,3 +204,17 @@ P.model.records["high@"+date]={status:"done"};
 assert.ok(!V.taskAssessment(C.addDays(date,-7),date,true).issues.some(i=>i.x.id==="high"));
 assert.ok(!V.mentorPanel().includes("Execução ="));
 V.model.closed=savedClosed;P.model.entries=savedEntries;P.model.records=savedRecords;
+
+for(const profile of ["gentle","firm","strict","hard"]){
+ const warning={key:"habits",action:"Você quer resultados consistentes com hábitos inconsistentes?"};
+ for(const score of [85,87,95,100]){
+  const result=V.mentorCommunication(score,"stable",0,profile,warning,"2026-11-26");
+  assert.equal(result.group,"steady","nota alta não recebe frase de cobrança");
+  assert.ok(!result.summary.includes(warning.action),"diagnóstico geral não contradiz resultado");
+ }
+ assert.equal(V.mentorCommunication(87,"growth",5,profile,warning,"2026-11-26").group,"growth");
+ assert.equal(V.mentorCommunication(87,"overload",5,profile,warning,"2026-11-26").group,"sustain");
+}
+assert.equal(V.mentorCommunication(45,"stable",-8,"hard",{action:"Corrigir"},"2026-11-26").group,"challenge");
+const quoteIds=new Set(Array.from({length:7},(_,i)=>V.mentorCommunication(87,"growth",5,"strict",null,"2026-11-"+(10+i)).quote.id));
+assert.equal(quoteIds.size,7,"variedade diária, sem troca a cada renderização");

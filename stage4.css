@@ -281,3 +281,7 @@
 /* v5.25: observations that do not imply a failure. */
 .evo-boss-attention>summary>span{color:var(--warning);background:color-mix(in srgb,var(--warning) 12%,var(--surface3))}
 .evo-boss-attention .evo-boss-detail-icon{color:var(--warning)}
+
+/* v5.26: short contextual quotation, separate from the diagnosis. */
+.evo-mentor-phrase blockquote{margin:0;font-size:13px;line-height:1.5;color:var(--text)}
+.evo-mentor-phrase figcaption{margin-top:5px;color:var(--muted);font-style:normal;font-size:10px}

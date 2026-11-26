@@ -1,5 +1,9 @@
 # Órbita
 
+## v5.26 — Comunicação contextual do Orientador
+
+- Diagnóstico geral coerente com a nota; cobranças específicas separadas do reconhecimento. 42 mensagens e citações, rotacionadas diariamente conforme o contexto, com fontes em `docs/mentor-quotes.md`.
+
 ## v5.25 — Crescimento e pontos de atenção
 
 - Aumento moderado da carga reconhecido como avanço. Crescimento substancial próximo da capacidade gera acompanhamento sem perda de nota; problemas concretos permanecem separados.
