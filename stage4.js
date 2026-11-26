@@ -639,7 +639,7 @@ function mentorPanel(){
  '<div class="evo-boss-grid"><details class="evo-boss-tile evo-boss-bad"><summary><span>✕</span><strong>Pontos de melhoria</strong><small>'+d.problems.length+' ponto(s)</small></summary><div class="evo-boss-tile-body">'+(d.problems.length?d.problems.map(issue).join(""):'<p class="note">Nenhuma falha confirmada nesta amostra.</p>')+'</div></details>'+
  '<details class="evo-boss-tile evo-boss-good"><summary><span>✓</span><strong>Pontos positivos</strong><small>'+d.positives.length+' avanço(s)</small></summary><div class="evo-boss-tile-body">'+(d.positives.length?d.positives.map(good).join(""):'<p class="note">Os pontos positivos aparecem conforme forem confirmados.</p>')+'</div></details>'+
  '<details class="evo-boss-tile"><summary><span>▥</span><strong>Minha evolução</strong><small>Últimas 6 semanas</small></summary><div class="evo-boss-tile-body">'+mentorTrendGraph(d)+'</div></details>'+
- '<details class="evo-boss-tile"><summary><span>◎</span><strong>Meta da semana</strong><small>Negociar com o chefe</small></summary><div class="evo-boss-tile-body"><p class="note">Proposta para a próxima semana: '+(d.proposal===null?"sem histórico comparável ainda":d.proposal+"% de execução")+'. Você pode escolher uma meta menor ou maior.</p><label class="evo-boss-target-label" for="s4-mentor-target">Sua meta <strong id="s4-mentor-target-value">'+target+'%</strong></label><input type="range" id="s4-mentor-target" min="0" max="100" step="5" value="'+target+'"><p class="note">Escolha um compromisso realista para a próxima semana.</p><button class="btn primary small" data-s4="mentorAcceptGoal">Assumir compromisso</button>'+
+ '<details class="evo-boss-tile"><summary><span>◎</span><strong>Meta da semana</strong><small>Negociar com o chefe</small></summary><div class="evo-boss-tile-body"><p class="note">Proposta para a próxima semana: '+(d.proposal===null?"sem histórico comparável ainda":d.proposal+"% de execução")+'. Você pode escolher uma meta menor ou maior.</p><label class="evo-boss-target-label" for="s4-mentor-target">Sua meta <strong id="s4-mentor-target-value">'+target+'%</strong></label><div class="evo-boss-target-control"><input type="range" id="s4-mentor-target" min="0" max="100" step="1" value="'+target+'" style="--mentor-progress:'+target+'%" aria-valuetext="'+target+'%"><div class="evo-boss-target-scale" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div></div><p class="note">Escolha um compromisso realista para a próxima semana.</p><button class="btn primary small" data-s4="mentorAcceptGoal">Assumir compromisso</button>'+
  (goal?'<div class="evo-boss-commitment"><strong>Compromisso registrado: '+goal.target+'%</strong><small>Semana de '+E(fmt(goal.weekStart,false))+' a '+E(fmt(goal.weekEnd,false))+'</small><p>'+E(finished?"Prestação de contas: "+goalState+(!oldGoal&&goalResult?.score!=null?" · avaliação "+goalResult.score+"%.":"."):"O chefe vai conferir este compromisso depois do prazo.")+'</p></div>':"")+
  '</div></details>'+
  '<details class="evo-boss-tile"><summary><span>▤</span><strong>Análises adicionais</strong><small>Registro, pausas e hábitos</small></summary><div class="evo-boss-tile-body">'+d.more.map(v=>'<details class="evo-boss-detail"><summary><span>'+E(v.title)+'</span><strong>'+E(v.evidence)+'</strong></summary><div><p>'+E(v.body)+'</p><p>'+E(v.action)+'</p></div></details>').join("")+'<p class="note">Vamos distinguir falta de registro de falta de execução.</p></div></details></div>'+
@@ -905,10 +905,17 @@ document.addEventListener("submit",event=>{
   else confirmSubmit(data);
  }catch(err){C.notify(err.message||"Confira a confirmação.");}
 });
+function updateMentorTarget(input){
+ const n=Number(input.value);if(!Number.isFinite(n))return;
+ mentorDraftTarget=Math.max(0,Math.min(100,Math.round(n)));
+ const v=$("s4-mentor-target-value");if(v)v.textContent=mentorDraftTarget+"%";
+ input.style?.setProperty?.("--mentor-progress",mentorDraftTarget+"%");input.setAttribute?.("aria-valuetext",mentorDraftTarget+"%");
+}
+document.addEventListener("input",event=>{if(event.target?.id==="s4-mentor-target")updateMentorTarget(event.target);});
 document.addEventListener("change",event=>{
  if(event.target.id==="s4-mentor-enabled"){ev.settings.mentorEnabled=event.target.checked;C.save();C.render();}
  if(event.target.id==="s4-mentor-notices"){ev.settings.mentorNotices=event.target.checked;C.save();C.render();}
- if(event.target.id==="s4-mentor-target"){mentorDraftTarget=Number(event.target.value);const v=$("s4-mentor-target-value");if(v)v.textContent=mentorDraftTarget+"%";}
+ if(event.target.id==="s4-mentor-target")updateMentorTarget(event.target);
  if(event.target.id==="s4-tone"&&profiles[event.target.value]){ev.settings.strictness=event.target.value;C.save();C.render();}
  if(event.target.id==="s4-mentor-interval"){ev.settings.mentorInterval=Number(event.target.value)||7;C.save();C.render();}
  if(event.target.id==="s4-reminders"){ev.settings.reminders=event.target.checked;C.save();C.render();}

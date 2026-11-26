@@ -1,5 +1,9 @@
 # Órbita
 
+## v5.24 — Controle da meta semanal
+
+- Slider personalizado nos temas claro e escuro, trilho preenchido, escala e atualização ao arrastar; precisão de 1 ponto percentual.
+
 ## v5.23 — Orientador contextual
 
 - Avaliação de hábitos, focos, sessões, evolução da carga e gestão de pendências; disponibilidade e descanso preservados.
