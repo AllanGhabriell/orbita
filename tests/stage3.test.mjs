@@ -334,3 +334,29 @@ T.setSessionStatus(missed[1].id,"notdone",null,"");
 assert.equal(T.summarize({from:date,to:date,cycleId:missCycle.id}).notDone,1);
 
 console.log("Etapa 3: ciclos, etapa multi-sessão, correção, pausa, reforço, vínculo com foco, estatísticas por dimensão e editor preservado.");
+
+ // v5.31: global queue changes only pending positions, including different cycles.
+const queueDate=date;
+const queueSessions=[
+ {id:"queue-done",date:queueDate,status:"done",kind:"supplement",discipline:"Português",planOrder:10001,actualMin:50},
+ {id:"queue-a",date:queueDate,status:"pending",kind:"supplement",discipline:"Matemática",planOrder:10002},
+ {id:"queue-b",date:queueDate,status:"pending",kind:"supplement",discipline:"Física",planOrder:10003},
+ {id:"queue-c",date:queueDate,status:"pending",kind:"supplement",discipline:"Química",planOrder:10004}
+];
+T.model.sessions.splice(0,T.model.sessions.length,...queueSessions);
+C.state.date=date;
+assert.equal(T.homeMove("queue-c","queue-a",false),true);
+assert.deepEqual(Array.from(T.planDayEntries(date),q=>q.id),["queue-done","queue-c","queue-a","queue-b"]);
+assert.equal(T.homeMove("queue-done","queue-b",true),false);
+T.setSessionStatus("queue-b","progress",null,"");
+assert.deepEqual(Array.from(T.planDayEntries(date),q=>q.id),["queue-done","queue-b","queue-c","queue-a"]);
+assert.equal(T.homeMove("queue-b","queue-a",true),false);
+assert.equal(T.homeMove("queue-a","queue-c",false),true);
+assert.deepEqual(Array.from(T.planDayEntries(date),q=>q.id),["queue-done","queue-b","queue-a","queue-c"]);
+assert.equal(T.session("queue-done").actualMin,50);
+C.render();
+assert.match(element("view").innerHTML,/study-control-pin/);
+assert.match(element("view").innerHTML,/study-control-timer/);
+assert.match(element("view").innerHTML,/data-home-movable="true"/);
+assert.match(element("view").innerHTML,/data-home-movable="false"/);
+assert.match(read("stage3.css"),/grid-template-columns:32px 116px 90px 94px 34px/);

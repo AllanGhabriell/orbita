@@ -214,6 +214,46 @@ const planWeekStart=date=>add(date,-((C.parse(date).getDay()+6)%7));
 const planWeekDates=date=>Array.from({length:7},(_,i)=>add(planWeekStart(date),i));
 const planDayEntries=date=>db.sessions.filter(x=>x.date===date&&!x.archived)
  .sort((a,b)=>Number(a.planOrder??0)-Number(b.planOrder??0)||(a.startTime||"99:99").localeCompare(b.startTime||"99:99")||String(a.createdAt||"").localeCompare(String(b.createdAt||"")));
+// The daily queue has one order across all cycles. Only pending slots can be exchanged.
+function homeMovable(x){
+ return !!x&&!x.archived&&x.date===day()&&x.date===s.date&&!blocked(x.date)&&!s.evolution?.closed?.[x.date]&&x.status==="pending"&&x.id!==s.timing?.active?.sessionId;
+}
+function pendingOrder(date,id,targetId,after=false){
+ const all=planDayEntries(date),pending=all.filter(homeMovable),source=pending.find(x=>x.id===id),target=pending.find(x=>x.id===targetId);
+ if(!source||!target||source===target)return null;
+ const peers=pending.filter(x=>x!==source);
+ peers.splice(peers.indexOf(target)+(after?1:0),0,source);
+ let index=0;
+ return all.map(x=>homeMovable(x)?peers[index++]:x);
+}
+function applyDailyOrder(date,ordered,kind,id){
+ const original=planDayEntries(date);
+ if(original.map(x=>x.id).join("|")===ordered.map(x=>x.id).join("|"))return false;
+ ordered.forEach((x,i)=>{x.planOrder=i+1;});
+ logs(kind,{sessionId:id,date,order:ordered.map(x=>x.id)});
+ return true;
+}
+function homeMove(id,targetId,after=false){
+ const x=session(id),target=session(targetId);
+ if(!homeMovable(x)||!homeMovable(target)||x.date!==target.date)return false;
+ const ordered=pendingOrder(x.date,id,targetId,after);
+ if(!ordered)return false;
+ const old=ordered.map(q=>[q,q.planOrder]),eventCount=db.events.length;
+ if(!applyDailyOrder(x.date,ordered,"daily_queue_moved",id))return false;
+ if(save()===false){
+  for(const [q,order] of old){if(order===undefined)delete q.planOrder;else q.planOrder=order;}
+  db.events.splice(eventCount);render();return false;
+ }
+ render();return true;
+}
+function promotePending(x){
+ if(!x||x.status!=="pending"||x.date!==day()||blocked(x.date)||s.evolution?.closed?.[x.date])return false;
+ const all=planDayEntries(x.date),movable=q=>q.status==="pending"&&q.id!==s.timing?.active?.sessionId;
+ const pending=all.filter(movable);
+ if(pending[0]===x||!pending.includes(x))return false;
+ const next=[x,...pending.filter(q=>q!==x)];let i=0;
+ return applyDailyOrder(x.date,all.map(q=>movable(q)?next[i++]:q),"daily_queue_started",x.id);
+}
 function planIsEditable(x){
  if(!x||x.archived)throw Error("Sessão não encontrada.");
  if(x.status!=="pending")throw Error("Esta sessão já foi iniciada ou concluída. Corrija a execução primeiro na tela Início.");
@@ -427,6 +467,9 @@ function setSessionStatus(id,status,actualMin,actualTime){
   x.rotationSlot=true;x.wasRotationSlot=true;x.subjectId="";x.stepNo=0;
   x.discipline="Próxima matéria do ciclo";x.resolvedAt=null;
  }
+ // If the user chooses another unstarted session, it becomes the next executed
+ // slot before it is locked. Re-evaluate pending subject reminders on the new order.
+ if(old==="pending"&&status==="progress"&&promotePending(x))window.OrbitaStage8?.inspect?.bindNextNotes?.(false);
  x.status=status;x.actualMin=status==="notdone"?null:minutes;x.actualTime=status==="notdone"?"":actualTime||"";
  if(status==="notdone")x.evidence={questions:null,correct:null,quality:null};
  if(status==="done")x.completedAt=x.completedAt||now();
@@ -533,10 +576,12 @@ function homePanel(){
   partial:'<circle cx="12" cy="12" r="9"/><path d="M12 3v9h9"/>',missed:'<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/>'
  }[name]||"")+'</svg>';
  const stat=(name,value,icon,tone="")=>'<span class="study-summary-stat '+tone+'" aria-label="'+A(name+": "+value)+'">'+(icon?glyph(icon):"")+'<strong>'+E(value)+'</strong><span class="study-summary-label">'+E(name)+'</span></span>';
- let body=groups.map(group=>{
+ const cycleSummary=groups.map(group=>{
   const c=group.cycle,p=c&&!c.archived?cycleProgress(c):null,n=group.items.filter(x=>x.status==="done").length;
-  const progress=group.items.length?Math.round(100*n/group.items.length):0,flash=c?.id===lastHomeAdvance?' study-home-advanced':'';
-  const entries=group.items.map(x=>{
+  const progress=group.items.length?Math.round(100*n/group.items.length):0;
+  return '<div class="study-daily-cycle-summary'+(c?.id===lastHomeAdvance?' study-home-advanced':'')+'"><div class="study-daily-heading"><strong>'+E(c?.title||"Estudos independentes")+'</strong><span class="study-cycle-count" title="'+A(n+" de "+group.items.length+" concluídas"+(p?.cur?" · Próxima: "+p.cur.title:""))+'">'+n+'/'+group.items.length+' concluídas</span></div><div class="study-session-progress" role="progressbar" aria-label="Sessões concluídas em '+A(c?.title||"Estudos independentes")+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progress+'"><div class="study-session-progress-fill" style="width:'+progress+'%"></div></div></div>';
+ }).join("");
+ const entries=daily.map(x=>{
    const number=sessionOrdinal(x),label=plannerLabel(x),inTimer=active?.sessionId===x.id;
    const phase=inTimer?active.phase:x.status==="done"?"done":x.status==="notdone"?"notdone":x.status==="progress"?"partial":"pending";
    const names={running:"Em estudo",paused:"Pausado",idle:"Interrompido",done:"Concluída",notdone:"Não realizada",partial:"Parcial",pending:"Pendente"};
@@ -546,19 +591,15 @@ function homePanel(){
    const meta=[timeLabel?timeLabel+(finished?" registrada":" prevista"):"",finished&&registered&&x.plannedMin!=null?minuteLabel(x.plannedMin)+" prevista":"",x.startTime||""].filter(Boolean).join(" · "),statusLabel="Sessão "+number+" · "+names[phase];
    const completion=x.status==="notdone"?'<button class="btn small ghost orb-icon-btn" data-s3="markPending" data-id="'+A(x.id)+'" title="Voltar a pendente" aria-label="Voltar a pendente">'+glyph("undo")+' Reabrir</button>':
     '<button class="btn small '+(x.status==="done"?"ghost":"primary")+' s3-quick-status" data-s3="quickDone" data-id="'+A(x.id)+'" title="'+(x.status==="done"?"Desfazer conclusão":"Concluir · clique direito para escolher situação")+'" aria-label="'+(x.status==="done"?"Desfazer conclusão":"Concluir sessão")+'">'+glyph(x.status==="done"?"undo":"check")+(x.status==="done"?" Desfazer":" Concluir")+'</button>';
-   return '<div class="study-daily-entry is-'+phase+'" data-session-state="'+phase+'"><span class="study-daily-number" title="'+A(statusLabel)+'" aria-label="'+A(statusLabel)+'">'+number+'</span>'+
+   const movable=homeMovable(x),cycleLabel=groups.length>1?(cycle(x.cycleId)?.title||"Estudo independente"):"";
+   return '<div class="study-daily-entry is-'+phase+(movable?' s3-home-movable':'')+'" data-session-state="'+phase+'" data-home-session="'+A(x.id)+'" data-home-movable="'+movable+'"><span class="study-daily-number" title="'+A(statusLabel)+'" aria-label="'+A(statusLabel)+'">'+number+'</span>'+
     '<div class="study-daily-label"><strong class="study-daily-subject" title="'+A("Sessão "+number+" · "+label)+'">'+E(label)+'</strong>'+
-    '<small class="study-session-meta"><span class="study-session-status is-'+phase+'"><span aria-hidden="true">'+(phase==="pending"?"·":symbols[phase])+'</span> '+E(names[phase])+'</span>'+(meta?'<span class="study-session-time">'+E(meta)+'</span>':"")+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
-    completion+'<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'" title="Registrar estudo" aria-label="Registrar estudo">'+glyph("record")+' Registrar</button>'+
-    (window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||""):
+    '<small class="study-session-meta"><span class="study-session-status is-'+phase+'"><span aria-hidden="true">'+(phase==="pending"?"·":symbols[phase])+'</span> '+E(names[phase])+'</span>'+(cycleLabel?'<span class="study-session-cycle">'+E(cycleLabel)+'</span>':"")+(meta?'<span class="study-session-time">'+E(meta)+'</span>':"")+'</small></div><div class="study-daily-controls">'+(!blocked(date)?
+    '<span class="study-control-pin">'+(window.OrbitaStage8?.indicatorFor?.({kind:"session",id:x.id,status:x.status,discipline:x.discipline,cycleId:x.cycleId})||"")+'</span><span class="study-control-timer" data-s7-slot="timer" data-id="'+A(x.id)+'"></span>'+
+    completion+'<button class="btn small ghost" data-s3="recordSession" data-id="'+A(x.id)+'" title="Registrar estudo" aria-label="Registrar estudo">'+glyph("record")+' Registrar</button><span class="study-control-menu" data-s7-slot="manage" data-id="'+A(x.id)+'"></span>':
     '<span class="status" title="Dia fechado" aria-label="Dia fechado">🔒</span>')+'</div></div>';
-  }).join("");
-  return '<div class="study-daily-group'+flash+'"><div class="study-daily-heading"><strong>'+E(c?.title||"Estudos independentes")+'</strong>'+
-   '<span class="study-cycle-count" title="'+A(n+" de "+group.items.length+" concluídas"+(p?.cur?" · Próxima: "+p.cur.title:""))+'" aria-label="'+A(n+" de "+group.items.length+" concluídas")+'">'+n+'/'+group.items.length+' concluídas</span></div>'+
-   '<div class="study-session-progress" role="progressbar" aria-label="Sessões concluídas em '+A(c?.title||"Estudos independentes")+'" aria-valuemin="0" aria-valuemax="'+group.items.length+'" aria-valuenow="'+n+'"><div class="study-session-progress-fill" style="width:'+progress+'%"></div></div>'+
-   '<div class="study-daily-list">'+entries+'</div></div>';
  }).join("");
- if(!groups.length)body='<div class="study-daily-empty"><p class="note">Sem sessões planejadas.</p></div>';
+ const body=groups.length?'<div class="study-daily-group study-daily-queue"><div class="study-daily-cycle-summaries">'+cycleSummary+'</div><div class="study-daily-list" data-home-queue>'+entries+'</div></div>':'<div class="study-daily-empty"><p class="note">Sem sessões planejadas.</p></div>';
  const real=summarize({from:date,to:date}),partial=daily.filter(x=>x.status==="progress"&&x.id!==active?.sessionId).length,missed=daily.filter(x=>x.status==="notdone").length;
  return '<section class="card study-home-panel study-daily-panel"><div class="card-head"><h2>Estudos de hoje</h2><button class="btn small ghost" data-s3="openStudies" title="Configurar estudos" aria-label="Configurar estudos">Configurar</button></div>'+
   '<div class="study-daily-summary">'+stat("Planejadas",daily.length,"")+stat("Concluídas",done,"check",done?"is-good":"")+stat("Parciais",partial,"partial",partial?"is-warning":"")+stat("Não realizadas",missed,"missed",missed?"is-danger study-missed-count":"")+stat("Registrado",minuteLabel(real.actualMin),"clock")+'</div>'+
@@ -1265,6 +1306,53 @@ document.addEventListener("drop",event=>{
 document.addEventListener("dragend",()=>{
  for(const n of document.querySelectorAll(".study-plan-day.is-drop-target,.study-plan-item.is-dragging"))n.classList.remove("is-drop-target","is-dragging");
 });
-window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planCopyOne,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,sessionOrdinal,sessionModeLabel,rotationPreview,plannerLabel,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
+// Drag the card body directly. The pointer is captured by the stable queue,
+// not by a row that may change its position. Execution controls never drag.
+let homeDrag=null;
+function homeDragClear(){
+ const d=homeDrag;if(!d)return null;homeDrag=null;
+ d.row.classList.remove("s3-home-dragging");d.ghost?.remove();
+ for(const el of d.queue.querySelectorAll(".s3-home-drop-before,.s3-home-drop-after"))el.classList.remove("s3-home-drop-before","s3-home-drop-after");
+ try{d.queue.releasePointerCapture?.(d.pointer);}catch{}
+ return d;
+}
+document.addEventListener("pointerdown",ev=>{
+ if(ev.pointerType!=="mouse"||ev.button!==0||ev.target.closest?.(".study-daily-controls,button,input,textarea,select,a,[contenteditable]"))return;
+ const row=ev.target.closest?.('[data-home-movable="true"]'),queue=row?.closest("[data-home-queue]");
+ if(!row||!queue||!homeMovable(session(row.dataset.homeSession)))return;
+ homeDragClear();
+ homeDrag={pointer:ev.pointerId,row,queue,id:row.dataset.homeSession,x:ev.clientX,y:ev.clientY,moved:false,target:null,after:false};
+});
+document.addEventListener("pointermove",ev=>{
+ const d=homeDrag;if(!d||d.pointer!==ev.pointerId)return;
+ if(!d.queue.isConnected||!homeMovable(session(d.id))){homeDragClear();return;}
+ if(!d.moved&&Math.hypot(ev.clientX-d.x,ev.clientY-d.y)<6)return;
+ if(!d.moved){
+  d.moved=true;const rect=d.row.getBoundingClientRect();
+  d.offsetX=d.x-rect.left;d.offsetY=d.y-rect.top;
+  const ghost=d.row.cloneNode(true);ghost.classList.add("s3-home-ghost");
+  ghost.removeAttribute("data-home-session");ghost.removeAttribute("data-home-movable");ghost.setAttribute("aria-hidden","true");ghost.inert=true;
+  ghost.style.width=rect.width+"px";ghost.style.left="0";ghost.style.top="0";
+  document.body.appendChild(ghost);d.ghost=ghost;
+  d.row.classList.add("s3-home-dragging");try{d.queue.setPointerCapture?.(ev.pointerId);}catch{}
+ }
+ if(d.ghost)d.ghost.style.transform="translate3d("+(ev.clientX-d.offsetX)+"px,"+(ev.clientY-d.offsetY)+"px,0)";
+ ev.preventDefault();
+ for(const el of d.queue.querySelectorAll(".s3-home-drop-before,.s3-home-drop-after"))el.classList.remove("s3-home-drop-before","s3-home-drop-after");
+ const target=document.elementFromPoint?.(ev.clientX,ev.clientY)?.closest?.('[data-home-movable="true"]');
+ d.target=null;
+ if(!target||target===d.row||!d.queue.contains(target)||!homeMovable(session(target.dataset.homeSession)))return;
+ const rect=target.getBoundingClientRect();d.target=target.dataset.homeSession;d.after=ev.clientY>rect.top+rect.height/2;
+ target.classList.add(d.after?"s3-home-drop-after":"s3-home-drop-before");
+},{passive:false});
+document.addEventListener("pointerup",ev=>{
+ if(homeDrag?.pointer!==ev.pointerId)return;
+ const d=homeDragClear();
+ if(d?.moved&&d.target){ev.preventDefault();homeMove(d.id,d.target,d.after);}
+});
+document.addEventListener("pointercancel",ev=>{if(homeDrag?.pointer===ev.pointerId)homeDragClear();});
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&homeDrag)homeDragClear();});
+window.addEventListener?.("blur",homeDragClear);
+window.OrbitaStage3={decorate,inspect:{get model(){return db},saveCycle,saveSubject,pauseSubject,archiveSubject,reorderSubject,saveMethod,addSessions,addBatchSessions,planValidate,planCreate,planEdit,planDelete,planMove,planCopyOne,planBulk,planCopyRange,planSaveTemplate,planApplyTemplate,planUndo,planWeekStart,planDayEntries,homeMovable,homeMove,promotePending,sessionOrdinal,sessionModeLabel,rotationPreview,plannerLabel,updateSession,setSessionStatus,deleteSession,progression,cycleState,stepSessions,requiredSessions,summarize,loadFor,cycleProgress,subject,cycle,session,actions,submission}};
 render();
 })();

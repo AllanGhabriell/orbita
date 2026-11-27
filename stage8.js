@@ -335,7 +335,7 @@ function nextCandidate(link){
  eligible.sort((a,b)=>a.x.date.localeCompare(b.x.date)||Number(a.x.planOrder??0)-Number(b.x.planOrder??0)||(a.x.startTime||"99:99").localeCompare(b.x.startTime||"99:99")||String(a.x.createdAt||"").localeCompare(String(b.x.createdAt||""))||a.i-b.i);
  return eligible[0]?.x||null;
 }
-function bindNextNotes(){
+function bindNextNotes(persist=true){
  let changed=false;
  for(const n of notes){
   const l=n.link;if(l?.scope!=="next")continue;
@@ -351,7 +351,7 @@ function bindNextNotes(){
   if(target!==l.boundSessionId){if(target)l.boundSessionId=target;else delete l.boundSessionId;changed=true;}
   if(target&&l.bindingVersion!==2){l.bindingVersion=2;changed=true;}
  }
- if(changed)C.save();
+ if(changed&&persist)C.save();
 }
 function complete(link){
  if(!link)return false;

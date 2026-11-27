@@ -969,9 +969,8 @@ function sessionMenu(id){
 
 function decorate(route,html){
  if(route==="inicio"){
-  html=html.replace(/(<button class="btn small [^"]*" data-s3="quickDone" data-id="([^"]+)")/g,(full,head,id)=>homeButtons(id)+head);
-  // Menu de ações contextual, sem controles espalhados na página.
-  html=html.replace(/(<button class="btn small ghost" data-s3="recordSession" data-id="([^"]+)"[^>]*>[\s\S]*?<\/button>)/g,(whole,button,id)=>button+sessionMenu(id));
+  // The fixed control slots stay present even when there is no timer or menu.
+  html=html.replace(/(<span class="study-control-(?:timer|menu)" data-s7-slot="(timer|manage)" data-id="([^"]+)">)<\/span>/g,(_all,open,kind,id)=>open+(kind==="timer"?homeButtons(id):sessionMenu(id))+"</span>");
   // Cronômetro dentro do próprio quadro de estudos (nunca no topo global).
   if(timing.active&&session(timing.active.sessionId)?.date===C.state.date){
    const marker='<div class="study-daily-summary">';

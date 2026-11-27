@@ -1,5 +1,11 @@
 # Órbita
 
+## v5.31 — Fila de estudos e controles alinhados
+
+- Estudos de hoje usa uma fila global ordenada, preservando resumos de ciclos e identificação da origem. Controles com espaços fixos; alfinete à esquerda de Cronometrar.
+- Arraste direto pelo cartão com mouse, sem botões de movimentação ou confirmação; posições não pendentes protegidas. Ao iniciar uma sessão pendente fora de ordem, ela assume a primeira posição pendente, preservando identificadores, registros e horários informados.
+- Reordenação salva no documento já sincronizado; lembretes de próxima matéria seguem a fila. Arraste com prévia flutuante e linha de inserção. Sem alteração de Supabase.
+
 ## v5.30 — Mural sem sobreposição e importância simples
 
 - A distribuição compacta utiliza colunas nativas com altura intrínseca; grades e listas também refluem ao expandir observações. Espaço reservado para a dobra inferior. A distribuição compacta pode rebalancear as colunas ao abrir ou fechar um cartão.

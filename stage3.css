@@ -533,3 +533,26 @@
 .study-daily-panel .study-daily-controls>.s3-quick-status.primary{background:var(--surface2);color:var(--text);border:1px solid var(--border);box-shadow:none}
 .study-daily-panel .study-daily-controls>.s3-quick-status.primary:hover{border-color:var(--borderStrong)}
 @media(max-width:600px){.study-daily-panel .study-daily-summary>.study-summary-stat{min-width:65px;padding-inline:7px}.study-daily-panel .study-summary-stat>strong{font-size:15px}.study-daily-panel .card-head h2{font-size:17px}}
+
+/* v5.31 — one ordered study queue; fixed action slots and direct card drag. */
+.study-daily-panel .study-daily-queue{gap:9px}
+.study-daily-cycle-summaries{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:8px 14px}
+.study-daily-cycle-summary{display:grid;gap:4px;min-width:0}
+.study-daily-panel .study-session-cycle{color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.study-daily-panel .study-daily-controls{display:grid;grid-template-columns:32px 116px 90px 94px 34px;gap:4px;align-items:center;justify-content:end;flex:none;padding:0;margin-left:auto}
+.study-daily-panel .study-control-pin,.study-daily-panel .study-control-timer,.study-daily-panel .study-control-menu{min-width:0;display:flex;align-items:center;justify-content:center;min-height:30px}
+.study-daily-panel .study-daily-controls>.btn,.study-daily-panel .study-control-timer>.btn,.study-daily-panel .study-control-menu>.btn{width:100%;min-width:0;justify-content:center;box-sizing:border-box;white-space:nowrap;min-height:30px}
+.study-daily-panel .study-control-pin>.s8-linked-pin{width:30px;min-width:0;max-width:100%;height:30px;min-height:0;padding:2px}
+.study-daily-panel .study-control-pin>.s8-linked-pin span{font-size:9px;min-width:0}
+.study-daily-panel .study-control-timer>[data-s7=start]:not(:disabled){background:color-mix(in srgb,var(--accent) 20%,var(--surface2));border-color:var(--borderStrong);color:var(--text);font-weight:700}
+.study-daily-panel .study-daily-controls>.status{grid-column:1/-1;justify-self:end}
+.study-daily-panel .study-daily-entry{position:relative;min-width:0}
+@media(pointer:fine){.study-daily-panel .s3-home-movable{cursor:grab;user-select:none}.study-daily-panel .s3-home-movable .study-daily-controls{cursor:default}.study-daily-panel .s3-home-movable button{cursor:pointer}}
+.study-daily-panel .s3-home-dragging{opacity:.5;cursor:grabbing!important}
+.study-daily-panel .s3-home-drop-before:before,.study-daily-panel .s3-home-drop-after:after{content:"";position:absolute;left:0;right:0;height:3px;background:var(--accent);border-radius:3px;pointer-events:none;z-index:2}
+.study-daily-panel .s3-home-drop-before:before{top:-4px}.study-daily-panel .s3-home-drop-after:after{bottom:-4px}
+@media(max-width:850px){.study-daily-panel .study-daily-entry{flex-wrap:wrap}.study-daily-panel .study-daily-controls{flex-basis:100%;width:100%;grid-template-columns:32px minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr) 34px;gap:4px;justify-content:stretch;padding:0}}
+@media(max-width:420px){.study-daily-panel .study-daily-controls{grid-template-columns:27px minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 27px;gap:3px}.study-daily-panel .study-daily-controls>.btn,.study-daily-panel .study-control-timer>.btn,.study-daily-panel .study-control-menu>.btn{font-size:10px;padding:4px 2px!important;white-space:normal;overflow-wrap:anywhere;line-height:1.2;min-height:32px}.study-daily-panel .study-daily-controls>.btn .orb-ui-icon{display:none}.study-daily-panel .study-control-pin>.s8-linked-pin{width:27px;height:32px}}
+
+.s3-home-ghost{position:fixed!important;z-index:9990;pointer-events:none!important;box-sizing:border-box;opacity:.93;box-shadow:0 10px 28px #0005;border:1px solid var(--accent)!important;background:var(--surface2)!important;cursor:grabbing!important;max-width:calc(100vw - 16px)}
+.s3-home-ghost .study-daily-controls{display:none}
