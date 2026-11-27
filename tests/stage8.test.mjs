@@ -116,7 +116,7 @@ assert.equal(R.targetRows("today").filter(x=>x.label.includes("Matemática")).le
 assert.match(read("stage8.css"),/position:fixed/,"botão permanece fixo na tela");
 assert.match(read("stage8.css"),/safe-area-inset-bottom/,"respeita navegação mobile");
 assert.ok(read("boot.js").includes('"stage8.js"'),"módulo carregado no bootstrap");
-assert.ok(read("sw.js").includes('"./stage8.js?v=20261126-v5-29-composer"'),"PWA inclui arquivo versionado");
+assert.ok(read("sw.js").includes('"./stage8.js?v=20261126-v5-30-reminder-flow"'),"PWA inclui arquivo versionado");
 console.log("Lembretes: criação, prioridade, conversão segura, botão fixo e cache.");
 
 R.saveNote(form({title:"Baixa fixada",priority:"low",color:"#123456",pinned:"on"}));
@@ -208,3 +208,39 @@ assert.match(lastModal,/id="s8-description" name="description"/);
 assert.match(lastModal,/data-s8="chooseImages"/);
 assert.doesNotMatch(lastModal,/Imagens \(opcional\)|Adicionar imagens<\/label>/);
 assert.match(read("stage8.css"),/\.s8-composer:focus-within/);
+
+R.edit(imgNote.id);
+assert.match(lastModal,/Este lembrete precisa de atenção especial/);
+assert.match(lastModal,/type="radio" name="priority" value="low" checked/);
+assert.doesNotMatch(lastModal,/<label>Prioridade<\/label>/);
+const beforeNormal=R.notes.length;R.saveNote(form({title:"Comum sem categoria"}));
+assert.equal(R.notes[beforeNormal].priority,"low");
+R.saveNote(form({title:"Importante binário",priority:"high"}));
+assert.equal(R.notes.at(-1).priority,"high");
+R.openPanel();assert.match(markup,/s8-important-group/);assert.doesNotMatch(markup,/data-priority="(?:medium|low)"/);
+assert.match(read("stage8.css"),/column-fill:balance/);assert.match(read("stage8.css"),/break-inside:avoid/);
+assert.match(read("stage8.css"),/s8-has-observation\{padding-bottom:/);
+const activeDate="2026-11-11";
+window.OrbitaStage3.inspect.model.subjects=[{id:"math",title:"Matemática",cycleId:"enem"}];
+window.OrbitaStage3.inspect.rotationPreview=x=>x.id==="rotation-math"?{id:"math",title:"Matemática"}:{id:"physics",title:"Física"};
+sessions.splice(0,sessions.length,
+ {id:"done-math",subjectId:"math",discipline:"Matemática",cycleId:"enem",date:activeDate,status:"done"},
+ {id:"active-math",subjectId:"math",discipline:"Matemática",cycleId:"enem",date:activeDate,status:"pending",planOrder:0},
+ {id:"partial-math",subjectId:"math",discipline:"Matemática",cycleId:"enem",date:activeDate,status:"progress",planOrder:1},
+ {id:"late-math",subjectId:"math",discipline:"Matemática",cycleId:"enem",date:activeDate,status:"pending",planOrder:4},
+ {id:"rotation-math",rotationSlot:true,subjectId:"",discipline:"Próxima matéria do ciclo",cycleId:"enem",date:activeDate,status:"pending",planOrder:2},
+ {id:"missed-math",subjectId:"math",discipline:"Matemática",cycleId:"enem",date:activeDate,status:"notdone",planOrder:1});
+state.timing={active:{sessionId:"active-math"},records:{}};
+const mathLink={scope:"next",id:"math",cycleId:"enem"};
+assert.equal(R.nextCandidate(mathLink).id,"rotation-math","ignora ativa, parcial, concluída e não realizada; prevê matéria do ciclo");
+R.saveNote(form({title:"Lembrar na próxima matemática",priority:"high",linkScope:"next",target:"next|math|enem"}));
+const mathNote=R.notes.at(-1);
+assert.equal(mathNote.link.boundSessionId,"rotation-math");
+assert.match(R.indicators({kind:"session",id:"rotation-math",status:"pending"}),/s8-linked-pin/);
+assert.doesNotMatch(R.indicators({kind:"session",id:"active-math",status:"pending"}),new RegExp(mathNote.id));
+sessions.find(x=>x.id==="rotation-math").status="progress";
+state.timing.active={sessionId:"rotation-math"};R.bindNextNotes();
+assert.equal(mathNote.link.boundSessionId,"rotation-math","vínculo válido permanece quando a sessão começa");
+sessions.find(x=>x.id==="rotation-math").status="done";R.prune();
+assert.equal(mathNote.link,null);
+assert.ok(R.notes.includes(mathNote));

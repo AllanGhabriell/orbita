@@ -88,6 +88,27 @@ try{
  await page.evaluate(()=>window.OrbitaStage8.inspect.openPanel());
  await page.waitForSelector(".s8-gallery");
  assert.equal((await measure()).count,"1 / 2");
+ await page.evaluate(()=>{
+  const R=window.OrbitaStage8.inspect;
+  R.layout.width=680;R.layout.height=540;R.layout.columns=2;R.layout.zoom=100;
+  const form=v=>({get:k=>v[k]??null});
+  for(let i=0;i<6;i++)R.saveNote(form({title:"Observação "+i,description:i===0?"Texto longo ".repeat(90):"Texto "+i,priority:i<3?"high":"low"}));
+  R.openPanel();
+ });
+ const checkOverlap=()=>page.evaluate(()=>{
+  const cards=[...document.querySelectorAll(".s8-note")];
+  const bounds=cards.map(x=>x.getBoundingClientRect());
+  return bounds.every((a,i)=>bounds.slice(i+1).every(b=>Math.min(a.right,b.right)-Math.max(a.left,b.left)<=.5||Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)<=.5))&&cards.every(x=>{
+   const p=x.querySelector(".s8-observation"),fold=x.querySelector(".s8-fold");if(!p||!fold)return true;
+   return p.getBoundingClientRect().bottom<=fold.getBoundingClientRect().top+.5;
+  });
+ });
+ for(const mode of ["masonry","uniform","list"]){
+  await page.evaluate(m=>{const R=window.OrbitaStage8.inspect;R.setAppearance("layoutMode",m);const n=R.notes.find(n=>n.title==="Observação 0");R.toggleObservation(n.id);},mode);
+  await page.waitForSelector(".s8-observation");
+  assert.equal(await checkOverlap(),true,"observações não sobrepõem cartões ou dobra em "+mode);
+  await page.evaluate(()=>{const R=window.OrbitaStage8.inspect;R.toggleObservation(R.notes.find(n=>n.title==="Observação 0").id);});
+ }
  assert.equal(errors.length,0,errors.join("; "));
  console.log("Chromium: anexos, carrossel sem variação de tamanho, zoom, fechamento e persistência.");
 }finally{

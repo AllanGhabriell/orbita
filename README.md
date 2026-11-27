@@ -1,5 +1,12 @@
 # Órbita
 
+## v5.30 — Mural sem sobreposição e importância simples
+
+- A distribuição compacta utiliza colunas nativas com altura intrínseca; grades e listas também refluem ao expandir observações. Espaço reservado para a dobra inferior. A distribuição compacta pode rebalancear as colunas ao abrir ou fechar um cartão.
+- A importância do lembrete é binária (sim/não), com fixação independente. Alta prioridade legada corresponde a importante; média/baixa correspondem a comum. Ordenação manual dentro de cada grupo, cores personalizadas mantidas.
+- Próxima sessão da matéria ignora sessões ativas, não realizadas e encerradas, reconhece a previsão dos ciclos e segue a ordem da agenda. A reserva acompanha mudanças do planejamento antes do início. Reservas corretamente feitas permanecem quando a sessão começa. Vínculos antigos ambíguos podem ser reescolhidos na edição.
+- Sem alterações de SQL; anexos e histórico preservados.
+
 ## v5.29 — Observações com imagens integradas
 
 - Campo único de composição: texto, miniaturas anexadas e botão discreto de imagem no canto. Ctrl+V de imagens no campo de observações; texto e anexos preservados separadamente no documento. Carrossel e ampliação mantidos.

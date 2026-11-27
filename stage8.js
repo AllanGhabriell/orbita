@@ -9,7 +9,9 @@ const notes=root.reminders;
 const E=C.esc,A=C.attr;
 const $=id=>document.getElementById(id);
 const labels={high:"Alta",medium:"Média",low:"Baixa"};
-const rank={high:0,medium:1,low:2};
+const important=n=>n?.priority==="high";
+const notePriority=v=>v==="high"||v==="yes"?"high":"low";
+const normalizeFilter=v=>v==="high"?"high":v==="medium"||v==="low"?"low":v==="pinned"?"pinned":"all";
 let opened=false,drag=null,skipClickUntil=0,highlightIds=[],selecting=false,selectedNotes=new Set();
 const defaults={x:null,y:null,width:340,height:430,locked:false,zoom:100,keepOpen:false,filter:"all",panelX:null,panelY:null,opacity:28,appearanceVersion:2,blur:4,background:"glass",backgroundColor:"",paperOpacity:100,spacing:6,radius:8,cardWidth:212,columns:0,layoutMode:"masonry",fontSize:14,fontWeight:620,textAlign:"left",shadow:false,showPriority:true,showAge:false,showDate:false,showLinks:true,showObservations:true,orderMode:"auto",manualOrder:[]};
 if(!root.reminderUi||typeof root.reminderUi!=="object")root.reminderUi={...defaults};
@@ -17,6 +19,7 @@ const ui=root.reminderUi;
  opened=ui.keepOpen===true;
 if(ui.appearanceVersion!==2){if(ui.opacity===92||ui.opacity==null)ui.opacity=28;ui.appearanceVersion=2;}
 for(const [key,value] of Object.entries(defaults))if(ui[key]===undefined)ui[key]=Array.isArray(value)?[]:value;
+ui.filter=normalizeFilter(ui.filter);
 const expandedNotes=new Set();let cardDrag=null,layoutObserver=null,contextAnchor=null,selectionHold=null,selectionHeld=false;
 const clamp=(v,low,high)=>Math.min(Math.max(v,low),high);
 function bounds(){
@@ -105,7 +108,7 @@ function applyLayout(data){
  ui.height=clamp(Number(data.get("height"))||430,Math.min(160,b.height-b.bottom-16),b.height-b.bottom-16);
  ui.zoom=clamp(Number(data.get("zoom"))||100,50,200);
  ui.locked=data.get("locked")!==null;ui.keepOpen=data.get("keepOpen")!==null;
- const filter=String(data.get("filter")||"all");ui.filter=["all","pinned","high","medium","low"].includes(filter)?filter:"all";
+ const filter=String(data.get("filter")||"all");ui.filter=normalizeFilter(filter);
  const r=panelRect();ui.panelX=r.left;ui.panelY=r.top;
  C.save();C.closeModal();redraw();
 }
@@ -260,6 +263,7 @@ function subjectChoices(){
  const available=subjects.map(x=>({value:"next|"+encodeURIComponent(x.id)+"|"+encodeURIComponent(x.cycleId||""),label:x.title+" · "+(cycles.find(c=>c.id===x.cycleId)?.title||"Sem ciclo")}));
  const known=new Set(subjects.map(x=>String(x.title||"").toLocaleLowerCase("pt-BR")));
  for(const x of S3?.model?.sessions||[]){
+  if(x.rotationSlot)continue;
   const title=String(x.discipline||"").trim();
   if(!title||known.has(title.toLocaleLowerCase("pt-BR")))continue;
   known.add(title.toLocaleLowerCase("pt-BR"));
@@ -314,24 +318,38 @@ function parseTarget(value){
  if(!id)throw Error("Escolha o vínculo.");
  return {scope,id,...(scope==="entry"?{date}:scope==="next"?{cycleId:date}:{})};
 }
+function subjectMatchesNext(x,link){
+ if(link.cycleId&&x.cycleId!==link.cycleId)return false;
+ const sub=(S3?.model?.subjects||[]).find(y=>y.id===link.id);
+ const forecast=x.rotationSlot&&x.status==="pending"?S3?.rotationPreview?.(x):null;
+ const subjectId=forecast?.id||x.subjectId||"",discipline=forecast?.title||x.discipline||"";
+ const normalized=v=>String(v||"").trim().toLocaleLowerCase("pt-BR");
+ return sub?(subjectId?subjectId===sub.id:normalized(discipline)===normalized(sub.title)):normalized(discipline)===normalized(link.id);
+}
+function nextEligible(x){
+ return !!x&&!x.archived&&x.status==="pending"&&x.date>=C.today()&&x.id!==root.timing?.active?.sessionId&&!root.evolution?.closed?.[x.date]&&!root.planner?.closedDays?.includes(x.date);
+}
 function nextCandidate(link){
- const subject=(S3?.model?.subjects||[]).find(x=>x.id===link.id);
  const sessions=S3?.model?.sessions||[];
- const current=C.today();
- const eligible=sessions.map((x,i)=>({x,i})).filter(({x})=>
-  !x.archived&&x.status!=="done"&&x.date>=current&&
-  (subject?(x.subjectId===subject.id||(!x.subjectId&&String(x.discipline||"").toLocaleLowerCase("pt-BR")===String(subject.title).toLocaleLowerCase("pt-BR")))&&(!link.cycleId||x.cycleId===link.cycleId):
-  String(x.discipline||"").trim().toLocaleLowerCase("pt-BR")===String(link.id).trim().toLocaleLowerCase("pt-BR"))
- );
- eligible.sort((a,b)=>a.x.date.localeCompare(b.x.date)||a.i-b.i);
+ const eligible=sessions.map((x,i)=>({x,i})).filter(({x})=>nextEligible(x)&&subjectMatchesNext(x,link));
+ eligible.sort((a,b)=>a.x.date.localeCompare(b.x.date)||Number(a.x.planOrder??0)-Number(b.x.planOrder??0)||(a.x.startTime||"99:99").localeCompare(b.x.startTime||"99:99")||String(a.x.createdAt||"").localeCompare(String(b.x.createdAt||""))||a.i-b.i);
  return eligible[0]?.x||null;
 }
 function bindNextNotes(){
  let changed=false;
  for(const n of notes){
-  if(n.link?.scope!=="next"||n.link.boundSessionId)continue;
-  const x=nextCandidate(n.link);
-  if(x){n.link.boundSessionId=x.id;changed=true;}
+  const l=n.link;if(l?.scope!=="next")continue;
+  const old=(S3?.model?.sessions||[]).find(x=>x.id===l.boundSessionId);
+  const started=old&&root.timing?.records?.[old.id]?.startedAt;
+  // A correctly reserved session keeps its reminder after starting. Legacy links
+  // created after the timer began may point at the wrong session.
+  const active=old&&old.id===root.timing?.active?.sessionId;
+  const legacyLate=!l.bindingVersion&&started&&Date.parse(n.updatedAt||n.createdAt||"")>Date.parse(started);
+  if(old&&!old.archived&&old.status==="done")continue;
+  if(old&&!old.archived&&(active||old.status==="progress")&&!legacyLate)continue;
+  const x=nextCandidate(l),target=x?.id;
+  if(target!==l.boundSessionId){if(target)l.boundSessionId=target;else delete l.boundSessionId;changed=true;}
+  if(target&&l.bindingVersion!==2){l.bindingVersion=2;changed=true;}
  }
  if(changed)C.save();
 }
@@ -382,15 +400,15 @@ function indicators(ctx){
 const palette={high:"#f5dad1",medium:"#f5eecb",low:"#dcf0e3"};
 const swatches=["#f5eecb","#f5dad1","#dcf0e3","#d6e7ff","#e5d9ff","#ffd9ed","#34364b","#ffffff"];
 function safeColor(value){return /^#[0-9a-f]{6}$/i.test(String(value||""))?String(value).toLowerCase():"";}
-function noteColor(n){return safeColor(n.color)||palette[n.priority]||palette.medium;}
+function noteColor(n){return safeColor(n.color)||(important(n)?palette.high:palette.medium);}
 function contrastColor(hex){const rgb=[1,3,5].map(i=>{const c=parseInt(hex.slice(i,i+2),16)/255;return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);});return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]>.179?"#202020":"#ffffff";}
-function automatic(a,b){return (rank[a.priority]??1)-(rank[b.priority]??1)||String(b.createdAt).localeCompare(String(a.createdAt));}
+function automatic(a,b){return Number(important(b))-Number(important(a))||String(b.createdAt).localeCompare(String(a.createdAt));}
 function sorted(){
  const order=new Map((Array.isArray(ui.manualOrder)?ui.manualOrder:[]).map((id,i)=>[id,i]));
- return [...notes].sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||(ui.orderMode==="manual"&&!a.pinned&&!b.pinned?((order.get(a.id)??1e9)-(order.get(b.id)??1e9)):0)||automatic(a,b));
+ return [...notes].sort((a,b)=>Number(!!b.pinned)-Number(!!a.pinned)||(!a.pinned&&!b.pinned?Number(important(b))-Number(important(a)):0)||(ui.orderMode==="manual"&&!a.pinned&&!b.pinned?((order.get(a.id)??1e9)-(order.get(b.id)??1e9)):0)||automatic(a,b));
 }
 function moveNote(id,targetId,after=false){
- const n=note(id),target=note(targetId);if(!n||n.pinned||!target||target.pinned||id===targetId)return false;
+ const n=note(id),target=note(targetId);if(!n||n.pinned||!target||target.pinned||id===targetId||important(n)!==important(target))return false;
  const order=sorted().filter(x=>!x.pinned).map(x=>x.id).filter(x=>x!==id);
  order.splice(order.indexOf(targetId)+(after?1:0),0,id);ui.manualOrder=order;ui.orderMode="manual";C.save();redraw();return true;
 }
@@ -403,7 +421,7 @@ function selectionAction(act){
  else{selecting=false;selectedNotes.clear();}
  C.save();redraw();
 }
-function toggleObservation(id){if(!note(id)?.description)return;expandedNotes.has(id)?expandedNotes.delete(id):expandedNotes.add(id);redraw();}
+function toggleObservation(id){if(!note(id)?.description)return;const list=document.querySelector?.("#s8-panel .s8-note-list"),top=list?.scrollTop||0;expandedNotes.has(id)?expandedNotes.delete(id):expandedNotes.add(id);redraw();const next=document.querySelector?.("#s8-panel .s8-note-list");if(next)next.scrollTop=top;const fold=$("s8-note-"+id)?.querySelector?.(".s8-fold");fold?.scrollIntoView?.({block:"nearest",inline:"nearest"});}
 
 function togglePin(idValue){const n=note(idValue);if(!n)return;n.pinned=!n.pinned;C.save();redraw();}
 function setZoom(value,commit=false){
@@ -423,7 +441,7 @@ function setOpacity(value,commit=false){
 }
 function selectColor(idValue,value){const n=note(idValue);if(!n)return;const color=safeColor(value);if(!color)throw Error("Cor inválida.");n.color=color;C.save();redraw();}
 function pinPanel(){ui.keepOpen=!ui.keepOpen;opened=true;C.save();redraw();}
-function visibleNotes(){return sorted().filter(n=>ui.filter==="pinned"?n.pinned:ui.filter==="all"||n.priority===ui.filter);}
+function visibleNotes(){return sorted().filter(n=>ui.filter==="pinned"?n.pinned:ui.filter==="all"||important(n)===(ui.filter==="high"));}
 function syncSelection(){
  const total=notes.filter(n=>selectedNotes.has(n.id)).length;
  const count=$("s8-selection-count");if(count)count.textContent=total+" selecionado"+(total===1?"":"s");
@@ -440,11 +458,11 @@ function bulkEdit(data){
  const chosen=notes.filter(n=>selectedNotes.has(n.id));if(!chosen.length)throw Error("Selecione ao menos um lembrete.");
  const mode=String(data.get("colorMode")||"keep"),color=safeColor(data.get("color")),priority=String(data.get("priority")||"keep"),pin=String(data.get("pin")||"keep");
  if(!["keep","custom","auto"].includes(mode)||mode==="custom"&&!color)throw Error("Escolha uma cor válida.");
- if(priority!=="keep"&&!labels[priority])throw Error("Prioridade inválida.");
+ if(priority!=="keep"&&!["high","medium","low","yes","no"].includes(priority))throw Error("Escolha se os lembretes são importantes.");
  if(!["keep","pin","unpin"].includes(pin))throw Error("Fixação inválida.");
  for(const n of chosen){
   if(mode==="custom")n.color=color;else if(mode==="auto")n.color=null;
-  if(priority!=="keep")n.priority=priority;
+  if(priority!=="keep")n.priority=notePriority(priority);
   if(pin!=="keep")n.pinned=pin==="pin";
  }
  C.save();C.closeModal();redraw();C.notify(chosen.length+" lembrete(s) atualizado(s).");
@@ -452,9 +470,9 @@ function bulkEdit(data){
 function bulkEditMenu(){
  const chosen=notes.filter(n=>selectedNotes.has(n.id));if(!chosen.length){C.notify("Selecione ao menos um lembrete.");return;}
  C.openModal("Editar "+chosen.length+" lembrete"+(chosen.length===1?"":"s"),'<form id="s8-bulk-form" class="section-stack">'+
- '<label class="field"><span>Cor dos papéis</span><select name="colorMode" id="s8-bulk-color-mode"><option value="keep">Manter cores atuais</option><option value="custom">Mesma cor para os selecionados</option><option value="auto">Cor automática da prioridade</option></select></label>'+
+ '<label class="field"><span>Cor dos papéis</span><select name="colorMode" id="s8-bulk-color-mode"><option value="keep">Manter cores atuais</option><option value="custom">Mesma cor para os selecionados</option><option value="auto">Cor automática</option></select></label>'+
  '<div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="bulkPreset" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-bulk-color" value="#f5eecb" aria-label="Escolher qualquer cor"></div>'+
- '<label class="field"><span>Prioridade</span><select name="priority"><option value="keep">Manter atuais</option><option value="high">Alta</option><option value="medium">Média</option><option value="low">Baixa</option></select></label>'+
+ '<label class="field"><span>Precisam de atenção especial?</span><select name="priority"><option value="keep">Manter atuais</option><option value="high">Sim</option><option value="low">Não</option></select></label>'+
  '<label class="field"><span>Fixação</span><select name="pin"><option value="keep">Manter atual</option><option value="pin">Fixar no topo</option><option value="unpin">Desafixar</option></select></label>'+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Aplicar aos selecionados</button></div></form>');
 }
@@ -474,12 +492,11 @@ function noteMenu(idValue,anchor){
  const n=note(idValue);if(!n)return;
  showContext(anchor||$("s8-note-"+idValue),'<div class="orb-manage-group">'+
  (n.description?contextItem("observation","note",expandedNotes.has(n.id)?"Recolher observação":"Abrir observação",n.id):"")+
- contextItem("edit","edit","Editar lembrete",n.id)+contextItem("quickColor","edit","Alterar cor",n.id)+contextItem("quickPriority","sort","Alterar prioridade",n.id)+contextItem("pinNote","pin",n.pinned?"Desafixar":"Fixar no topo",n.id)+contextItem("convert","arrow","Transformar em atividade",n.id)+contextItem("remove","trash","Excluir",n.id,"orb-risk")+'</div>');
+ contextItem("edit","edit","Editar lembrete",n.id)+contextItem("quickColor","edit","Alterar cor",n.id)+contextItem("toggleImportant","sort",important(n)?"Retirar importância":"Marcar como importante",n.id)+contextItem("pinNote","pin",n.pinned?"Desafixar":"Fixar no topo",n.id)+contextItem("convert","arrow","Transformar em atividade",n.id)+contextItem("remove","trash","Excluir",n.id,"orb-risk")+'</div>');
 }
 function quickNoteOptions(idValue,kind){
  const n=note(idValue),anchor=$("s8-note-"+idValue);if(!n)return;
- if(kind==="quickPriority")showContext(anchor,'<div class="orb-manage-group">'+Object.entries(labels).map(([key,label])=>'<button type="button" class="orb-manage-item" data-s8="setPriority" data-id="'+A(idValue)+'" data-value="'+key+'"><span class="orb-manage-icon">'+(n.priority===key?glyph("check"):"")+'</span><span><strong>'+label+'</strong></span><span></span></button>').join("")+'</div>');
- else showContext(anchor,'<div class="s8-quick-colors"><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="quickPreset" data-id="'+A(idValue)+'" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" data-s8-color="'+A(idValue)+'" value="'+noteColor(n)+'" aria-label="Outra cor"></div><button type="button" class="btn small ghost" data-s8="autoNoteColor" data-id="'+A(idValue)+'">Cor automática</button></div>');
+ showContext(anchor,'<div class="s8-quick-colors"><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="quickPreset" data-id="'+A(idValue)+'" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" data-s8-color="'+A(idValue)+'" value="'+noteColor(n)+'" aria-label="Outra cor"></div><button type="button" class="btn small ghost" data-s8="autoNoteColor" data-id="'+A(idValue)+'">Cor automática</button></div>');
 }
 function selectionMenu(anchor){showContext(anchor,'<div class="orb-manage-group">'+contextItem("selectAllContext","all","Selecionar todos")+contextItem("clearSelection","select","Desmarcar todos")+contextItem("invertSelection","sort","Inverter seleção")+contextItem("exitSelection","close","Sair da seleção")+'</div>');}
 const appearanceKeys=["opacity","blur","background","backgroundColor","paperOpacity","spacing","radius","cardWidth","columns","layoutMode","fontSize","fontWeight","textAlign","shadow","showPriority","showAge","showDate","showLinks","showObservations"];
@@ -504,7 +521,7 @@ function settingsMenu(){
  group("Aparência",select("background","Fundo",[["glass","Vidro translúcido"],["transparent","Transparente"],["solid","Sólido"],["original","Tema original"]])+range("opacity","Opacidade do fundo")+range("blur","Desfoque")+'<label class="s8-setting"><span>Cor do fundo</span><input type="color" data-s8-pref="backgroundColor" value="'+(safeColor(ui.backgroundColor)||"#11132a")+'"></label><button type="button" class="btn small ghost" data-s8="themeColor">Usar cor do tema</button>'+range("paperOpacity","Opacidade dos papéis")+range("radius","Bordas")+toggle("shadow","Sombras dos papéis"),true)+
  group("Organização",select("layoutMode","Distribuição",[["masonry","Compacta"],["uniform","Grade uniforme"],["list","Lista"]])+range("columns","Colunas (0 = automático)")+range("spacing","Espaçamento")+range("cardWidth","Largura dos cartões"))+
  group("Tipografia",range("fontSize","Tamanho do texto")+range("fontWeight","Espessura",50)+select("textAlign","Alinhamento",[["left","Esquerda"],["center","Centro"],["right","Direita"]]))+
- group("Informações visíveis",toggle("showPriority","Prioridade")+toggle("showAge","Tempo desde a criação")+toggle("showDate","Data de criação")+toggle("showLinks","Vínculos")+toggle("showObservations","Indicador de observação"))+
+ group("Informações visíveis",toggle("showPriority","Indicador de importância")+toggle("showAge","Tempo desde a criação")+toggle("showDate","Data de criação")+toggle("showLinks","Vínculos")+toggle("showObservations","Indicador de observação"))+
  group("Comportamento",toggle("keepOpen","Manter mural aberto ao voltar ao Início"))+
  '<div class="modal-footer"><button type="button" class="btn ghost" data-s8="resetAppearance">Restaurar aparência</button><button type="button" class="btn primary" data-action="closeModal">Fechar</button></div></div>');
 }
@@ -517,38 +534,29 @@ function applyAppearance(){
 }
 function layoutNotes(){
  const panel=document.querySelector?.("#s8-panel"),list=panel?.querySelector(".s8-note-list");if(!list)return;
- const gap=Number(ui.spacing)||6;
+ const gap=Math.max(0,Number(ui.spacing)||0);
  for(const group of list.querySelectorAll(".s8-note-group")){
-  const cards=[...group.querySelectorAll(".s8-note")],w=group.clientWidth;if(!w)continue;
+  const cards=group.querySelectorAll(".s8-note"),w=group.clientWidth;if(!w)continue;
   const cols=ui.layoutMode==="list"?1:Math.max(1,Math.min(cards.length||1,Math.floor((w+gap)/110),Number(ui.columns)||Math.floor((w+gap)/(ui.cardWidth*ui.zoom/100+gap))||1));
-  group.style.gridTemplateColumns="repeat("+cols+",minmax(0,1fr))";
-  const masonry=ui.layoutMode==="masonry";
-  group.style.rowGap=masonry?"0px":gap+"px";group.style.gridAutoRows=masonry?"1px":"auto";
-  for(const card of cards){card.style.gridColumn="";card.style.gridRow="";}
-  if(!masonry)continue;
-  const heights=Array(cols).fill(1);
-  for(const card of cards){
-   const col=heights.indexOf(Math.min(...heights));
-   card.style.gridColumn=String(col+1);card.style.gridRow=heights[col]+" / span 1";
-   const h=Math.ceil(card.getBoundingClientRect().height)+gap;
-   card.style.gridRow=heights[col]+" / span "+Math.max(1,h);
-   heights[col]+=Math.max(1,h);
-  }
+  // Native column/row layout reserves the full intrinsic height, even while
+  // descriptions, images, fonts or viewport dimensions change.
+  const value=String(cols);
+  if(group.style.getPropertyValue("--s8-cols")!==value)group.style.setProperty("--s8-cols",value);
  }
 }
 function observeLayout(){
  layoutObserver?.disconnect();layoutObserver=null;applyAppearance();layoutNotes();
  const list=document.querySelector?.("#s8-panel .s8-note-list");
- if(list&&typeof ResizeObserver!=="undefined"){layoutObserver=new ResizeObserver(()=>layoutNotes());layoutObserver.observe(list);for(const card of list.querySelectorAll(".s8-note"))layoutObserver.observe(card);}
+ if(list&&typeof ResizeObserver!=="undefined")layoutObserver=new ResizeObserver(()=>layoutNotes()),layoutObserver.observe(list);
 }
 
 function markup(){
  if(!opened)return '<div id="s8-floating-root" class="s8-float" aria-label="Lembretes"><button type="button" class="s8-trigger" data-s8="toggle" aria-expanded="false" title="Abrir lembretes" aria-label="Abrir lembretes">'+"<svg width=\"27\" height=\"27\" viewBox=\"0 0 28 28\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 7h18v17H5z\" fill=\"#f4e5ad\" stroke=\"#aa9860\" stroke-width=\"1.5\"/><path d=\"M7 11h14M7 15h14M7 19h10\" stroke=\"#b4a675\" stroke-width=\"1.3\" stroke-linecap=\"round\"/><path d=\"m15 4 4 5\" stroke=\"#a44950\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"14\" cy=\"5\" r=\"4\" fill=\"#d96874\" stroke=\"#a44950\" stroke-width=\"1\"/><circle cx=\"13\" cy=\"4\" r=\"1.1\" fill=\"#ffe2e5\"/></svg>"+(notes.length?'<span class="s8-count">'+notes.length+'</span>':"")+'</button></div>';
  const renderNote=n=>{
-  const p=labels[n.priority]?n.priority:"medium",link=n.link?linkLabel(n.link):n.lastLinkLabel?"Vínculo encerrado · "+n.lastLinkLabel:"";
+  const p=important(n)?"high":"low",link=n.link?linkLabel(n.link):n.lastLinkLabel?"Vínculo encerrado · "+n.lastLinkLabel:"";
   return '<article id="s8-note-'+A(n.id)+'" data-s8-card="'+A(n.id)+'" class="s8-note s8-priority-'+p+(highlightIds.includes(n.id)?' s8-highlight':'')+(selecting&&selectedNotes.has(n.id)?' s8-selected':'')+(n.pinned?' s8-pinned':'')+(n.description?' s8-has-observation':'')+(expandedNotes.has(n.id)?' s8-expanded':'')+'" tabindex="0" '+(selecting?'role="checkbox" aria-checked="'+selectedNotes.has(n.id)+'"': 'role="group"')+' aria-label="'+A(n.title)+'" style="--s8-note-bg:'+noteColor(n)+';--s8-note-fg:'+contrastColor(noteColor(n))+'">'+
    '<div class="s8-note-top">'+(selecting&&selectedNotes.has(n.id)?'<span class="s8-selected-mark" aria-hidden="true">'+glyph("check")+'</span>':"")+
-   '<span class="s8-note-priority" data-priority="'+p+'" title="Prioridade '+E(labels[p])+'">'+E(labels[p])+'</span><div class="s8-note-tools">'+
+   (important(n)?'<span class="s8-note-priority" data-priority="high" title="Precisa de atenção especial">Importante</span>':"")+'<div class="s8-note-tools">'+
    '<small class="s8-age">'+E(age(n.createdAt))+'</small><small class="s8-created">'+E(String(n.createdAt||"").slice(0,10).split("-").reverse().join("/"))+'</small>'+(link?'<span class="s8-link-symbol" title="'+A(link)+'" aria-label="'+A(link)+'">'+glyph("link")+'</span>':"")+
    smallButton("pinNote","pin",n.pinned?"Desafixar lembrete":"Fixar no topo",'data-id="'+A(n.id)+'" aria-pressed="'+!!n.pinned+'"')+
    smallButton("noteMenu","more","Mais opções",'data-id="'+A(n.id)+'"')+'</div></div>'+
@@ -556,12 +564,12 @@ function markup(){
    (n.description?'<button class="s8-fold" type="button" data-s8="observation" data-id="'+A(n.id)+'" aria-label="Abrir ou recolher observação" aria-expanded="'+expandedNotes.has(n.id)+'"></button>':"")+
    (n.description&&expandedNotes.has(n.id)?'<p class="s8-observation">'+E(n.description)+'</p>':"")+galleryMarkup(n)+'</article>';
  };
- const visible=visibleNotes(),pinned=visible.filter(n=>n.pinned),others=visible.filter(n=>!n.pinned);
- const list=(pinned.length?'<div class="s8-note-group s8-pinned-group">'+pinned.map(renderNote).join("")+'</div>':"")+(others.length?'<div class="s8-note-group">'+others.map(renderNote).join("")+'</div>':"");
+ const visible=visibleNotes(),pinned=visible.filter(n=>n.pinned),urgent=visible.filter(n=>!n.pinned&&important(n)),others=visible.filter(n=>!n.pinned&&!important(n));
+ const list=(pinned.length?'<div class="s8-note-group s8-pinned-group">'+pinned.map(renderNote).join("")+'</div>':"")+(urgent.length?'<div class="s8-note-group s8-important-group">'+urgent.map(renderNote).join("")+'</div>':"")+(others.length?'<div class="s8-note-group">'+others.map(renderNote).join("")+'</div>':"");
  const z=clamp((Number(ui.zoom)||100)/100,.5,2);
  return '<div id="s8-floating-root" class="s8-float s8-open" aria-label="Lembretes"><section id="s8-panel" class="s8-panel" style="--s8-opacity:'+clamp(Number(ui.opacity),0,100)+'%" aria-label="Mural de lembretes"><header class="s8-panel-head"><div data-s8="movePanel" title="'+(ui.locked?"Mural travado":"Arraste para mover o mural")+'"><strong>Lembretes <small>'+visibleNotes().length+(visibleNotes().length!==notes.length?"/"+notes.length:"")+'</small></strong>'+'</div><div class="s8-head-tools">'+
  smallButton("new","plus","Novo lembrete")+smallButton("lock",ui.locked?"lock":"unlock",ui.locked?"Destravar mural":"Travar posição e tamanho",'aria-pressed="'+!!ui.locked+'"')+smallButton("settings","more","Aparência do mural")+smallButton("close","close","Fechar mural")+'</div></header>'+
- '<div class="s8-toolbar"><div class="s8-toolbar-group">'+smallButton("selectMode","select","Selecionar · botão direito para opções",'aria-pressed="'+selecting+'"')+smallButton("resetOrder","sort","Organizar por prioridade",'aria-pressed="'+(ui.orderMode==="auto")+'"')+'</div><select id="s8-filter" aria-label="Filtrar lembretes">'+[["all","Todos"],["pinned","Fixados"],["high","Alta"],["medium","Média"],["low","Baixa"]].map(([k,l])=>'<option value="'+k+'" '+(ui.filter===k?"selected":"")+'>'+l+'</option>').join("")+'</select></div>'+
+ '<div class="s8-toolbar"><div class="s8-toolbar-group">'+smallButton("selectMode","select","Selecionar · botão direito para opções",'aria-pressed="'+selecting+'"')+smallButton("resetOrder","sort","Organizar por importância",'aria-pressed="'+(ui.orderMode==="auto")+'"')+'</div><select id="s8-filter" aria-label="Filtrar lembretes">'+[["all","Todos"],["pinned","Fixados"],["high","Importantes"],["low","Comuns"]].map(([k,l])=>'<option value="'+k+'" '+(ui.filter===k?"selected":"")+'>'+l+'</option>').join("")+'</select></div>'+
  (selecting?'<div class="s8-bulk-tools"><span id="s8-selection-count">'+selectedNotes.size+' selecionado'+(selectedNotes.size===1?"":"s")+'</span><button type="button" class="s8-bulk-edit" data-s8="bulkEdit" '+(!selectedNotes.size?"disabled":"")+'>'+glyph("edit")+' Editar</button>'+smallButton("selectMode","close","Sair da seleção")+'</div>':"")+
  '<div class="s8-note-list" style="--s8-z:'+z+';--s8-card-width:'+Math.round(ui.cardWidth*z)+'px">'+(list||'<p class="s8-empty">'+(notes.length?"Sem lembretes neste filtro.":"Nenhum lembrete.")+'</p>')+'</div>'+
  '<div class="s8-zoom-bar">'+smallButton("reset","reset","Restaurar posição e tamanho")+'<span class="s8-footer-divider"></span>'+smallButton("zoomOut","minus","Diminuir zoom")+'<input id="s8-zoom-slider" type="range" min="50" max="200" step="5" value="'+(Number(ui.zoom)||100)+'" aria-label="Zoom dos lembretes"><output id="s8-zoom-value">'+Math.round(Number(ui.zoom)||100)+'%</output>'+smallButton("zoomIn","plus","Aumentar zoom")+'</div>'+
@@ -594,8 +602,8 @@ function edit(idValue,preselected){
  '<div class="field"><label for="s8-description">Observações (opcional)</label><div class="s8-composer" id="s8-composer"><textarea id="s8-description" name="description" maxlength="1200" rows="3" placeholder="Escreva ou cole uma imagem (Ctrl + V)…">'+E(n?.description||"")+'</textarea>'+
  '<div class="s8-image-edit-list" id="s8-image-edit-list">'+imageEditorMarkup(attachments)+'</div>'+
  '<div class="s8-composer-tools"><small id="s8-image-edit-status" aria-live="polite">'+(attachments.length?attachments.length+'/'+IMAGE_LIMIT+' imagens':'')+'</small><button type="button" class="s8-composer-attach" data-s8="chooseImages" aria-label="Adicionar imagens" title="Adicionar imagens de uma pasta">'+glyph("imageAdd")+'</button><input class="s8-image-file" id="s8-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" multiple tabindex="-1" aria-label="Selecionar arquivos de imagem"></div></div></div>'+
- '<div class="field"><label>Prioridade</label><select name="priority">'+Object.entries(labels).map(([key,value])=>'<option value="'+key+'" '+((n?.priority||"medium")===key?"selected":"")+'>'+value+'</option>').join("")+'</select></div>'+
- '<div class="field"><label>Cor do papel</label><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="presetColor" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-note-color" aria-label="Escolher qualquer cor" value="'+noteColor(n||{priority:"medium"})+'"></div><label class="checkline"><input type="checkbox" name="autoColor" '+(!safeColor(n?.color)?"checked":"")+'> Cor automática da prioridade</label><label class="checkline"><input type="checkbox" name="pinned" '+(n?.pinned?"checked":"")+'> Fixar este lembrete no topo</label></div>'+
+ '<fieldset class="s8-importance-field"><legend>Este lembrete precisa de atenção especial?</legend><div class="s8-importance-choice">'+[["low","Não"],["high","Sim"]].map(([key,label])=>'<label><input type="radio" name="priority" value="'+key+'" '+((important(n)? "high":"low")===key?"checked":"")+'><span>'+label+'</span></label>').join("")+'</div></fieldset>'+
+ '<div class="field"><label>Cor do papel</label><div class="s8-swatches">'+swatches.map(color=>'<button type="button" class="s8-swatch" data-s8="presetColor" data-color="'+color+'" style="--swatch:'+color+'" aria-label="Cor '+color+'"></button>').join("")+'<input type="color" name="color" id="s8-note-color" aria-label="Escolher qualquer cor" value="'+noteColor(n||{priority:"medium"})+'"></div><label class="checkline"><input type="checkbox" name="autoColor" '+(!safeColor(n?.color)?"checked":"")+'> Cor automática</label><label class="checkline"><input type="checkbox" name="pinned" '+(n?.pinned?"checked":"")+'> Fixar este lembrete no topo</label></div>'+
  '<div class="field"><label>Ícone quando vinculado</label><select name="icon">'+Object.entries(icons).map(([key,value])=>'<option value="'+key+'" '+((n?.icon||"pin")===key?"selected":"")+'>'+E(value)+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Onde este lembrete deve aparecer?</label><select name="linkScope" id="s8-link-scope">'+Object.entries(scopeLabel).filter(([k])=>k!=="legacy").map(([k,v])=>'<option value="'+k+'" '+((preselected? (preselected.scope===k) : initialScope(n)===k)?"selected":"")+'>'+E(v)+'</option>').join("")+(initialScope(n)==="legacy"?'<option value="legacy" selected>Vínculo anterior</option>':"")+'</select></div>'+
  '<div class="field" id="s8-target-wrap" '+(scope==="none"?"hidden":"")+'><label id="s8-target-label">Escolher vínculo</label>'+
@@ -610,7 +618,7 @@ function edit(idValue,preselected){
 function saveNote(data,attachments){
  const title=String(data.get("title")||"").trim().slice(0,140);
  const description=String(data.get("description")||"").trim().slice(0,1200);
- const priority=String(data.get("priority")||"medium");
+ const priority=notePriority(data.get("priority"));
  const icon=String(data.get("icon")||"pin"),scope=String(data.get("linkScope")||"");
  const link=parseTarget(scope==="none"?"none":data.get("target"));
  if(scope&&scope!=="legacy"&&scope!=="none"&&!link)throw Error("Escolha a atividade, matéria ou ciclo para vincular.");
@@ -626,7 +634,8 @@ function saveNote(data,attachments){
  const color=data.get("autoColor")?null:safeColor(data.get("color"))||existing?.color||null;
  const pinned=data.get("pinned")!==null;
  if(existing&&link?.scope==="next"&&existing.link?.scope==="next"&&link.id===existing.link.id&&link.cycleId===existing.link.cycleId){
-  link.boundSessionId=existing.link.boundSessionId;
+  const old=existing.link,bound=S3?.model?.sessions?.find(x=>x.id===old.boundSessionId);
+  if(old.bindingVersion===2&&bound&&!bound.archived&&(bound.status==="progress"||bound.id===root.timing?.active?.sessionId)){link.boundSessionId=old.boundSessionId;link.bindingVersion=2;}
  }
  if(existing)Object.assign(existing,{title,description,priority,icon,link,color,pinned,images:images.slice(),lastLinkLabel:link?null:existing.lastLinkLabel,updatedAt:new Date().toISOString()});
  else notes.push({id:id(),title,description,priority,icon,link,color,pinned,images:images.slice(),createdAt:new Date().toISOString()});
@@ -666,7 +675,7 @@ function convert(idValue){
  '<div class="field"><label>Transformar em</label><select name="type"><option value="task">Tarefa secundária</option><option value="focus">Foco do dia</option></select></div>'+
  '<div class="field"><label>Atividade</label><input name="title" required maxlength="140" value="'+A(n.title)+'"></div>'+
  '<div class="field"><label>Data</label><input type="date" name="date" required min="'+A(C.state.firstAccess)+'" value="'+A(date)+'"></div>'+
- '<div class="field"><label>Prioridade (para tarefas secundárias)</label><select name="priority">'+Object.entries(labels).map(([k,v])=>'<option value="'+k+'" '+(n.priority===k?"selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
+ '<div class="field"><label>Prioridade (para tarefas secundárias)</label><select name="priority">'+Object.entries(labels).map(([k,v])=>'<option value="'+k+'" '+((important(n)?"high":"medium")===k?"selected":"")+'>'+v+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Objetivo relacionado (opcional)</label><select name="goalId"><option value="">Sem objetivo</option>'+ (root.goals||[]).filter(g=>!g.archived).map(g=>'<option value="'+A(g.id)+'">'+E(g.title)+'</option>').join("")+'</select></div>'+
  '<div class="field"><label>Horário (opcional)</label><input type="time" name="startTime"></div>'+
  '<div class="field"><label>Duração estimada em minutos (opcional)</label><input type="number" name="estimatedMin" min="1" max="1440"></div>'+
@@ -712,10 +721,10 @@ document.addEventListener("click",ev=>{
   else if(action==="settings")settingsMenu();
   else if(action==="noteMenu")noteMenu(b.dataset.id,b);
   else if(action==="observation")toggleObservation(b.dataset.id);
-  else if(action==="quickColor"||action==="quickPriority")quickNoteOptions(b.dataset.id,action);
+  else if(action==="quickColor")quickNoteOptions(b.dataset.id,action);
   else if(action==="quickPreset")selectColor(b.dataset.id,b.dataset.color);
   else if(action==="autoNoteColor"){const n=note(b.dataset.id);if(n){n.color=null;C.save();redraw();}}
-  else if(action==="setPriority"){const n=note(b.dataset.id);if(n&&Object.hasOwn(labels,b.dataset.value)){n.priority=b.dataset.value;C.save();redraw();}}
+  else if(action==="toggleImportant"){const n=note(b.dataset.id);if(n){n.priority=important(n)?"low":"high";C.save();redraw();}}
   else if(action==="resetOrder")resetOrder();
   else if(action==="selectAllContext"||action==="clearSelection"||action==="invertSelection"||action==="exitSelection")selectionAction(action);
   else if(action==="resetAppearance")resetAppearance();
@@ -763,7 +772,7 @@ document.addEventListener("change",event=>{
  if(t?.id==="s8-keep-open"){ui.keepOpen=!!t.checked;C.save();return;}
  if(t?.id==="s8-bulk-color"){const mode=$("s8-bulk-color-mode");if(mode)mode.value="custom";return;}
  if(t?.dataset?.s8Color){selectColor(t.dataset.s8Color,t.value);return;}
- if(t?.id==="s8-filter"){ui.filter=["all","pinned","high","medium","low"].includes(t.value)?t.value:"all";C.save();redraw();return;}
+ if(t?.id==="s8-filter"){ui.filter=normalizeFilter(t.value);C.save();redraw();return;}
  if(t?.id==="s8-note-color"){const auto=t.closest("form")?.querySelector('[name="autoColor"]');if(auto)auto.checked=false;}
  if(event.target?.id==="s8-link-scope")updateTargetSelect(event.target.value);
  if(event.target?.id==="s8-future-date")updateTargetSelect($("s8-link-scope")?.value||"future");
@@ -790,7 +799,7 @@ document.addEventListener("pointermove",ev=>{
  d.moved=true;ev.preventDefault();d.card.classList.add("s8-dragging");
  const target=document.elementFromPoint?.(ev.clientX,ev.clientY)?.closest?.("[data-s8-card]");
  d.target?.classList.remove("s8-drop-before","s8-drop-after");d.target=null;
- if(target&&target!==d.card&&!note(target.dataset.s8Card)?.pinned){const r=target.getBoundingClientRect();d.target=target;d.after=ev.clientY>r.top+r.height/2;target.classList.add(d.after?"s8-drop-after":"s8-drop-before");}
+ if(target&&target!==d.card&&!note(target.dataset.s8Card)?.pinned&&important(note(target.dataset.s8Card))===important(note(d.id))){const r=target.getBoundingClientRect();d.target=target;d.after=ev.clientY>r.top+r.height/2;target.classList.add(d.after?"s8-drop-after":"s8-drop-before");}
 },{passive:false});
 function endCardDrag(ev){
  if(!cardDrag||cardDrag.pointer!==ev.pointerId)return;
